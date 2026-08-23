@@ -1,0 +1,21 @@
+# IntelliJ IDEA 로컬 설정
+.idea/
+*.iml
+
+# 운영체제 및 편집기 임시 파일
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+
+# 비밀정보 및 로컬 환경 설정
+.env
+.env.*
+!.env.example
+
+# 일반적인 빌드 산출물
+build/
+out/
+target/
+.gradle/
+

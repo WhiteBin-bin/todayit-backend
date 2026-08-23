@@ -14,7 +14,6 @@ on:
   pull_request_target:
     branches:
       - main
-      - develop
     types:
       - opened
       - reopened
@@ -24,7 +23,6 @@ on:
   push:
     branches:
       - main
-      - develop
 
 permissions:
   contents: read

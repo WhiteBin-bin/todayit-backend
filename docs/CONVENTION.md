@@ -2,6 +2,8 @@
 
 프로젝트의 변경 이력을 일관된 형태로 관리하기 위한 Commit, Branch, Pull Request 규칙입니다.
 
+이 문서는 협업 Convention의 단일 원본입니다. 현재 기본 브랜치는 `main`이며 별도 승인 없이 `develop`을 전제로 하지 않습니다.
+
 ## Commit Convention
 
 ### Commit Message Format

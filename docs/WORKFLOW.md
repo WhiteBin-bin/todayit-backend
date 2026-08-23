@@ -13,7 +13,7 @@ upstream 등록
    ↓
 Issue 생성
    ↓
-develop 최신화
+main 최신화
    ↓
 작업 Branch 생성
    ↓
@@ -27,7 +27,7 @@ Review / Test
    ↓
 Merge
    ↓
-Fork Repository develop 최신화
+Fork Repository main 최신화
 ```
 
 ## 1. Repository Fork 및 Clone
@@ -95,43 +95,43 @@ upstream  → today-it/backend
 * 세부 작업 목록
 * 완료 조건
 
-## 4. develop 최신화
+## 4. main 최신화
 
-새로운 작업을 시작하기 전에 원본 Repository의 최신 `develop`을 자신의 Fork Repository에 반영합니다.
+새로운 작업을 시작하기 전에 원본 Repository의 최신 `main`을 자신의 Fork Repository에 반영합니다.
 
 ```bash
-git checkout develop
+git checkout main
 git fetch upstream
-git reset --hard upstream/develop
-git push origin develop --force-with-lease
+git merge --ff-only upstream/main
+git push origin main
 ```
 
 각 Remote의 역할은 다음과 같습니다.
 
 ```text
-upstream/develop
+upstream/main
         ↓
-local develop
+local main
         ↓
-origin/develop
+origin/main
 ```
 
-즉, 원본 Repository의 `develop`을 기준으로 로컬과 자신의 Fork Repository를 동일한 상태로 맞춥니다.
+즉, 원본 Repository의 `main`을 기준으로 로컬과 자신의 Fork Repository를 동일한 상태로 맞춥니다.
 
-> `git reset --hard`는 로컬의 커밋되지 않은 변경 사항을 삭제하므로 실행 전에 작업 중인 변경 사항이 없는지 확인합니다.
+> `git merge --ff-only`은 로컬 `main`과 `upstream/main`이 분기된 경우 중단됩니다. 이때 강제로 초기화하지 말고 `git status`와 Commit 이력을 먼저 확인합니다.
 
 ## 5. 작업 Branch 생성
 
-최신화된 `develop`을 기준으로 작업 브랜치를 생성합니다.
+최신화된 `main`을 기준으로 작업 브랜치를 생성합니다.
 
 ```bash
-git checkout develop
+git checkout main
 git checkout -b feature/12-profile-update
 ```
 
 브랜치 이름은 [Convention](CONVENTION.md)의 Branch Convention을 따릅니다.
 
-작업은 반드시 별도의 작업 브랜치에서 진행하며 `develop`에서 직접 개발하지 않습니다.
+작업은 반드시 별도의 작업 브랜치에서 진행하며 `main`에서 직접 개발하지 않습니다.
 
 ## 6. 개발 및 Commit
 
@@ -168,7 +168,7 @@ feature/12-profile-update
 
 ## 8. Pull Request 생성
 
-Fork Repository에 작업 브랜치를 Push한 후 원본 Repository의 `develop`을 대상으로 Pull Request를 생성합니다.
+Fork Repository에 작업 브랜치를 Push한 후 원본 Repository의 `main`을 대상으로 Pull Request를 생성합니다.
 
 PR 방향은 다음과 같습니다.
 
@@ -179,13 +179,13 @@ feature/12-profile-update
 Pull Request
         ↓
 today-it/backend
-develop
+main
 ```
 
 Pull Request 생성 시 다음 내용을 확인합니다.
 
 * Base Repository: `today-it/backend`
-* Base Branch: `develop`
+* Base Branch: `main`
 * Head Repository: 자신의 Fork Repository
 * Compare Branch: 자신의 작업 브랜치
 * PR Template 작성
@@ -212,17 +212,17 @@ git push origin feature/12-profile-update
 
 동일한 Branch에 Push하면 기존 Pull Request에 변경 사항이 자동으로 반영됩니다.
 
-## 10. Merge 후 develop 최신화
+## 10. Merge 후 main 최신화
 
-Pull Request가 Merge되면 원본 Repository의 `develop`에 새로운 변경 사항이 생깁니다.
+Pull Request가 Merge되면 원본 Repository의 `main`에 새로운 변경 사항이 생깁니다.
 
-다음 작업을 시작하기 전에 자신의 로컬 `develop`과 Fork Repository의 `develop`을 원본 Repository와 다시 동일하게 맞춥니다.
+다음 작업을 시작하기 전에 자신의 로컬 `main`과 Fork Repository의 `main`을 원본 Repository와 다시 동일하게 맞춥니다.
 
 ```bash
-git checkout develop
+git checkout main
 git fetch upstream
-git reset --hard upstream/develop
-git push origin develop --force-with-lease
+git merge --ff-only upstream/main
+git push origin main
 ```
 
 이 과정을 기억하면 됩니다.
@@ -232,18 +232,18 @@ upstream이 있으면
 
 fetch
   ↓
-reset
+merge --ff-only
   ↓
-force-with-lease
+push
 ```
 
-즉, PR이 Merge된 이후에는 다음 명령어를 기준으로 `develop`을 최신 상태로 유지합니다.
+즉, PR이 Merge된 이후에는 다음 명령어를 기준으로 `main`을 최신 상태로 유지합니다.
 
 ```bash
-git checkout develop
+git checkout main
 git fetch upstream
-git reset --hard upstream/develop
-git push origin develop --force-with-lease
+git merge --ff-only upstream/main
+git push origin main
 ```
 
 ## Fork 후 Clone만 한 경우
@@ -265,21 +265,21 @@ git remote add upstream https://github.com/today-it/backend.git
 이후 PR Merge 후에는 동일하게 다음 명령어를 사용합니다.
 
 ```bash
-git checkout develop
+git checkout main
 git fetch upstream
-git reset --hard upstream/develop
-git push origin develop --force-with-lease
+git merge --ff-only upstream/main
+git push origin main
 ```
 
 ## 핵심 명령어
 
-Fork Repository를 사용하면서 원본 Repository의 `develop`과 동기화할 때는 다음 네 줄을 기본으로 사용합니다.
+Fork Repository를 사용하면서 원본 Repository의 `main`과 동기화할 때는 다음 네 줄을 기본으로 사용합니다.
 
 ```bash
-git checkout develop
+git checkout main
 git fetch upstream
-git reset --hard upstream/develop
-git push origin develop --force-with-lease
+git merge --ff-only upstream/main
+git push origin main
 ```
 
 ```text
@@ -287,7 +287,7 @@ upstream 확인
    ↓
 fetch
    ↓
-reset --hard
+merge --ff-only
    ↓
-force-with-lease
+push
 ```
