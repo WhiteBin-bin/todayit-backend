@@ -1,0 +1,10 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'External API data integration'
+
+dependencies {
+    implementation project(':domains:recommendation')
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+}

@@ -1,0 +1,9 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'Recommendation domain'
+
+dependencies {
+    implementation 'org.drools:drools-ruleunits-engine:10.2.0'
+}

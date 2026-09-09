@@ -206,7 +206,7 @@ Merge 전에 다음 사항을 확인합니다.
 
 ```bash
 git add .
-git commit -m "🐛 Fix: 리뷰 내용 반영"
+git commit -m "🐛 Bug: 리뷰 내용 반영"
 git push origin feature/12-profile-update
 ```
 

@@ -2,16 +2,23 @@
 
 이 디렉터리는 Agent 전용 행동 지침만 관리합니다. 사람과 Agent가 함께 사용하는 코드 규칙의 단일 원본은 [docs/code-rules/README.md](../../docs/code-rules/README.md)입니다.
 
+## 적용 범위
+
+- 이 저장소에는 Cycle, Task 원장과 제품 설계 Workflow를 사용하지 않습니다.
+- Git 협업은 [Convention](../../docs/CONVENTION.md)과 [Workflow](../../docs/WORKFLOW.md)를 따릅니다.
+- 하위 경로에 `AGENTS.md`가 있으면 해당 경로에서는 더 가까운 규칙을 우선합니다.
+
 ## 필수 읽기 순서
 
 1. [코드 규칙](../../docs/code-rules/README.md)
-2. 작업 대상의 관련 세부 규칙
-3. [명세 원본 규칙](../../docs/code-rules/specification.md)
-4. 수정할 코드와 테스트
+2. [명세 원본 규칙](../../docs/code-rules/specification.md)
+3. 수정할 코드와 테스트
 
 ## Agent 행동 규칙
 
 - 코드 변경 전에 Git 변경과 현재 브랜치를 확인합니다.
+- 기술 스택과 기존 코드 구조를 확인하고 관련 코드·테스트를 읽은 뒤 최소 범위로 변경합니다.
+- 결정되지 않은 프레임워크·라이브러리·코드 스타일을 임의로 도입하지 않습니다.
 - 구현 대상의 요구사항 ID, 기능 ID, API ID와 결정상태를 확인합니다.
 - `APPROVED`가 아닌 명세를 임의로 구현하지 않습니다.
 - 명세와 코드가 충돌하면 임의로 맞추지 않고 충돌 내용을 먼저 알립니다.
@@ -27,4 +34,3 @@
 3. `docs/code-rules/`의 공통 코드 규칙
 4. 기존 코드와 프로젝트 설정에서 일관되게 사용되는 규칙
 5. `docs/`의 Git 협업 문서
-

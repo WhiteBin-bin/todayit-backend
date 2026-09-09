@@ -1,97 +1,84 @@
 plugins {
-    id 'java'
-    id 'checkstyle'
-    id 'org.springframework.boot' version '4.1.1'
-    id 'io.spring.dependency-management' version '1.1.7'
-    id 'com.diffplug.spotless' version '8.10.0'
+    id 'base'
+    id 'org.springframework.boot' version '4.1.1' apply false
+    id 'io.spring.dependency-management' version '1.1.7' apply false
+    id 'com.diffplug.spotless' version '8.10.0' apply false
 }
 
-group = 'com.todayit'
-version = '0.0.1-SNAPSHOT'
-description = 'today-it backend'
+allprojects {
+    group = 'com.todayit'
+    version = '0.0.1-SNAPSHOT'
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+    repositories {
+        mavenCentral()
     }
 }
 
-repositories {
-    mavenCentral()
-}
+def moduleProjects = [
+    project(':apps:api'),
+    project(':apps:data-worker'),
+    project(':domains:recommendation'),
+    project(':integrations:external-data')
+]
 
-dependencies {
-    // Spring Boot / Web
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+configure(moduleProjects) {
+    apply plugin: 'java'
+    apply plugin: 'checkstyle'
+    apply plugin: 'io.spring.dependency-management'
+    apply plugin: 'com.diffplug.spotless'
 
-    // Observability
-    implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
-
-    // Spring Security / JWT
-    implementation 'org.springframework.boot:spring-boot-starter-security'
-    implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
-    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
-    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
-
-    // Spring Batch
-    implementation 'org.springframework.boot:spring-boot-starter-batch'
-
-    // Database / JPA / Flyway
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-flyway'
-    runtimeOnly 'org.postgresql:postgresql'
-    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
-
-    // Redis
-    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-
-    // Spring AI
-    implementation platform('org.springframework.ai:spring-ai-bom:2.0.0')
-    implementation 'org.springframework.ai:spring-ai-model'
-
-    // Drools
-    implementation 'org.drools:drools-ruleunits-engine:10.2.0'
-
-    // Test
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-batch-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
-    testImplementation 'com.tngtech.archunit:archunit-junit5:1.5.0'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-}
-
-tasks.named('test') {
-    useJUnitPlatform()
-}
-
-spotless {
     java {
-        target 'src/**/*.java'
-        googleJavaFormat()
-        removeUnusedImports()
-        trimTrailingWhitespace()
-        endWithNewline()
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
     }
-}
 
-checkstyle {
-    toolVersion = '14.0.0'
-    maxWarnings = 0
-}
-
-tasks.withType(Checkstyle).configureEach {
-    javaLauncher = javaToolchains.launcherFor {
-        languageVersion = JavaLanguageVersion.of(21)
+    dependencyManagement {
+        imports {
+            mavenBom 'org.springframework.boot:spring-boot-dependencies:4.1.1'
+        }
     }
-    reports {
-        xml.required = true
-        html.required = true
+
+    dependencies {
+        testImplementation 'org.junit.jupiter:junit-jupiter'
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    }
+
+    tasks.named('test') {
+        useJUnitPlatform()
+    }
+
+    spotless {
+        java {
+            target 'src/**/*.java'
+            googleJavaFormat()
+            removeUnusedImports()
+            trimTrailingWhitespace()
+            endWithNewline()
+        }
+    }
+
+    checkstyle {
+        toolVersion = '14.0.0'
+        maxWarnings = 0
+        configDirectory = rootProject.layout.projectDirectory.dir('config/checkstyle')
+    }
+
+    tasks.withType(Checkstyle).configureEach {
+        javaLauncher = javaToolchains.launcherFor {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+        reports {
+            xml.required = true
+            html.required = true
+        }
+    }
+
+    tasks.named('check') {
+        dependsOn tasks.named('spotlessCheck')
     }
 }
 
 tasks.named('check') {
-    dependsOn tasks.named('spotlessCheck')
+    dependsOn moduleProjects.collect { it.tasks.named('check') }
 }
