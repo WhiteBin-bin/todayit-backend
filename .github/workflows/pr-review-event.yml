@@ -17,7 +17,9 @@ jobs:
     name: PR 리뷰 이벤트 저장
     runs-on: ubuntu-latest
 
-    if: github.event.pull_request.base.ref == 'main'
+    if: |
+      github.event.pull_request.base.ref == 'main' ||
+      github.event.pull_request.base.ref == 'develop'
 
     steps:
       - name: 리뷰 이벤트 저장
