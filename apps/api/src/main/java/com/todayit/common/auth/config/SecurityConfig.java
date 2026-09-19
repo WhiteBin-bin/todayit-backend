@@ -1,7 +1,9 @@
 package com.todayit.common.auth.config;
 
+import com.todayit.common.auth.filter.JwtAuthenticationFilter;
 import com.todayit.common.auth.handler.RestAccessDeniedHandler;
 import com.todayit.common.auth.handler.RestAuthenticationEntryPoint;
+import com.todayit.common.auth.jwt.JwtProperties;
 import java.util.List;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -9,14 +11,17 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /** Spring Security 공통 설정 SecurityFilterChain -> 인증 방식, 세션 정책, 인증 인가 실패 처리, API 접근 정책 설정됨 */
 @Configuration
-@EnableConfigurationProperties(CorsProperties.class)
+@EnableConfigurationProperties({CorsProperties.class, JwtProperties.class})
 public class SecurityConfig {
 
   private final RestAuthenticationEntryPoint authenticationEntryPoint;
@@ -71,12 +76,16 @@ public class SecurityConfig {
    *
    * @param http Spring Security HTTP 설정
    * @param corsConfigurationSource CORS 설정
+   * @param jwtAuthenticationFilter Access Token 인증 필터
    * @return SecurityFilterChain
    * @throws Exception SecurityFilterChain 구성 실패 시
    */
   @Bean
   public SecurityFilterChain securityFilterChain(
-      HttpSecurity http, CorsConfigurationSource corsConfigurationSource) throws Exception {
+      HttpSecurity http,
+      CorsConfigurationSource corsConfigurationSource,
+      JwtAuthenticationFilter jwtAuthenticationFilter)
+      throws Exception {
     return http
         // Cross-Origin 요청 처리
         .cors(cors -> cors.configurationSource(corsConfigurationSource))
@@ -107,6 +116,19 @@ public class SecurityConfig {
                 exception
                     .authenticationEntryPoint(authenticationEntryPoint)
                     .accessDeniedHandler(accessDeniedHandler))
+
+        // Controller 전에 JWT 인증 처리
+        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
         .build();
+  }
+
+  /**
+   * 로컬 로그인 비밀번호 암호화, 검증에 사용할 PasswordEncoder
+   *
+   * @return BCrypt 기반 PasswordEncoder
+   */
+  @Bean
+  public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
   }
 }
