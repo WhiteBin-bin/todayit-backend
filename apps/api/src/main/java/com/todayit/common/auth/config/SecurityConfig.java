@@ -105,6 +105,12 @@ public class SecurityConfig {
                     // 로그인, 회원가입 -> 인증 안 된 사용자가 호출해야함
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/signup")
                     .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/places")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/places/*/location")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/places/*/images")
+                    .permitAll()
 
                     // 위에를 제외한 모든 요청은 인증된 사용자만 접근 가능하도록 설정
                     .anyRequest()

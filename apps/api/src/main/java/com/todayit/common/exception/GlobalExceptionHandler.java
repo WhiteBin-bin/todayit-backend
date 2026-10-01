@@ -34,6 +34,7 @@ public class GlobalExceptionHandler {
     return switch (status) {
       case BAD_REQUEST -> HttpStatus.BAD_REQUEST;
       case UNAUTHORIZED -> HttpStatus.UNAUTHORIZED;
+      case NOT_FOUND -> HttpStatus.NOT_FOUND;
     };
   }
 }
