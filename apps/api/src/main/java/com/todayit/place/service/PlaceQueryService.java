@@ -5,14 +5,12 @@ import com.todayit.place.entity.Place;
 import com.todayit.place.entity.PlaceImage;
 import com.todayit.place.exception.PlaceNotFoundException;
 import com.todayit.place.repository.PlaceImageRepository;
-import com.todayit.place.repository.PlaceMemberLikeRepository;
 import com.todayit.place.repository.PlaceRepository;
 import com.todayit.place.repository.PlaceScrapRepository;
 import com.todayit.place.service.model.PlaceImageResult;
-import com.todayit.place.service.model.PlaceLikeResult;
 import com.todayit.place.service.model.PlaceLocationResult;
 import com.todayit.place.service.model.PlaceResult;
-import com.todayit.place.service.model.PlaceScrapResult;
+import com.todayit.place.service.model.PlaceScrapSort;
 import com.todayit.place.service.model.PlaceSort;
 import java.util.List;
 import java.util.Map;
@@ -23,31 +21,27 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 장소 관련 업무를 처리하는 Service입니다. */
+/** 장소 조회 업무를 처리하는 Query Service입니다. */
 @Service
-public class PlaceService {
+public class PlaceQueryService implements PlaceScrapQueryService {
 
   private final PlaceRepository placeRepository;
   private final PlaceImageRepository placeImageRepository;
-  private final PlaceMemberLikeRepository placeMemberLikeRepository;
   private final PlaceScrapRepository placeScrapRepository;
 
   /**
-   * 장소 정보를 조회하고 저장할 Repository를 받습니다.
+   * 장소 조회에 필요한 Repository를 받습니다.
    *
    * @param placeRepository 장소 Repository
    * @param placeImageRepository 장소 이미지 Repository
-   * @param placeMemberLikeRepository 장소 좋아요 Repository
    * @param placeScrapRepository 장소 스크랩 Repository
    */
-  public PlaceService(
+  public PlaceQueryService(
       PlaceRepository placeRepository,
       PlaceImageRepository placeImageRepository,
-      PlaceMemberLikeRepository placeMemberLikeRepository,
       PlaceScrapRepository placeScrapRepository) {
     this.placeRepository = placeRepository;
     this.placeImageRepository = placeImageRepository;
-    this.placeMemberLikeRepository = placeMemberLikeRepository;
     this.placeScrapRepository = placeScrapRepository;
   }
 
@@ -68,6 +62,81 @@ public class PlaceService {
 
     Page<Place> placePage =
         placeRepository.findByIsActiveTrueAndIsDeletedFalse(PageRequest.of(page, size, order));
+    List<Place> places = placePage.getContent();
+    Map<Integer, List<String>> imageUrlsByPlaceId = findImageUrlsByPlaceId(places);
+    List<PlaceResult> content =
+        places.stream().map(place -> toResult(place, imageUrlsByPlaceId)).toList();
+
+    return new PageResult<>(
+        content, placePage.getNumber(), placePage.getSize(), placePage.getTotalElements());
+  }
+
+  /**
+   * 활성화되고 삭제되지 않은 장소의 지도 정보를 조회합니다.
+   *
+   * @param placeId 장소 식별자
+   * @return 장소 식별자, 좌표와 주소
+   * @throws PlaceNotFoundException 장소가 없거나 비활성·삭제 상태일 때
+   */
+  @Transactional(readOnly = true)
+  public PlaceLocationResult findPlaceLocation(int placeId) {
+    Place place =
+        placeRepository
+            .findByPlaceIdAndIsActiveTrueAndIsDeletedFalse(placeId)
+            .orElseThrow(PlaceNotFoundException::new);
+
+    return PlaceLocationResult.from(place.getSnapshot());
+  }
+
+  /**
+   * 활성화되고 삭제되지 않은 장소의 사진을 최신 등록순으로 페이지 단위 조회합니다.
+   *
+   * @param placeId 장소 식별자
+   * @param page 페이지 번호
+   * @param size 페이지 크기
+   * @return 장소 사진 목록과 페이지 정보
+   * @throws PlaceNotFoundException 장소가 없거나 비활성·삭제 상태일 때
+   */
+  @Transactional(readOnly = true)
+  public PageResult<PlaceImageResult> findPlaceImages(int placeId, int page, int size) {
+    placeRepository
+        .findByPlaceIdAndIsActiveTrueAndIsDeletedFalse(placeId)
+        .orElseThrow(PlaceNotFoundException::new);
+
+    Page<PlaceImage> imagePage =
+        placeImageRepository.findByPlacePlaceId(
+            placeId,
+            PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("placeImageId"))));
+
+    return new PageResult<>(
+        imagePage.getContent().stream()
+            .map(image -> new PlaceImageResult(image.getPlaceImageId(), image.getImageUrl()))
+            .toList(),
+        imagePage.getNumber(),
+        imagePage.getSize(),
+        imagePage.getTotalElements());
+  }
+
+  /**
+   * 회원이 활성 상태로 스크랩한 장소를 페이지 단위로 조회합니다.
+   *
+   * @param memberId 회원 식별자
+   * @param page 페이지 번호
+   * @param size 페이지 크기
+   * @param sort 스크랩 장소 정렬 기준
+   * @return 스크랩 장소 페이지
+   */
+  @Transactional(readOnly = true)
+  @Override
+  public PageResult<PlaceResult> findScrappedPlaces(
+      String memberId, int page, int size, PlaceScrapSort sort) {
+    Page<Place> placePage =
+        sort == PlaceScrapSort.OLDEST
+            ? placeScrapRepository.findScrappedPlacesOldest(memberId, PageRequest.of(page, size))
+            : placeScrapRepository.findScrappedPlacesLatest(memberId, PageRequest.of(page, size));
     List<Place> places = placePage.getContent();
     Map<Integer, List<String>> imageUrlsByPlaceId = findImageUrlsByPlaceId(places);
     List<PlaceResult> content =
@@ -103,119 +172,10 @@ public class PlaceService {
    *
    * @param place 변환할 장소
    * @param imageUrlsByPlaceId 장소 식별자별 이미지 URL 목록
-   * @return 장소 서비스 결과
+   * @return 장소 조회 결과
    */
   private PlaceResult toResult(Place place, Map<Integer, List<String>> imageUrlsByPlaceId) {
     return PlaceResult.from(
         place.getSnapshot(imageUrlsByPlaceId.getOrDefault(place.getPlaceId(), List.of())));
-  }
-
-  /**
-   * 활성화되고 삭제되지 않은 장소의 지도 정보를 조회합니다.
-   *
-   * @param placeId 장소 식별자
-   * @return 장소 식별자, 좌표와 주소
-   * @throws PlaceNotFoundException 장소가 없거나 비활성·삭제 상태일 때
-   */
-  @Transactional(readOnly = true)
-  public PlaceLocationResult findPlaceLocation(int placeId) {
-
-    Place place =
-        placeRepository
-            .findByPlaceIdAndIsActiveTrueAndIsDeletedFalse(placeId)
-            .orElseThrow(PlaceNotFoundException::new);
-    Place.PlaceSnapshot snapshot = place.getSnapshot();
-
-    return PlaceLocationResult.from(snapshot);
-  }
-
-  /**
-   * 활성화되고 삭제되지 않은 장소의 사진을 최신 등록순으로 페이지 단위 조회합니다.
-   *
-   * @param placeId 장소 식별자
-   * @param page 페이지 번호
-   * @param size 페이지 크기
-   * @return 장소 사진 목록과 페이지 정보
-   * @throws PlaceNotFoundException 장소가 없거나 비활성·삭제 상태일 때
-   */
-  @Transactional(readOnly = true)
-  public PageResult<PlaceImageResult> findPlaceImages(int placeId, int page, int size) {
-
-    placeRepository
-        .findByPlaceIdAndIsActiveTrueAndIsDeletedFalse(placeId)
-        .orElseThrow(PlaceNotFoundException::new);
-
-    Page<PlaceImage> imagePage =
-        placeImageRepository.findByPlacePlaceId(
-            placeId,
-            PageRequest.of(
-                page,
-                size,
-                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("placeImageId"))));
-
-    return new PageResult<>(
-        imagePage.getContent().stream()
-            .map(image -> new PlaceImageResult(image.getPlaceImageId(), image.getImageUrl()))
-            .toList(),
-        imagePage.getNumber(),
-        imagePage.getSize(),
-        imagePage.getTotalElements());
-  }
-
-  /**
-   * 회원의 장소 스크랩을 생성하고 장소의 활성 스크랩 수를 반환합니다.
-   *
-   * @param placeId 장소 식별자
-   * @param memberId 회원 식별자
-   * @return 장소 스크랩 결과
-   * @throws PlaceNotFoundException 장소가 없거나 비활성·삭제 상태일 때
-   */
-  @Transactional
-  public PlaceScrapResult scrapPlace(int placeId, String memberId) {
-    placeRepository
-        .findByPlaceIdAndIsActiveTrueAndIsDeletedFalse(placeId)
-        .orElseThrow(PlaceNotFoundException::new);
-
-    placeScrapRepository.upsertByMemberIdAndPlaceId(memberId, placeId);
-
-    return new PlaceScrapResult(placeId, true, placeScrapRepository.countActiveByPlaceId(placeId));
-  }
-
-  /**
-   * 회원의 장소 스크랩을 취소하고 장소의 활성 스크랩 수를 반환합니다.
-   *
-   * @param placeId 장소 식별자
-   * @param memberId 회원 식별자
-   * @return 장소 스크랩 결과
-   * @throws PlaceNotFoundException 장소가 없거나 비활성·삭제 상태일 때
-   */
-  @Transactional
-  public PlaceScrapResult cancelPlaceScrap(int placeId, String memberId) {
-    placeRepository
-        .findByPlaceIdAndIsActiveTrueAndIsDeletedFalse(placeId)
-        .orElseThrow(PlaceNotFoundException::new);
-
-    placeScrapRepository.cancelByMemberIdAndPlaceId(memberId, placeId);
-
-    return new PlaceScrapResult(placeId, false, placeScrapRepository.countActiveByPlaceId(placeId));
-  }
-
-  /**
-   * 회원의 장소 좋아요를 생성하고 장소의 좋아요 수를 반환합니다.
-   *
-   * @param placeId 장소 식별자
-   * @param memberId 회원 식별자
-   * @return 장소 좋아요 결과
-   * @throws PlaceNotFoundException 장소가 없거나 비활성·삭제 상태일 때
-   */
-  @Transactional
-  public PlaceLikeResult likePlace(int placeId, String memberId) {
-    placeRepository
-        .findByPlaceIdAndIsActiveTrueAndIsDeletedFalse(placeId)
-        .orElseThrow(PlaceNotFoundException::new);
-
-    placeMemberLikeRepository.insertIfAbsent(memberId, placeId);
-
-    return new PlaceLikeResult(placeId, true, placeMemberLikeRepository.countByPlaceId(placeId));
   }
 }

@@ -13,7 +13,8 @@ import com.todayit.common.exception.GlobalExceptionHandler;
 import com.todayit.common.pagination.PageResult;
 import com.todayit.place.entity.Category;
 import com.todayit.place.exception.PlaceNotFoundException;
-import com.todayit.place.service.PlaceService;
+import com.todayit.place.service.PlaceCommandService;
+import com.todayit.place.service.PlaceQueryService;
 import com.todayit.place.service.model.PlaceImageResult;
 import com.todayit.place.service.model.PlaceLikeResult;
 import com.todayit.place.service.model.PlaceLocationResult;
@@ -36,7 +37,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 @ExtendWith(MockitoExtension.class)
 class PlaceControllerTest {
 
-  @Mock private PlaceService placeService;
+  @Mock private PlaceQueryService placeQueryService;
+
+  @Mock private PlaceCommandService placeCommandService;
 
   private MockMvc mockMvc;
 
@@ -44,7 +47,7 @@ class PlaceControllerTest {
   @BeforeEach
   void setUp() {
     mockMvc =
-        MockMvcBuilders.standaloneSetup(new PlaceController(placeService))
+        MockMvcBuilders.standaloneSetup(new PlaceController(placeQueryService, placeCommandService))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
   }
@@ -68,7 +71,7 @@ class PlaceControllerTest {
             Category.RESTAURANT,
             10,
             List.of("https://placehold.co/1200x800?text=Restaurant"));
-    when(placeService.findPlaces(1, 5, PlaceSort.POPULAR))
+    when(placeQueryService.findPlaces(1, 5, PlaceSort.POPULAR))
         .thenReturn(new PageResult<>(List.of(place), 1, 5, 6));
 
     // When
@@ -85,10 +88,11 @@ class PlaceControllerTest {
                 .value("https://placehold.co/1200x800?text=Restaurant"))
         .andExpect(jsonPath("$.data.page").value(1))
         .andExpect(jsonPath("$.data.size").value(5))
-        .andExpect(jsonPath("$.data.totalElements").value(6));
+        .andExpect(jsonPath("$.data.totalElements").value(6))
+        .andExpect(jsonPath("$.data.totalPages").value(2));
 
     // Then
-    verify(placeService).findPlaces(1, 5, PlaceSort.POPULAR);
+    verify(placeQueryService).findPlaces(1, 5, PlaceSort.POPULAR);
   }
 
   /** 장소 사진 목록과 페이지 정보를 성공 응답으로 반환하는지 검증합니다. */
@@ -96,7 +100,7 @@ class PlaceControllerTest {
   @DisplayName("장소 사진 목록을 페이지 정보와 함께 반환한다")
   void returnsPagedPlaceImages() throws Exception {
     // Given
-    when(placeService.findPlaceImages(1, 0, 5))
+    when(placeQueryService.findPlaceImages(1, 0, 5))
         .thenReturn(
             new PageResult<>(
                 List.of(new PlaceImageResult(10, "https://example.com/place-image.jpg")), 0, 5, 1));
@@ -111,10 +115,11 @@ class PlaceControllerTest {
             jsonPath("$.data.content[0].imageUrl").value("https://example.com/place-image.jpg"))
         .andExpect(jsonPath("$.data.page").value(0))
         .andExpect(jsonPath("$.data.size").value(5))
-        .andExpect(jsonPath("$.data.totalElements").value(1));
+        .andExpect(jsonPath("$.data.totalElements").value(1))
+        .andExpect(jsonPath("$.data.totalPages").value(1));
 
     // Then
-    verify(placeService).findPlaceImages(1, 0, 5);
+    verify(placeQueryService).findPlaceImages(1, 0, 5);
   }
 
   /** 인증된 회원의 장소 스크랩 결과를 반환하는지 검증합니다. */
@@ -122,7 +127,8 @@ class PlaceControllerTest {
   @DisplayName("장소를 스크랩하고 스크랩 수를 반환한다")
   void scrapsPlace() throws Exception {
     // Given
-    when(placeService.scrapPlace(1, "member-1")).thenReturn(new PlaceScrapResult(1, true, 3));
+    when(placeCommandService.scrapPlace(1, "member-1"))
+        .thenReturn(new PlaceScrapResult(1, true, 3));
 
     // When
     mockMvc
@@ -136,7 +142,7 @@ class PlaceControllerTest {
         .andExpect(jsonPath("$.data.scrapCount").value(3));
 
     // Then
-    verify(placeService).scrapPlace(1, "member-1");
+    verify(placeCommandService).scrapPlace(1, "member-1");
   }
 
   /** 인증된 회원의 장소 좋아요 결과를 반환하는지 검증합니다. */
@@ -144,7 +150,7 @@ class PlaceControllerTest {
   @DisplayName("장소를 좋아요하고 좋아요 수를 반환한다")
   void likesPlace() throws Exception {
     // Given
-    when(placeService.likePlace(1, "member-1")).thenReturn(new PlaceLikeResult(1, true, 3));
+    when(placeCommandService.likePlace(1, "member-1")).thenReturn(new PlaceLikeResult(1, true, 3));
 
     // When
     mockMvc
@@ -158,7 +164,7 @@ class PlaceControllerTest {
         .andExpect(jsonPath("$.data.likeCount").value(3));
 
     // Then
-    verify(placeService).likePlace(1, "member-1");
+    verify(placeCommandService).likePlace(1, "member-1");
   }
 
   /** 인증된 회원의 장소 스크랩 취소 결과를 반환하는지 검증합니다. */
@@ -166,7 +172,7 @@ class PlaceControllerTest {
   @DisplayName("장소 스크랩을 취소하고 남은 스크랩 수를 반환한다")
   void cancelsPlaceScrap() throws Exception {
     // Given
-    when(placeService.cancelPlaceScrap(1, "member-1"))
+    when(placeCommandService.cancelPlaceScrap(1, "member-1"))
         .thenReturn(new PlaceScrapResult(1, false, 2));
 
     // When
@@ -181,7 +187,7 @@ class PlaceControllerTest {
         .andExpect(jsonPath("$.data.scrapCount").value(2));
 
     // Then
-    verify(placeService).cancelPlaceScrap(1, "member-1");
+    verify(placeCommandService).cancelPlaceScrap(1, "member-1");
   }
 
   /**
@@ -203,7 +209,7 @@ class PlaceControllerTest {
         .andExpect(jsonPath("$.code").value("INVALID_PAGINATION"));
 
     // Then
-    verifyNoInteractions(placeService);
+    verifyNoInteractions(placeQueryService, placeCommandService);
   }
 
   /**
@@ -226,7 +232,7 @@ class PlaceControllerTest {
         .andExpect(jsonPath("$.message").value("페이지 요청값이 올바르지 않습니다."));
 
     // Then
-    verifyNoInteractions(placeService);
+    verifyNoInteractions(placeQueryService, placeCommandService);
   }
 
   /**
@@ -238,7 +244,7 @@ class PlaceControllerTest {
   @DisplayName("장소 지도 정보를 반환한다")
   void returnsPlaceLocation() throws Exception {
     // Given
-    when(placeService.findPlaceLocation(1))
+    when(placeQueryService.findPlaceLocation(1))
         .thenReturn(
             new PlaceLocationResult(
                 1,
@@ -257,7 +263,7 @@ class PlaceControllerTest {
         .andExpect(jsonPath("$.data.address").value("서울특별시 종로구 종로 1"));
 
     // Then
-    verify(placeService).findPlaceLocation(1);
+    verify(placeQueryService).findPlaceLocation(1);
   }
 
   /**
@@ -269,7 +275,7 @@ class PlaceControllerTest {
   @DisplayName("존재하지 않는 장소의 지도 조회는 404 응답을 반환한다")
   void returnsNotFoundWhenPlaceLocationDoesNotExist() throws Exception {
     // Given
-    when(placeService.findPlaceLocation(999)).thenThrow(new PlaceNotFoundException());
+    when(placeQueryService.findPlaceLocation(999)).thenThrow(new PlaceNotFoundException());
 
     // When
     mockMvc
@@ -279,6 +285,6 @@ class PlaceControllerTest {
         .andExpect(jsonPath("$.code").value("PLACE_NOT_FOUND"));
 
     // Then
-    verify(placeService).findPlaceLocation(999);
+    verify(placeQueryService).findPlaceLocation(999);
   }
 }

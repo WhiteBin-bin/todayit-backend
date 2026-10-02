@@ -8,7 +8,8 @@ import com.todayit.place.dto.response.PlaceLikeResponse;
 import com.todayit.place.dto.response.PlaceLocationResponse;
 import com.todayit.place.dto.response.PlaceResponse;
 import com.todayit.place.dto.response.PlaceScrapResponse;
-import com.todayit.place.service.PlaceService;
+import com.todayit.place.service.PlaceCommandService;
+import com.todayit.place.service.PlaceQueryService;
 import com.todayit.place.service.model.PlaceSort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -28,15 +29,19 @@ public class PlaceController {
   private static final int DEFAULT_PAGE = 0;
   private static final int DEFAULT_SIZE = 20;
 
-  private final PlaceService placeService;
+  private final PlaceQueryService placeQueryService;
+  private final PlaceCommandService placeCommandService;
 
   /**
    * 장소 기능을 처리할 서비스를 받습니다.
    *
-   * @param placeService 장소 Service
+   * @param placeQueryService 장소 조회 Service
+   * @param placeCommandService 장소 변경 Service
    */
-  public PlaceController(PlaceService placeService) {
-    this.placeService = placeService;
+  public PlaceController(
+      PlaceQueryService placeQueryService, PlaceCommandService placeCommandService) {
+    this.placeQueryService = placeQueryService;
+    this.placeCommandService = placeCommandService;
   }
 
   /**
@@ -55,7 +60,8 @@ public class PlaceController {
     PaginationValidator.validate(page, size);
     return ResponseEntity.ok(
         ApiResponse.success(
-            PageResponse.from(placeService.findPlaces(page, size, sort), PlaceResponse::from)));
+            PageResponse.from(
+                placeQueryService.findPlaces(page, size, sort), PlaceResponse::from)));
   }
 
   /**
@@ -68,7 +74,8 @@ public class PlaceController {
   public ResponseEntity<ApiResponse<PlaceLocationResponse>> findPlaceLocation(
       @PathVariable int placeId) {
     return ResponseEntity.ok(
-        ApiResponse.success(PlaceLocationResponse.from(placeService.findPlaceLocation(placeId))));
+        ApiResponse.success(
+            PlaceLocationResponse.from(placeQueryService.findPlaceLocation(placeId))));
   }
 
   /**
@@ -88,7 +95,7 @@ public class PlaceController {
     return ResponseEntity.ok(
         ApiResponse.success(
             PageResponse.from(
-                placeService.findPlaceImages(placeId, page, size), PlaceImageResponse::from)));
+                placeQueryService.findPlaceImages(placeId, page, size), PlaceImageResponse::from)));
   }
 
   /**
@@ -103,7 +110,8 @@ public class PlaceController {
       @PathVariable int placeId, Authentication authentication) {
     return ResponseEntity.ok(
         ApiResponse.success(
-            PlaceScrapResponse.from(placeService.scrapPlace(placeId, authentication.getName()))));
+            PlaceScrapResponse.from(
+                placeCommandService.scrapPlace(placeId, authentication.getName()))));
   }
 
   /**
@@ -119,7 +127,7 @@ public class PlaceController {
     return ResponseEntity.ok(
         ApiResponse.success(
             PlaceScrapResponse.from(
-                placeService.cancelPlaceScrap(placeId, authentication.getName()))));
+                placeCommandService.cancelPlaceScrap(placeId, authentication.getName()))));
   }
 
   /**
@@ -134,6 +142,7 @@ public class PlaceController {
       @PathVariable int placeId, Authentication authentication) {
     return ResponseEntity.ok(
         ApiResponse.success(
-            PlaceLikeResponse.from(placeService.likePlace(placeId, authentication.getName()))));
+            PlaceLikeResponse.from(
+                placeCommandService.likePlace(placeId, authentication.getName()))));
   }
 }

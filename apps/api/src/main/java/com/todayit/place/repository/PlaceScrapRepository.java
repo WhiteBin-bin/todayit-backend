@@ -1,6 +1,9 @@
 package com.todayit.place.repository;
 
+import com.todayit.place.entity.Place;
 import com.todayit.place.entity.PlaceScrap;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -8,6 +11,52 @@ import org.springframework.data.repository.query.Param;
 
 /** 장소 스크랩 정보를 조회하고 저장하는 JPA Repository입니다. */
 public interface PlaceScrapRepository extends JpaRepository<PlaceScrap, Integer> {
+
+  /**
+   * 회원이 활성 상태로 스크랩한 장소를 오래된 순서로 조회합니다.
+   *
+   * @param memberId 회원 식별자
+   * @param pageable 페이지 정보
+   * @return 스크랩 장소 페이지
+   */
+  @Query(
+      value =
+          "select scrap.place from PlaceScrap scrap "
+              + "where scrap.memberId = :memberId "
+              + "and scrap.isDeleted = false "
+              + "and scrap.place.isActive = true "
+              + "and scrap.place.isDeleted = false "
+              + "order by scrap.createdAt asc, scrap.place.placeId asc",
+      countQuery =
+          "select count(scrap) from PlaceScrap scrap "
+              + "where scrap.memberId = :memberId "
+              + "and scrap.isDeleted = false "
+              + "and scrap.place.isActive = true "
+              + "and scrap.place.isDeleted = false")
+  Page<Place> findScrappedPlacesOldest(@Param("memberId") String memberId, Pageable pageable);
+
+  /**
+   * 회원이 활성 상태로 스크랩한 장소를 최신 순서로 조회합니다.
+   *
+   * @param memberId 회원 식별자
+   * @param pageable 페이지 정보
+   * @return 스크랩 장소 페이지
+   */
+  @Query(
+      value =
+          "select scrap.place from PlaceScrap scrap "
+              + "where scrap.memberId = :memberId "
+              + "and scrap.isDeleted = false "
+              + "and scrap.place.isActive = true "
+              + "and scrap.place.isDeleted = false "
+              + "order by scrap.createdAt desc, scrap.place.placeId desc",
+      countQuery =
+          "select count(scrap) from PlaceScrap scrap "
+              + "where scrap.memberId = :memberId "
+              + "and scrap.isDeleted = false "
+              + "and scrap.place.isActive = true "
+              + "and scrap.place.isDeleted = false")
+  Page<Place> findScrappedPlacesLatest(@Param("memberId") String memberId, Pageable pageable);
 
   /**
    * 회원의 장소 스크랩을 생성하거나 기존 스크랩을 활성화합니다.

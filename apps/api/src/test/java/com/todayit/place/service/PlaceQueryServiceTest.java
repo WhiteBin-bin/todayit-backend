@@ -11,7 +11,6 @@ import com.todayit.common.pagination.PageResult;
 import com.todayit.place.entity.Category;
 import com.todayit.place.entity.Place;
 import com.todayit.place.repository.PlaceImageRepository;
-import com.todayit.place.repository.PlaceMemberLikeRepository;
 import com.todayit.place.repository.PlaceRepository;
 import com.todayit.place.repository.PlaceScrapRepository;
 import com.todayit.place.service.model.PlaceLocationResult;
@@ -31,13 +30,11 @@ import org.springframework.data.domain.Sort;
 
 /** 장소 목록 조회 Service의 업무 결과를 검증합니다. */
 @ExtendWith(MockitoExtension.class)
-class PlaceServiceTest {
+class PlaceQueryServiceTest {
 
   @Mock private PlaceRepository placeRepository;
 
   @Mock private PlaceImageRepository placeImageRepository;
-
-  @Mock private PlaceMemberLikeRepository placeMemberLikeRepository;
 
   @Mock private PlaceScrapRepository placeScrapRepository;
 
@@ -66,12 +63,11 @@ class PlaceServiceTest {
                     pageable.equals(
                         PageRequest.of(1, 2, Sort.by(Sort.Direction.DESC, "viewCount"))))))
         .thenReturn(new PageImpl<>(List.of(place), PageRequest.of(1, 2), 3));
-    PlaceService placeService =
-        new PlaceService(
-            placeRepository, placeImageRepository, placeMemberLikeRepository, placeScrapRepository);
+    PlaceQueryService placeQueryService =
+        new PlaceQueryService(placeRepository, placeImageRepository, placeScrapRepository);
 
     // When
-    PageResult<PlaceResult> result = placeService.findPlaces(1, 2, PlaceSort.POPULAR);
+    PageResult<PlaceResult> result = placeQueryService.findPlaces(1, 2, PlaceSort.POPULAR);
 
     // Then
     assertThat(result.content())
@@ -112,12 +108,11 @@ class PlaceServiceTest {
                 List.of("https://placehold.co/1200x800?text=Restaurant")));
     when(placeRepository.findByPlaceIdAndIsActiveTrueAndIsDeletedFalse(1))
         .thenReturn(Optional.of(place));
-    PlaceService placeService =
-        new PlaceService(
-            placeRepository, placeImageRepository, placeMemberLikeRepository, placeScrapRepository);
+    PlaceQueryService placeQueryService =
+        new PlaceQueryService(placeRepository, placeImageRepository, placeScrapRepository);
 
     // When
-    PlaceLocationResult result = placeService.findPlaceLocation(1);
+    PlaceLocationResult result = placeQueryService.findPlaceLocation(1);
 
     // Then
     assertThat(result)
@@ -136,12 +131,11 @@ class PlaceServiceTest {
     // Given
     when(placeRepository.findByPlaceIdAndIsActiveTrueAndIsDeletedFalse(999))
         .thenReturn(Optional.empty());
-    PlaceService placeService =
-        new PlaceService(
-            placeRepository, placeImageRepository, placeMemberLikeRepository, placeScrapRepository);
+    PlaceQueryService placeQueryService =
+        new PlaceQueryService(placeRepository, placeImageRepository, placeScrapRepository);
 
     // When
-    var exception = assertThatThrownBy(() -> placeService.findPlaceLocation(999));
+    var exception = assertThatThrownBy(() -> placeQueryService.findPlaceLocation(999));
 
     // Then
     exception.isInstanceOf(com.todayit.place.exception.PlaceNotFoundException.class);
