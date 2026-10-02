@@ -122,6 +122,7 @@ public class PlaceController {
       @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size,
       @RequestParam(defaultValue = "LATEST") CourseSort sort) {
     PaginationValidator.validate(page, size);
+    placeQueryService.validatePlaceExists(placeId);
     return ResponseEntity.ok(
         ApiResponse.success(
             PageResponse.from(

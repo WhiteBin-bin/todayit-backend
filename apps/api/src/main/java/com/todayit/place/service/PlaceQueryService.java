@@ -89,6 +89,19 @@ public class PlaceQueryService implements PlaceScrapQueryService {
   }
 
   /**
+   * 코스 등 장소를 참조하는 기능에서 장소가 조회 가능한 상태인지 검증합니다.
+   *
+   * @param placeId 장소 식별자
+   * @throws PlaceNotFoundException 장소가 없거나 비활성·삭제 상태일 때
+   */
+  @Transactional(readOnly = true)
+  public void validatePlaceExists(int placeId) {
+    placeRepository
+        .findByPlaceIdAndIsActiveTrueAndIsDeletedFalse(placeId)
+        .orElseThrow(PlaceNotFoundException::new);
+  }
+
+  /**
    * 활성화되고 삭제되지 않은 장소의 사진을 최신 등록순으로 페이지 단위 조회합니다.
    *
    * @param placeId 장소 식별자
