@@ -5,9 +5,11 @@ import com.todayit.place.entity.Place;
 import com.todayit.place.entity.PlaceImage;
 import com.todayit.place.exception.PlaceNotFoundException;
 import com.todayit.place.repository.PlaceImageRepository;
+import com.todayit.place.repository.PlaceMemberLikeRepository;
 import com.todayit.place.repository.PlaceRepository;
 import com.todayit.place.repository.PlaceScrapRepository;
 import com.todayit.place.service.model.PlaceImageResult;
+import com.todayit.place.service.model.PlaceLikeResult;
 import com.todayit.place.service.model.PlaceLocationResult;
 import com.todayit.place.service.model.PlaceResult;
 import com.todayit.place.service.model.PlaceScrapResult;
@@ -27,6 +29,7 @@ public class PlaceService {
 
   private final PlaceRepository placeRepository;
   private final PlaceImageRepository placeImageRepository;
+  private final PlaceMemberLikeRepository placeMemberLikeRepository;
   private final PlaceScrapRepository placeScrapRepository;
 
   /**
@@ -34,14 +37,17 @@ public class PlaceService {
    *
    * @param placeRepository 장소 Repository
    * @param placeImageRepository 장소 이미지 Repository
+   * @param placeMemberLikeRepository 장소 좋아요 Repository
    * @param placeScrapRepository 장소 스크랩 Repository
    */
   public PlaceService(
       PlaceRepository placeRepository,
       PlaceImageRepository placeImageRepository,
+      PlaceMemberLikeRepository placeMemberLikeRepository,
       PlaceScrapRepository placeScrapRepository) {
     this.placeRepository = placeRepository;
     this.placeImageRepository = placeImageRepository;
+    this.placeMemberLikeRepository = placeMemberLikeRepository;
     this.placeScrapRepository = placeScrapRepository;
   }
 
@@ -195,9 +201,21 @@ public class PlaceService {
   }
 
   /**
-   * 장소 Entity를 목록 조회 결과로 변환합니다.
+   * 회원의 장소 좋아요를 생성하고 장소의 좋아요 수를 반환합니다.
    *
-   * @param place 장소 Entity
-   * @return 장소 조회 결과
+   * @param placeId 장소 식별자
+   * @param memberId 회원 식별자
+   * @return 장소 좋아요 결과
+   * @throws PlaceNotFoundException 장소가 없거나 비활성·삭제 상태일 때
    */
+  @Transactional
+  public PlaceLikeResult likePlace(int placeId, String memberId) {
+    placeRepository
+        .findByPlaceIdAndIsActiveTrueAndIsDeletedFalse(placeId)
+        .orElseThrow(PlaceNotFoundException::new);
+
+    placeMemberLikeRepository.insertIfAbsent(memberId, placeId);
+
+    return new PlaceLikeResult(placeId, true, placeMemberLikeRepository.countByPlaceId(placeId));
+  }
 }

@@ -15,6 +15,7 @@ import com.todayit.place.entity.Category;
 import com.todayit.place.exception.PlaceNotFoundException;
 import com.todayit.place.service.PlaceService;
 import com.todayit.place.service.model.PlaceImageResult;
+import com.todayit.place.service.model.PlaceLikeResult;
 import com.todayit.place.service.model.PlaceLocationResult;
 import com.todayit.place.service.model.PlaceResult;
 import com.todayit.place.service.model.PlaceScrapResult;
@@ -136,6 +137,28 @@ class PlaceControllerTest {
 
     // Then
     verify(placeService).scrapPlace(1, "member-1");
+  }
+
+  /** 인증된 회원의 장소 좋아요 결과를 반환하는지 검증합니다. */
+  @Test
+  @DisplayName("장소를 좋아요하고 좋아요 수를 반환한다")
+  void likesPlace() throws Exception {
+    // Given
+    when(placeService.likePlace(1, "member-1")).thenReturn(new PlaceLikeResult(1, true, 3));
+
+    // When
+    mockMvc
+        .perform(
+            post("/api/v1/places/1/like")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.placeId").value(1))
+        .andExpect(jsonPath("$.data.liked").value(true))
+        .andExpect(jsonPath("$.data.likeCount").value(3));
+
+    // Then
+    verify(placeService).likePlace(1, "member-1");
   }
 
   /** 인증된 회원의 장소 스크랩 취소 결과를 반환하는지 검증합니다. */

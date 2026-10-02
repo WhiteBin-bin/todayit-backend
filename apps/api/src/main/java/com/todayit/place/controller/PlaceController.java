@@ -4,6 +4,7 @@ import com.todayit.common.pagination.PageResponse;
 import com.todayit.common.pagination.PaginationValidator;
 import com.todayit.common.response.ApiResponse;
 import com.todayit.place.dto.response.PlaceImageResponse;
+import com.todayit.place.dto.response.PlaceLikeResponse;
 import com.todayit.place.dto.response.PlaceLocationResponse;
 import com.todayit.place.dto.response.PlaceResponse;
 import com.todayit.place.dto.response.PlaceScrapResponse;
@@ -119,5 +120,20 @@ public class PlaceController {
         ApiResponse.success(
             PlaceScrapResponse.from(
                 placeService.cancelPlaceScrap(placeId, authentication.getName()))));
+  }
+
+  /**
+   * 인증된 회원의 장소 좋아요를 생성합니다.
+   *
+   * @param placeId 장소 식별자
+   * @param authentication 인증된 회원 정보
+   * @return 장소 좋아요 결과
+   */
+  @PostMapping("/{placeId}/like")
+  public ResponseEntity<ApiResponse<PlaceLikeResponse>> likePlace(
+      @PathVariable int placeId, Authentication authentication) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            PlaceLikeResponse.from(placeService.likePlace(placeId, authentication.getName()))));
   }
 }

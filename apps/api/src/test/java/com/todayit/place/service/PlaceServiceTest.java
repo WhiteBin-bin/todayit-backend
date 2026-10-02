@@ -11,6 +11,7 @@ import com.todayit.common.pagination.PageResult;
 import com.todayit.place.entity.Category;
 import com.todayit.place.entity.Place;
 import com.todayit.place.repository.PlaceImageRepository;
+import com.todayit.place.repository.PlaceMemberLikeRepository;
 import com.todayit.place.repository.PlaceRepository;
 import com.todayit.place.repository.PlaceScrapRepository;
 import com.todayit.place.service.model.PlaceLocationResult;
@@ -35,6 +36,8 @@ class PlaceServiceTest {
   @Mock private PlaceRepository placeRepository;
 
   @Mock private PlaceImageRepository placeImageRepository;
+
+  @Mock private PlaceMemberLikeRepository placeMemberLikeRepository;
 
   @Mock private PlaceScrapRepository placeScrapRepository;
 
@@ -64,7 +67,8 @@ class PlaceServiceTest {
                         PageRequest.of(1, 2, Sort.by(Sort.Direction.DESC, "viewCount"))))))
         .thenReturn(new PageImpl<>(List.of(place), PageRequest.of(1, 2), 3));
     PlaceService placeService =
-        new PlaceService(placeRepository, placeImageRepository, placeScrapRepository);
+        new PlaceService(
+            placeRepository, placeImageRepository, placeMemberLikeRepository, placeScrapRepository);
 
     // When
     PageResult<PlaceResult> result = placeService.findPlaces(1, 2, PlaceSort.POPULAR);
@@ -109,7 +113,8 @@ class PlaceServiceTest {
     when(placeRepository.findByPlaceIdAndIsActiveTrueAndIsDeletedFalse(1))
         .thenReturn(Optional.of(place));
     PlaceService placeService =
-        new PlaceService(placeRepository, placeImageRepository, placeScrapRepository);
+        new PlaceService(
+            placeRepository, placeImageRepository, placeMemberLikeRepository, placeScrapRepository);
 
     // When
     PlaceLocationResult result = placeService.findPlaceLocation(1);
@@ -132,7 +137,8 @@ class PlaceServiceTest {
     when(placeRepository.findByPlaceIdAndIsActiveTrueAndIsDeletedFalse(999))
         .thenReturn(Optional.empty());
     PlaceService placeService =
-        new PlaceService(placeRepository, placeImageRepository, placeScrapRepository);
+        new PlaceService(
+            placeRepository, placeImageRepository, placeMemberLikeRepository, placeScrapRepository);
 
     // When
     var exception = assertThatThrownBy(() -> placeService.findPlaceLocation(999));
