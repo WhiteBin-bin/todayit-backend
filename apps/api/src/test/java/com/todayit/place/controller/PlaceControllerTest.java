@@ -1,5 +1,6 @@
 package com.todayit.place.controller;
 
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -133,6 +134,23 @@ class PlaceControllerTest {
 
     // Then
     verify(coursePlaceQueryService).findCoursesByPlace(1, 0, 20, CourseSort.LATEST);
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 장소의 코스 조회는 장소 없음 오류를 반환한다")
+  void returnsNotFoundWhenCoursesPlaceDoesNotExist() throws Exception {
+    // Given
+    doThrow(new PlaceNotFoundException()).when(placeQueryService).validatePlaceExists(999);
+
+    // When
+    mockMvc
+        .perform(get("/api/v1/places/999/courses"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("PLACE_NOT_FOUND"));
+
+    // Then
+    verifyNoInteractions(coursePlaceQueryService);
   }
 
   /** 장소 사진 목록과 페이지 정보를 성공 응답으로 반환하는지 검증합니다. */
