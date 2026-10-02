@@ -1,5 +1,6 @@
 package com.todayit.place.service;
 
+import com.todayit.place.exception.PlaceAlreadyLikedException;
 import com.todayit.place.exception.PlaceNotFoundException;
 import com.todayit.place.repository.PlaceMemberLikeRepository;
 import com.todayit.place.repository.PlaceRepository;
@@ -72,11 +73,15 @@ public class PlaceCommandService {
    * @param memberId 회원 식별자
    * @return 장소 좋아요 결과
    * @throws PlaceNotFoundException 장소가 없거나 비활성·삭제 상태일 때
+   * @throws PlaceAlreadyLikedException 이미 좋아요를 누른 장소일 때
    */
   @Transactional
   public PlaceLikeResult likePlace(int placeId, String memberId) {
     validatePlace(placeId);
-    placeMemberLikeRepository.insertIfAbsent(memberId, placeId);
+    int insertedCount = placeMemberLikeRepository.insertIfAbsent(memberId, placeId);
+    if (insertedCount == 0) {
+      throw new PlaceAlreadyLikedException();
+    }
 
     return new PlaceLikeResult(placeId, true, placeMemberLikeRepository.countByPlaceId(placeId));
   }

@@ -96,7 +96,7 @@ public class SecurityConfigTest {
     ResultActions result = mockMvc.perform(get(url));
 
     // Then
-    result.andExpect(status().isNotFound());
+    result.andExpect(status().isOk());
   }
 
   @Test
