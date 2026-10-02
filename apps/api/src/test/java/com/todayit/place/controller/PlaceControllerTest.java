@@ -11,6 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.todayit.common.exception.GlobalExceptionHandler;
 import com.todayit.common.pagination.PageResult;
+import com.todayit.course.service.CoursePlaceQueryService;
+import com.todayit.course.service.model.CourseResult;
+import com.todayit.course.service.model.CourseSort;
 import com.todayit.place.entity.Category;
 import com.todayit.place.exception.PlaceNotFoundException;
 import com.todayit.place.service.PlaceCommandService;
@@ -41,13 +44,17 @@ class PlaceControllerTest {
 
   @Mock private PlaceCommandService placeCommandService;
 
+  @Mock private CoursePlaceQueryService coursePlaceQueryService;
+
   private MockMvc mockMvc;
 
   /** Controller와 공통 예외 처리기를 MockMvc에 등록합니다. */
   @BeforeEach
   void setUp() {
     mockMvc =
-        MockMvcBuilders.standaloneSetup(new PlaceController(placeQueryService, placeCommandService))
+        MockMvcBuilders.standaloneSetup(
+                new PlaceController(
+                    placeQueryService, placeCommandService, coursePlaceQueryService))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
   }
@@ -93,6 +100,39 @@ class PlaceControllerTest {
 
     // Then
     verify(placeQueryService).findPlaces(1, 5, PlaceSort.POPULAR);
+  }
+
+  /** 특정 장소를 포함한 코스 목록을 페이지 정보와 함께 반환하는지 검증합니다. */
+  @Test
+  @DisplayName("해당 장소로 만들어진 코스를 페이지 정보와 함께 반환한다")
+  void returnsCoursesByPlace() throws Exception {
+    // Given
+    CourseResult course =
+        new CourseResult(
+            1,
+            "종로 맛집과 카페 코스",
+            "종로에서 식사와 카페를 함께 즐기는 코스입니다.",
+            com.todayit.course.entity.CourseTransport.WALKING,
+            java.time.LocalDateTime.of(2026, 10, 3, 11, 0),
+            java.time.LocalDateTime.of(2026, 10, 3, 15, 0),
+            25);
+    when(coursePlaceQueryService.findCoursesByPlace(1, 0, 20, CourseSort.LATEST))
+        .thenReturn(new PageResult<>(List.of(course), 0, 20, 1));
+
+    // When
+    mockMvc
+        .perform(get("/api/v1/places/1/courses"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.content[0].courseId").value(1))
+        .andExpect(jsonPath("$.data.content[0].title").value("종로 맛집과 카페 코스"))
+        .andExpect(jsonPath("$.data.page").value(0))
+        .andExpect(jsonPath("$.data.size").value(20))
+        .andExpect(jsonPath("$.data.totalElements").value(1))
+        .andExpect(jsonPath("$.data.totalPages").value(1));
+
+    // Then
+    verify(coursePlaceQueryService).findCoursesByPlace(1, 0, 20, CourseSort.LATEST);
   }
 
   /** 장소 사진 목록과 페이지 정보를 성공 응답으로 반환하는지 검증합니다. */

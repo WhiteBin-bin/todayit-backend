@@ -3,6 +3,9 @@ package com.todayit.place.controller;
 import com.todayit.common.pagination.PageResponse;
 import com.todayit.common.pagination.PaginationValidator;
 import com.todayit.common.response.ApiResponse;
+import com.todayit.course.dto.response.CourseResponse;
+import com.todayit.course.service.CoursePlaceQueryService;
+import com.todayit.course.service.model.CourseSort;
 import com.todayit.place.dto.response.PlaceImageResponse;
 import com.todayit.place.dto.response.PlaceLikeResponse;
 import com.todayit.place.dto.response.PlaceLocationResponse;
@@ -31,17 +34,22 @@ public class PlaceController {
 
   private final PlaceQueryService placeQueryService;
   private final PlaceCommandService placeCommandService;
+  private final CoursePlaceQueryService coursePlaceQueryService;
 
   /**
    * 장소 기능을 처리할 서비스를 받습니다.
    *
    * @param placeQueryService 장소 조회 Service
    * @param placeCommandService 장소 변경 Service
+   * @param coursePlaceQueryService 코스 장소 조회 Service 계약
    */
   public PlaceController(
-      PlaceQueryService placeQueryService, PlaceCommandService placeCommandService) {
+      PlaceQueryService placeQueryService,
+      PlaceCommandService placeCommandService,
+      CoursePlaceQueryService coursePlaceQueryService) {
     this.placeQueryService = placeQueryService;
     this.placeCommandService = placeCommandService;
+    this.coursePlaceQueryService = coursePlaceQueryService;
   }
 
   /**
@@ -96,6 +104,29 @@ public class PlaceController {
         ApiResponse.success(
             PageResponse.from(
                 placeQueryService.findPlaceImages(placeId, page, size), PlaceImageResponse::from)));
+  }
+
+  /**
+   * 특정 장소를 포함한 공개 코스 목록을 조회합니다.
+   *
+   * @param placeId 장소 식별자
+   * @param page 페이지 번호
+   * @param size 페이지 크기
+   * @param sort 코스 정렬 기준
+   * @return 코스 목록과 페이지 정보
+   */
+  @GetMapping("/{placeId}/courses")
+  public ResponseEntity<ApiResponse<PageResponse<CourseResponse>>> findCoursesByPlace(
+      @PathVariable int placeId,
+      @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
+      @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size,
+      @RequestParam(defaultValue = "LATEST") CourseSort sort) {
+    PaginationValidator.validate(page, size);
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            PageResponse.from(
+                coursePlaceQueryService.findCoursesByPlace(placeId, page, size, sort),
+                CourseResponse::from)));
   }
 
   /**

@@ -67,4 +67,33 @@ public class Course {
   private List<CoursePlace> coursePlaces = new ArrayList<>();
 
   protected Course() {}
+
+  /**
+   * 코스의 조회 정보를 반환합니다.
+   *
+   * @return 코스 조회 정보
+   */
+  public CourseSnapshot getSnapshot() {
+    return new CourseSnapshot(courseId, title, courseSummary, transport, startAt, endAt, viewCount);
+  }
+
+  /**
+   * 코스 조회에 필요한 정보를 담습니다.
+   *
+   * @param courseId 코스 식별자
+   * @param title 코스명
+   * @param courseSummary 코스 요약
+   * @param transport 이동수단
+   * @param startAt 코스 시작 시간
+   * @param endAt 코스 종료 시간
+   * @param viewCount 조회수
+   */
+  public record CourseSnapshot(
+      int courseId,
+      String title,
+      String courseSummary,
+      CourseTransport transport,
+      LocalDateTime startAt,
+      LocalDateTime endAt,
+      int viewCount) {}
 }

@@ -1,6 +1,7 @@
 package com.todayit.place.service;
 
 import com.todayit.place.exception.PlaceAlreadyLikedException;
+import com.todayit.place.exception.PlaceAlreadyScrappedException;
 import com.todayit.place.exception.PlaceNotFoundException;
 import com.todayit.place.repository.PlaceMemberLikeRepository;
 import com.todayit.place.repository.PlaceRepository;
@@ -41,10 +42,14 @@ public class PlaceCommandService {
    * @param memberId 회원 식별자
    * @return 장소 스크랩 결과
    * @throws PlaceNotFoundException 장소가 없거나 비활성·삭제 상태일 때
+   * @throws PlaceAlreadyScrappedException 이미 스크랩한 장소일 때
    */
   @Transactional
   public PlaceScrapResult scrapPlace(int placeId, String memberId) {
     validatePlace(placeId);
+    if (placeScrapRepository.existsByMemberIdAndPlacePlaceIdAndIsDeletedFalse(memberId, placeId)) {
+      throw new PlaceAlreadyScrappedException();
+    }
     placeScrapRepository.upsertByMemberIdAndPlaceId(memberId, placeId);
 
     return new PlaceScrapResult(placeId, true, placeScrapRepository.countActiveByPlaceId(placeId));

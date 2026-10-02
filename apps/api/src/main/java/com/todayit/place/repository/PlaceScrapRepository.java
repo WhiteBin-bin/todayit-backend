@@ -13,6 +13,15 @@ import org.springframework.data.repository.query.Param;
 public interface PlaceScrapRepository extends JpaRepository<PlaceScrap, Integer> {
 
   /**
+   * 회원이 장소를 활성 상태로 스크랩했는지 확인합니다.
+   *
+   * @param memberId 회원 식별자
+   * @param placeId 장소 식별자
+   * @return 활성 스크랩 존재 여부
+   */
+  boolean existsByMemberIdAndPlacePlaceIdAndIsDeletedFalse(String memberId, int placeId);
+
+  /**
    * 회원이 활성 상태로 스크랩한 장소를 오래된 순서로 조회합니다.
    *
    * @param memberId 회원 식별자
