@@ -1,6 +1,7 @@
 package com.todayit.common.auth.config;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
@@ -13,8 +14,11 @@ import com.todayit.common.auth.handler.RestAccessDeniedHandler;
 import com.todayit.common.auth.handler.RestAuthenticationEntryPoint;
 import com.todayit.common.auth.jwt.JwtTokenProvider;
 import com.todayit.common.auth.token.RefreshTokenService;
+import com.todayit.common.pagination.PageResult;
+import com.todayit.course.service.CoursePlaceQueryService;
 import com.todayit.member.service.LoginFacade;
 import com.todayit.member.service.model.LoginResult;
+import com.todayit.place.service.PlaceQueryService;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,6 +56,10 @@ public class SecurityConfigTest {
   @MockitoBean private JwtTokenProvider jwtTokenProvider;
 
   @MockitoBean private RefreshTokenService refreshTokenService;
+
+  @MockitoBean private PlaceQueryService placeQueryService;
+
+  @MockitoBean private CoursePlaceQueryService coursePlaceQueryService;
 
   @Autowired
   SecurityConfigTest(MockMvc mockMvc) {
@@ -91,6 +99,8 @@ public class SecurityConfigTest {
   void allowsAnonymousAccessToPlaceImagesEndpoint() throws Exception {
     // Given
     String url = "/api/v1/places/1/images";
+    when(placeQueryService.findPlaceImages(anyInt(), anyInt(), anyInt()))
+        .thenReturn(new PageResult<>(List.of(), 0, 20, 0));
 
     // When
     ResultActions result = mockMvc.perform(get(url));
@@ -104,6 +114,8 @@ public class SecurityConfigTest {
   void allowsAnonymousAccessToPlaceCoursesEndpoint() throws Exception {
     // Given
     String url = "/api/v1/places/1/courses";
+    when(coursePlaceQueryService.findCoursesByPlace(anyInt(), anyInt(), anyInt(), any()))
+        .thenReturn(new PageResult<>(List.of(), 0, 20, 0));
 
     // When
     ResultActions result = mockMvc.perform(get(url));
