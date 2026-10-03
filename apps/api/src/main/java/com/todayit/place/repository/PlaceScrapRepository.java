@@ -35,7 +35,7 @@ public interface PlaceScrapRepository extends JpaRepository<PlaceScrap, Integer>
               + "and scrap.isDeleted = false "
               + "and scrap.place.isActive = true "
               + "and scrap.place.isDeleted = false "
-              + "order by scrap.createdAt asc, scrap.place.placeId asc",
+              + "order by coalesce(scrap.updatedAt, scrap.createdAt) asc, scrap.place.placeId asc",
       countQuery =
           "select count(scrap) from PlaceScrap scrap "
               + "where scrap.memberId = :memberId "
@@ -58,7 +58,7 @@ public interface PlaceScrapRepository extends JpaRepository<PlaceScrap, Integer>
               + "and scrap.isDeleted = false "
               + "and scrap.place.isActive = true "
               + "and scrap.place.isDeleted = false "
-              + "order by scrap.createdAt desc, scrap.place.placeId desc",
+              + "order by coalesce(scrap.updatedAt, scrap.createdAt) desc, scrap.place.placeId desc",
       countQuery =
           "select count(scrap) from PlaceScrap scrap "
               + "where scrap.memberId = :memberId "
