@@ -112,6 +112,15 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/v1/places/*/images")
                     .permitAll()
 
+                    // API 명세
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/scalar/**",
+                        "/v3/api-docs",
+                        "/v3/api-docs/**",
+                        "/v3/api-docs.yaml")
+                    .permitAll()
+
                     // 위에를 제외한 모든 요청은 인증된 사용자만 접근 가능하도록 설정
                     .anyRequest()
                     .authenticated())
