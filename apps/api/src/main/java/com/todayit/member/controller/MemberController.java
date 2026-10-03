@@ -2,7 +2,7 @@ package com.todayit.member.controller;
 
 import com.todayit.common.pagination.PageResponse;
 import com.todayit.common.pagination.PaginationValidator;
-import com.todayit.common.response.ApiResponse;
+import com.todayit.common.response.CommonResponse;
 import com.todayit.place.dto.response.PlaceResponse;
 import com.todayit.place.service.PlaceScrapQueryService;
 import com.todayit.place.service.model.PlaceScrapSort;
@@ -41,13 +41,13 @@ public class MemberController {
    * @return 스크랩 장소 페이지
    */
   @GetMapping("/me/scrapped-places")
-  public ResponseEntity<ApiResponse<PageResponse<PlaceResponse>>> findScrappedPlaces(
+  public ResponseEntity<CommonResponse<PageResponse<PlaceResponse>>> findScrappedPlaces(
       @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
       @RequestParam(defaultValue = "LATEST") PlaceScrapSort sort,
       Authentication authentication) {
     PaginationValidator.validate(page, DEFAULT_SIZE);
     return ResponseEntity.ok(
-        ApiResponse.success(
+        CommonResponse.success(
             PageResponse.from(
                 placeScrapQueryService.findScrappedPlaces(
                     authentication.getName(), page, DEFAULT_SIZE, sort),

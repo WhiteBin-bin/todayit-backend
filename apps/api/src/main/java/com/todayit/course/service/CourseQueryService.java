@@ -41,8 +41,8 @@ public class CourseQueryService implements CoursePlaceQueryService {
       int placeId, int page, int size, CourseSort sort) {
     Sort order =
         sort == CourseSort.POPULAR
-            ? Sort.by(Sort.Direction.DESC, "viewCount")
-            : Sort.by(Sort.Direction.DESC, "createdAt");
+            ? Sort.by(Sort.Order.desc("viewCount"), Sort.Order.desc("courseId"))
+            : Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("courseId"));
     Page<Course> coursePage =
         courseRepository.findPublicActiveByPlaceId(placeId, PageRequest.of(page, size, order));
 

@@ -35,6 +35,7 @@ class CourseQueryServiceTest {
   @DisplayName("장소를 포함한 코스를 최신순으로 페이지 조회한다")
   void findsLatestCoursesByPlace() {
     // Given
+    Sort expectedSort = Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("courseId"));
     when(course.getSnapshot())
         .thenReturn(
             new Course.CourseSnapshot(
@@ -45,13 +46,8 @@ class CourseQueryServiceTest {
                 LocalDateTime.of(2026, 10, 3, 11, 0),
                 LocalDateTime.of(2026, 10, 3, 15, 0),
                 25));
-    when(courseRepository.findPublicActiveByPlaceId(
-            1, PageRequest.of(1, 5, Sort.by(Sort.Direction.DESC, "createdAt"))))
-        .thenReturn(
-            new PageImpl<>(
-                List.of(course),
-                PageRequest.of(1, 5, Sort.by(Sort.Direction.DESC, "createdAt")),
-                6));
+    when(courseRepository.findPublicActiveByPlaceId(1, PageRequest.of(1, 5, expectedSort)))
+        .thenReturn(new PageImpl<>(List.of(course), PageRequest.of(1, 5, expectedSort), 6));
     CourseQueryService service = new CourseQueryService(courseRepository);
 
     // When
@@ -63,21 +59,17 @@ class CourseQueryServiceTest {
     assertThat(result.page()).isEqualTo(1);
     assertThat(result.size()).isEqualTo(5);
     assertThat(result.totalElements()).isEqualTo(6);
-    verify(courseRepository)
-        .findPublicActiveByPlaceId(
-            1, PageRequest.of(1, 5, Sort.by(Sort.Direction.DESC, "createdAt")));
+    verify(courseRepository).findPublicActiveByPlaceId(1, PageRequest.of(1, 5, expectedSort));
   }
 
   @Test
   @DisplayName("장소를 포함한 코스를 인기순으로 조회한다")
   void findsPopularCoursesByPlace() {
     // Given
+    Sort expectedSort = Sort.by(Sort.Order.desc("viewCount"), Sort.Order.desc("courseId"));
     when(courseRepository.findPublicActiveByPlaceId(
             eq(1),
-            argThat(
-                pageable ->
-                    pageable != null
-                        && pageable.getSort().equals(Sort.by(Sort.Direction.DESC, "viewCount")))))
+            argThat(pageable -> pageable != null && pageable.getSort().equals(expectedSort))))
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
     CourseQueryService service = new CourseQueryService(courseRepository);
 
