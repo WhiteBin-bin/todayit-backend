@@ -193,7 +193,7 @@ class PlaceControllerTest {
         .perform(
             post("/api/v1/places/1/scrap")
                 .principal(new UsernamePasswordAuthenticationToken("member-1", null)))
-        .andExpect(status().isOk())
+        .andExpect(status().isCreated())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.placeId").value(1))
         .andExpect(jsonPath("$.data.scrapped").value(true))
@@ -215,7 +215,7 @@ class PlaceControllerTest {
         .perform(
             post("/api/v1/places/1/like")
                 .principal(new UsernamePasswordAuthenticationToken("member-1", null)))
-        .andExpect(status().isOk())
+        .andExpect(status().isCreated())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.placeId").value(1))
         .andExpect(jsonPath("$.data.liked").value(true))

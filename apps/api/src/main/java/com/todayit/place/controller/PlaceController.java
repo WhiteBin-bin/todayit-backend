@@ -14,6 +14,7 @@ import com.todayit.place.dto.response.PlaceScrapResponse;
 import com.todayit.place.service.PlaceCommandService;
 import com.todayit.place.service.PlaceQueryService;
 import com.todayit.place.service.model.PlaceSort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -140,10 +141,11 @@ public class PlaceController {
   @PostMapping("/{placeId}/scrap")
   public ResponseEntity<CommonResponse<PlaceScrapResponse>> scrapPlace(
       @PathVariable int placeId, Authentication authentication) {
-    return ResponseEntity.ok(
-        CommonResponse.success(
-            PlaceScrapResponse.from(
-                placeCommandService.scrapPlace(placeId, authentication.getName()))));
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(
+            CommonResponse.success(
+                PlaceScrapResponse.from(
+                    placeCommandService.scrapPlace(placeId, authentication.getName()))));
   }
 
   /**
@@ -172,9 +174,10 @@ public class PlaceController {
   @PostMapping("/{placeId}/like")
   public ResponseEntity<CommonResponse<PlaceLikeResponse>> likePlace(
       @PathVariable int placeId, Authentication authentication) {
-    return ResponseEntity.ok(
-        CommonResponse.success(
-            PlaceLikeResponse.from(
-                placeCommandService.likePlace(placeId, authentication.getName()))));
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(
+            CommonResponse.success(
+                PlaceLikeResponse.from(
+                    placeCommandService.likePlace(placeId, authentication.getName()))));
   }
 }
