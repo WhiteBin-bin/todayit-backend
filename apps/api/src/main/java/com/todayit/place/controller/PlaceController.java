@@ -6,6 +6,7 @@ import com.todayit.common.response.CommonResponse;
 import com.todayit.course.dto.response.CourseResponse;
 import com.todayit.course.service.CoursePlaceQueryService;
 import com.todayit.course.service.model.CourseSort;
+import com.todayit.place.controller.docs.PlaceApiDocs;
 import com.todayit.place.dto.response.PlaceImageResponse;
 import com.todayit.place.dto.response.PlaceLikeResponse;
 import com.todayit.place.dto.response.PlaceLocationResponse;
@@ -28,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 /** 장소 관련 HTTP 요청을 처리하는 Controller입니다. */
 @RestController
 @RequestMapping("/api/v1/places")
-public class PlaceController {
+public class PlaceController implements PlaceApiDocs {
 
   private static final int DEFAULT_PAGE = 0;
   private static final int DEFAULT_SIZE = 20;
