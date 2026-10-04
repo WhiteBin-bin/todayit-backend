@@ -111,6 +111,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/places/*/images")
                     .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/places/*/courses")
+                    .permitAll()
 
                     // API 명세
                     .requestMatchers(
