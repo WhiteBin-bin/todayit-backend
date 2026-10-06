@@ -11,6 +11,7 @@ import com.todayit.place.dto.response.PlaceLikeResponse;
 import com.todayit.place.dto.response.PlaceLocationResponse;
 import com.todayit.place.dto.response.PlaceResponse;
 import com.todayit.place.dto.response.PlaceScrapResponse;
+import com.todayit.place.dto.response.PlaceShareResponse;
 import com.todayit.place.service.model.PlaceSort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -81,7 +82,7 @@ public interface PlaceApiDocs {
                   @ExampleObject(
                       name = "잘못된 페이지",
                       value =
-                          "{\"success\":false,\"code\":\"INVALID_PAGINATION\",\"message\":\"페이지 요청값이 올바르지 않습니다.\"}")
+                          "{\"success\":false,\"code\":\"INVALID_PAGINATION\",\"message\":\"페이지 요청값이 올바르지 않습니다.\"} shipment")
                 })),
     @ApiResponse(
         responseCode = "500",
@@ -454,4 +455,49 @@ public interface PlaceApiDocs {
   })
   ResponseEntity<CommonResponse<PlaceLikeResponse>> likePlace(
       int placeId, Authentication authentication);
+
+  /**
+   * 장소 공유 링크를 생성합니다.
+   *
+   * @param placeId 장소 식별자
+   * @return 장소 공유 링크 정보
+   */
+  @Operation(
+      summary = "장소 공유하기",
+      description = "장소 식별자를 기반으로 공유 가능한 URL과 만료 일시를 반환합니다.")
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "공유 링크 생성 성공",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":true,\"data\":{\"placeId\":1,\"shareUrl\":\"http://localhost:3000/places/1\",\"expiresAt\":\"2026-10-13T14:35:57\"}}"))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "장소를 찾을 수 없음",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"PLACE_NOT_FOUND\",\"message\":\"장소를 찾을 수 없습니다.\"}"))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 내부 오류",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"서버 내부 오류가 발생했습니다.\"}")))
+  })
+  ResponseEntity<CommonResponse<PlaceShareResponse>> sharePlace(int placeId);
 }

@@ -18,7 +18,9 @@ import com.todayit.common.pagination.PageResult;
 import com.todayit.course.service.CoursePlaceQueryService;
 import com.todayit.member.service.LoginFacade;
 import com.todayit.member.service.model.LoginResult;
+import com.todayit.place.service.PlaceCommandService;
 import com.todayit.place.service.PlaceQueryService;
+import com.todayit.place.service.model.PlaceShareResult;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -58,6 +60,8 @@ public class SecurityConfigTest {
   @MockitoBean private RefreshTokenService refreshTokenService;
 
   @MockitoBean private PlaceQueryService placeQueryService;
+
+  @MockitoBean private PlaceCommandService placeCommandService;
 
   @MockitoBean private CoursePlaceQueryService coursePlaceQueryService;
 
@@ -119,6 +123,21 @@ public class SecurityConfigTest {
 
     // When
     ResultActions result = mockMvc.perform(get(url));
+
+    // Then
+    result.andExpect(status().isOk());
+  }
+
+  @Test
+  @DisplayName("장소 공유하기 API는 인증 없이 접근할 수 있다")
+  void allowsAnonymousAccessToPlaceShareEndpoint() throws Exception {
+    // Given
+    String url = "/api/v1/places/1/share";
+    when(placeCommandService.sharePlace(1))
+        .thenReturn(new PlaceShareResult(1, "http://localhost:3000/places/1", null));
+
+    // When
+    ResultActions result = mockMvc.perform(post(url));
 
     // Then
     result.andExpect(status().isOk());

@@ -1,5 +1,6 @@
 package com.todayit.place.service;
 
+import com.todayit.place.config.PlaceShareProperties;
 import com.todayit.place.exception.PlaceAlreadyLikedException;
 import com.todayit.place.exception.PlaceAlreadyScrappedException;
 import com.todayit.place.exception.PlaceNotFoundException;
@@ -8,6 +9,8 @@ import com.todayit.place.repository.PlaceRepository;
 import com.todayit.place.repository.PlaceScrapRepository;
 import com.todayit.place.service.model.PlaceLikeResult;
 import com.todayit.place.service.model.PlaceScrapResult;
+import com.todayit.place.service.model.PlaceShareResult;
+import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,21 +21,25 @@ public class PlaceCommandService {
   private final PlaceRepository placeRepository;
   private final PlaceMemberLikeRepository placeMemberLikeRepository;
   private final PlaceScrapRepository placeScrapRepository;
+  private final PlaceShareProperties placeShareProperties;
 
   /**
-   * 장소 변경에 필요한 Repository를 받습니다.
+   * 장소 변경과 공유에 필요한 Repository 및 설정값을 받습니다.
    *
    * @param placeRepository 장소 Repository
    * @param placeMemberLikeRepository 장소 좋아요 Repository
    * @param placeScrapRepository 장소 스크랩 Repository
+   * @param placeShareProperties 장소 공유 설정값
    */
   public PlaceCommandService(
       PlaceRepository placeRepository,
       PlaceMemberLikeRepository placeMemberLikeRepository,
-      PlaceScrapRepository placeScrapRepository) {
+      PlaceScrapRepository placeScrapRepository,
+      PlaceShareProperties placeShareProperties) {
     this.placeRepository = placeRepository;
     this.placeMemberLikeRepository = placeMemberLikeRepository;
     this.placeScrapRepository = placeScrapRepository;
+    this.placeShareProperties = placeShareProperties;
   }
 
   /**
@@ -92,6 +99,36 @@ public class PlaceCommandService {
     }
 
     return new PlaceLikeResult(placeId, true, placeMemberLikeRepository.countByPlaceId(placeId));
+  }
+
+  /**
+   * 활성화되고 삭제되지 않은 장소의 공유 링크와 만료 일시를 생성합니다.
+   *
+   * @param placeId 장소 식별자
+   * @return 장소 공유 결과
+   * @throws PlaceNotFoundException 장소가 없거나 비활성·삭제 상태일 때
+   */
+  @Transactional(readOnly = true)
+  public PlaceShareResult sharePlace(int placeId) {
+    return sharePlace(placeId, LocalDateTime.now());
+  }
+
+  /**
+   * 특정 시점을 기준으로 장소의 공유 링크와 만료 일시를 생성합니다.
+   *
+   * @param placeId 장소 식별자
+   * @param now 기준 일시
+   * @return 장소 공유 결과
+   * @throws PlaceNotFoundException 장소가 없거나 비활성·삭제 상태일 때
+   */
+  PlaceShareResult sharePlace(int placeId, LocalDateTime now) {
+    validatePlace(placeId);
+    String shareUrl = placeShareProperties.createShareUrl(placeId);
+    LocalDateTime expiresAt =
+        placeShareProperties.expiration() != null
+            ? now.plus(placeShareProperties.expiration())
+            : null;
+    return new PlaceShareResult(placeId, shareUrl, expiresAt);
   }
 
   private void validatePlace(int placeId) {

@@ -31,7 +31,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
-/** 장소 목록 조회 Service의 업무 결과를 검증합니다. */
 @ExtendWith(MockitoExtension.class)
 class PlaceQueryServiceTest {
 
@@ -45,7 +44,6 @@ class PlaceQueryServiceTest {
 
   @Mock private Place place;
 
-  /** 장소를 인기순으로 조회하고 서비스 결과로 변환하는지 검증합니다. */
   @Test
   @DisplayName("장소 목록을 인기순으로 조회하고 페이지 정보와 함께 반환한다")
   void findsPlacesByPopularity() {
@@ -101,7 +99,6 @@ class PlaceQueryServiceTest {
     verify(placeImageRepository).findByPlacePlaceIdInOrderByPlacePlaceIdAscCreatedAtAsc(List.of(1));
   }
 
-  /** 지역, 카테고리와 영업 요일 필터를 Repository 조회 조건으로 변환하는지 검증합니다. */
   @Test
   @DisplayName("지역, 카테고리, 영업 요일 필터를 조합해 장소를 조회한다")
   void findsPlacesWithFilters() {
@@ -144,7 +141,6 @@ class PlaceQueryServiceTest {
             pageable);
   }
 
-  /** 장소 Entity에서 지도 조회에 필요한 위치 정보를 반환하는지 검증합니다. */
   @Test
   @DisplayName("장소 식별자로 좌표와 주소를 조회한다")
   void findsPlaceLocation() {
@@ -179,7 +175,6 @@ class PlaceQueryServiceTest {
                 "서울특별시 종로구 종로 1"));
   }
 
-  /** 존재하지 않는 장소를 조회하면 장소 없음 예외를 발생시키는지 검증합니다. */
   @Test
   @DisplayName("존재하지 않는 장소의 지도 조회는 장소 없음 예외를 발생시킨다")
   void throwsWhenPlaceLocationDoesNotExist() {

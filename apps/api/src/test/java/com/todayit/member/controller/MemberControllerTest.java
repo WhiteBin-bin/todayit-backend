@@ -24,7 +24,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-/** 회원의 장소 조회 Controller 응답을 검증합니다. */
 @ExtendWith(MockitoExtension.class)
 class MemberControllerTest {
 
@@ -32,7 +31,6 @@ class MemberControllerTest {
 
   private MockMvc mockMvc;
 
-  /** Controller와 공통 예외 처리기를 MockMvc에 등록합니다. */
   @BeforeEach
   void setUp() {
     mockMvc =
@@ -41,7 +39,6 @@ class MemberControllerTest {
             .build();
   }
 
-  /** 인증된 회원의 스크랩 장소를 정렬 기준과 페이지 정보와 함께 반환하는지 검증합니다. */
   @Test
   @DisplayName("회원이 스크랩한 장소를 조회한다")
   void returnsScrappedPlaces() throws Exception {

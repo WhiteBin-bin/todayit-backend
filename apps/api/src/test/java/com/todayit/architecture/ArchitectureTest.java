@@ -51,6 +51,8 @@ class ArchitectureTest {
       classes()
           .that()
           .resideInAPackage("..controller..")
+          .and()
+          .resideOutsideOfPackages("..controller.docs..")
           .should()
           .haveSimpleNameEndingWith("Controller")
           .allowEmptyShould(true);

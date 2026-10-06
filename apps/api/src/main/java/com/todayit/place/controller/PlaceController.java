@@ -12,6 +12,7 @@ import com.todayit.place.dto.response.PlaceLikeResponse;
 import com.todayit.place.dto.response.PlaceLocationResponse;
 import com.todayit.place.dto.response.PlaceResponse;
 import com.todayit.place.dto.response.PlaceScrapResponse;
+import com.todayit.place.dto.response.PlaceShareResponse;
 import com.todayit.place.entity.Category;
 import com.todayit.place.exception.InvalidPlaceCategoryFilterException;
 import com.todayit.place.exception.InvalidPlaceWeekdayFilterException;
@@ -241,5 +242,17 @@ public class PlaceController implements PlaceApiDocs {
             CommonResponse.success(
                 PlaceLikeResponse.from(
                     placeCommandService.likePlace(placeId, authentication.getName()))));
+  }
+
+  /**
+   * 장소 공유 링크를 생성합니다.
+   *
+   * @param placeId 장소 식별자
+   * @return 장소 공유 링크 응답
+   */
+  @PostMapping("/{placeId}/share")
+  public ResponseEntity<CommonResponse<PlaceShareResponse>> sharePlace(@PathVariable int placeId) {
+    return ResponseEntity.ok(
+        CommonResponse.success(PlaceShareResponse.from(placeCommandService.sharePlace(placeId))));
   }
 }

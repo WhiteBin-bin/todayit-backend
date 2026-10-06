@@ -113,6 +113,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/places/*/courses")
                     .permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/places/*/share")
+                    .permitAll()
 
                     // API 명세
                     .requestMatchers(
@@ -123,7 +125,7 @@ public class SecurityConfig {
                         "/v3/api-docs.yaml")
                     .permitAll()
 
-                    // 위에를 제외한 모든 요청은 인증된 사용자만 접근 가능하도록 설정
+                    // 위를 제외한 모든 요청은 인증된 사용자만 접근 가능하도록 설정
                     .anyRequest()
                     .authenticated())
 

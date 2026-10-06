@@ -14,13 +14,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-/** 지역 경로의 단계별 조회와 유효성 검증을 테스트합니다. */
 @ExtendWith(MockitoExtension.class)
 class RegionQueryServiceTest {
 
   @Mock private RegionRepository regionRepository;
 
-  /** 시·도만 전달하면 모든 하위 지역 식별자를 반환하는지 검증합니다. */
   @Test
   @DisplayName("시·도만 선택하면 모든 하위 지역을 반환한다")
   void findsAllRegionsInSi() {
@@ -36,7 +34,6 @@ class RegionQueryServiceTest {
     verify(regionRepository).findIdsBySi("서울특별시");
   }
 
-  /** 시·군만 전달하면 모든 하위 구의 지역 식별자를 반환하는지 검증합니다. */
   @Test
   @DisplayName("시·군만 선택하면 모든 하위 구를 반환한다")
   void findsAllRegionsInGun() {
@@ -54,7 +51,6 @@ class RegionQueryServiceTest {
     verify(regionRepository).findIdsByGun("수원시");
   }
 
-  /** 구만 전달하면 동일한 구 이름을 가진 지역 식별자를 반환하는지 검증합니다. */
   @Test
   @DisplayName("구만 선택하면 동일한 이름의 구를 모두 반환한다")
   void findsAllRegionsInGu() {
@@ -74,7 +70,6 @@ class RegionQueryServiceTest {
     verify(regionRepository).findIdsByGu("중구");
   }
 
-  /** 시·도와 하위 구를 전달하면 해당 경로의 지역만 반환하는지 검증합니다. */
   @Test
   @DisplayName("시·도와 구를 선택하면 해당 하위 지역만 반환한다")
   void findsRegionBySiAndSubdivision() {
@@ -90,7 +85,6 @@ class RegionQueryServiceTest {
     verify(regionRepository).findIdsBySiAndSubdivision("서울특별시", "동대문구");
   }
 
-  /** 시·군과 구를 전달하면 시·도 없이도 해당 지역을 반환하는지 검증합니다. */
   @Test
   @DisplayName("시·군과 구만 선택해도 해당 지역을 반환한다")
   void findsRegionByGunAndGu() {
@@ -108,7 +102,6 @@ class RegionQueryServiceTest {
     verify(regionRepository).findIdsByGunAndGu("수원시", "팔달구");
   }
 
-  /** 시·도, 시·군과 구를 전달하면 전체 경로가 일치하는 지역만 반환하는지 검증합니다. */
   @Test
   @DisplayName("시·도, 시·군과 구를 순서대로 검증한다")
   void findsRegionByFullPath() {
@@ -124,7 +117,6 @@ class RegionQueryServiceTest {
     verify(regionRepository).findIdsBySiAndGunAndGu("경기도", "수원시", "팔달구");
   }
 
-  /** 상하위 조합이 존재하지 않으면 잘못된 요청 예외를 발생시키는지 검증합니다. */
   @Test
   @DisplayName("존재하지 않는 상하위 지역 조합은 거부한다")
   void rejectsInvalidRegionPath() {

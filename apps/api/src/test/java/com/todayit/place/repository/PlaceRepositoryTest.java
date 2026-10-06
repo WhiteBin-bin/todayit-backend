@@ -15,11 +15,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * PostgreSQL 장소 목록 조회 Repository의 조건과 페이징을 검증합니다.
- *
- * <p>테스트 실행 전에 PostgreSQL의 todayit 데이터베이스와 todayit 스키마가 필요합니다.
- */
 @SpringBootTest(
     properties = {
       "spring.datasource.url=jdbc:postgresql://localhost:5432/todayit?currentSchema=todayit",
@@ -35,7 +30,6 @@ class PlaceRepositoryTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;
 
-  /** 각 테스트가 독립적으로 실행되도록 장소 데이터를 초기화합니다. */
   @BeforeEach
   void setUp() {
     jdbcTemplate.update("DELETE FROM place_member_like");
@@ -46,7 +40,6 @@ class PlaceRepositoryTest {
     jdbcTemplate.update("DELETE FROM place");
   }
 
-  /** 활성화되고 삭제되지 않은 장소만 페이지 단위로 반환하는지 검증합니다. */
   @Test
   @DisplayName("활성화되고 삭제되지 않은 장소만 페이지 단위로 조회한다")
   @Transactional
@@ -73,7 +66,6 @@ class PlaceRepositoryTest {
     assertThat(result.getContent().getFirst().getSnapshot().name()).isEqualTo("활성 장소");
   }
 
-  /** 지역, 카테고리와 영업 요일 조건을 모두 만족하는 장소만 반환하는지 검증합니다. */
   @Test
   @DisplayName("지역, 다중 카테고리, 영업 요일이 모두 일치하는 장소만 조회한다")
   @Transactional
@@ -109,7 +101,6 @@ class PlaceRepositoryTest {
     assertThat(result.getContent().getFirst().getSnapshot().name()).isEqualTo("월요일 식당");
   }
 
-  /** 시 단위 필터는 모든 하위 구를, 시·구 경로 필터는 선택한 구만 반환하는지 검증합니다. */
   @Test
   @DisplayName("상위 지역은 모든 하위 지역을 포함하고 전체 경로는 선택한 하위 지역만 조회한다")
   @Transactional
@@ -155,14 +146,6 @@ class PlaceRepositoryTest {
         .containsExactly("종로 장소");
   }
 
-  /**
-   * 필터 테스트에 사용할 지역을 생성합니다.
-   *
-   * @param si 시·도
-   * @param gun 시·군
-   * @param gu 구
-   * @return 생성한 지역 식별자
-   */
   private Integer insertRegion(String si, String gun, String gu) {
     return jdbcTemplate.queryForObject(
         "INSERT INTO region (si, gun, gu) VALUES (?, ?, ?) RETURNING region_id",
@@ -172,13 +155,6 @@ class PlaceRepositoryTest {
         gu);
   }
 
-  /**
-   * 필터 테스트에 사용할 활성 장소를 생성합니다.
-   *
-   * @param name 장소명
-   * @param category 장소 카테고리
-   * @return 생성한 장소 식별자
-   */
   private Integer insertPlace(String name, String category) {
     return jdbcTemplate.queryForObject(
         """
@@ -192,23 +168,11 @@ class PlaceRepositoryTest {
         category);
   }
 
-  /**
-   * 지역과 장소의 관계를 생성합니다.
-   *
-   * @param regionId 지역 식별자
-   * @param placeId 장소 식별자
-   */
   private void linkRegion(int regionId, int placeId) {
     jdbcTemplate.update(
         "INSERT INTO region_place (region_id, place_id) VALUES (?, ?)", regionId, placeId);
   }
 
-  /**
-   * 장소의 영업시간을 생성합니다.
-   *
-   * @param placeId 장소 식별자
-   * @param openDate 영업 시작 날짜와 시각
-   */
   private void insertHours(int placeId, String openDate) {
     jdbcTemplate.update(
         """
