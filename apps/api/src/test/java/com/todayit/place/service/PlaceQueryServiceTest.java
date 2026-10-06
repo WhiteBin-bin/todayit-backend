@@ -3,11 +3,11 @@ package com.todayit.place.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.todayit.common.pagination.PageResult;
+import com.todayit.course.service.RegionPlaceQueryService;
 import com.todayit.place.entity.Category;
 import com.todayit.place.entity.Place;
 import com.todayit.place.repository.PlaceImageRepository;
@@ -17,6 +17,7 @@ import com.todayit.place.service.model.PlaceLocationResult;
 import com.todayit.place.service.model.PlaceResult;
 import com.todayit.place.service.model.PlaceScrapSort;
 import com.todayit.place.service.model.PlaceSort;
+import com.todayit.place.service.model.PlaceWeekday;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -38,6 +40,8 @@ class PlaceQueryServiceTest {
   @Mock private PlaceImageRepository placeImageRepository;
 
   @Mock private PlaceScrapRepository placeScrapRepository;
+
+  @Mock private RegionPlaceQueryService regionPlaceQueryService;
 
   @Mock private Place place;
 
@@ -58,17 +62,17 @@ class PlaceQueryServiceTest {
             15,
             List.of("https://placehold.co/1200x800?text=Restaurant"));
     when(place.getSnapshot(anyList())).thenReturn(snapshot);
-    when(placeRepository.findByIsActiveTrueAndIsDeletedFalse(
-            argThat(
-                pageable ->
-                    pageable.equals(
-                        PageRequest.of(1, 2, Sort.by(Sort.Direction.DESC, "viewCount"))))))
+    PageRequest pageable = PageRequest.of(1, 2, Sort.by(Sort.Direction.DESC, "viewCount"));
+    when(placeRepository.findPlaces(
+            List.of(0), false, List.of(Category.values()), false, false, 0, pageable))
         .thenReturn(new PageImpl<>(List.of(place), PageRequest.of(1, 2), 3));
     PlaceQueryService placeQueryService =
-        new PlaceQueryService(placeRepository, placeImageRepository, placeScrapRepository);
+        new PlaceQueryService(
+            placeRepository, placeImageRepository, placeScrapRepository, regionPlaceQueryService);
 
     // When
-    PageResult<PlaceResult> result = placeQueryService.findPlaces(1, 2, PlaceSort.POPULAR);
+    PageResult<PlaceResult> result =
+        placeQueryService.findPlaces(null, List.of(), null, 1, 2, PlaceSort.POPULAR);
 
     // Then
     assertThat(result.content())
@@ -86,9 +90,58 @@ class PlaceQueryServiceTest {
     assertThat(result.size()).isEqualTo(2);
     assertThat(result.totalElements()).isEqualTo(3);
     verify(placeRepository)
-        .findByIsActiveTrueAndIsDeletedFalse(
+        .findPlaces(
+            List.of(0),
+            false,
+            List.of(Category.values()),
+            false,
+            false,
+            0,
             PageRequest.of(1, 2, Sort.by(Sort.Direction.DESC, "viewCount")));
     verify(placeImageRepository).findByPlacePlaceIdInOrderByPlacePlaceIdAscCreatedAtAsc(List.of(1));
+  }
+
+  /** 지역, 카테고리와 영업 요일 필터를 Repository 조회 조건으로 변환하는지 검증합니다. */
+  @Test
+  @DisplayName("지역, 카테고리, 영업 요일 필터를 조합해 장소를 조회한다")
+  void findsPlacesWithFilters() {
+    // Given
+    PageRequest pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
+    when(regionPlaceQueryService.findRegionIds(" 서울특별시 동대문구 ")).thenReturn(List.of(10));
+    when(placeRepository.findPlaces(
+            List.of(10),
+            true,
+            List.of(Category.RESTAURANT, Category.CAFE_DESSERT),
+            true,
+            true,
+            1,
+            pageable))
+        .thenReturn(Page.empty(pageable));
+    PlaceQueryService placeQueryService =
+        new PlaceQueryService(
+            placeRepository, placeImageRepository, placeScrapRepository, regionPlaceQueryService);
+
+    // When
+    PageResult<PlaceResult> result =
+        placeQueryService.findPlaces(
+            " 서울특별시 동대문구 ",
+            List.of(Category.RESTAURANT, Category.CAFE_DESSERT),
+            PlaceWeekday.MONDAY,
+            0,
+            20,
+            PlaceSort.LATEST);
+
+    // Then
+    assertThat(result.content()).isEmpty();
+    verify(placeRepository)
+        .findPlaces(
+            List.of(10),
+            true,
+            List.of(Category.RESTAURANT, Category.CAFE_DESSERT),
+            true,
+            true,
+            1,
+            pageable);
   }
 
   /** 장소 Entity에서 지도 조회에 필요한 위치 정보를 반환하는지 검증합니다. */
@@ -110,7 +163,8 @@ class PlaceQueryServiceTest {
     when(placeRepository.findByPlaceIdAndIsActiveTrueAndIsDeletedFalse(1))
         .thenReturn(Optional.of(place));
     PlaceQueryService placeQueryService =
-        new PlaceQueryService(placeRepository, placeImageRepository, placeScrapRepository);
+        new PlaceQueryService(
+            placeRepository, placeImageRepository, placeScrapRepository, regionPlaceQueryService);
 
     // When
     PlaceLocationResult result = placeQueryService.findPlaceLocation(1);
@@ -133,7 +187,8 @@ class PlaceQueryServiceTest {
     when(placeRepository.findByPlaceIdAndIsActiveTrueAndIsDeletedFalse(999))
         .thenReturn(Optional.empty());
     PlaceQueryService placeQueryService =
-        new PlaceQueryService(placeRepository, placeImageRepository, placeScrapRepository);
+        new PlaceQueryService(
+            placeRepository, placeImageRepository, placeScrapRepository, regionPlaceQueryService);
 
     // When
     var exception = assertThatThrownBy(() -> placeQueryService.findPlaceLocation(999));
@@ -162,7 +217,8 @@ class PlaceQueryServiceTest {
     when(placeScrapRepository.findScrappedPlacesOldest("member-1", pageable))
         .thenReturn(new PageImpl<>(List.of(place), pageable, 3));
     PlaceQueryService placeQueryService =
-        new PlaceQueryService(placeRepository, placeImageRepository, placeScrapRepository);
+        new PlaceQueryService(
+            placeRepository, placeImageRepository, placeScrapRepository, regionPlaceQueryService);
 
     // When
     PageResult<PlaceResult> result =

@@ -41,4 +41,35 @@ class FlywayLocalSeedTest {
 
     assertThat(roleNames).containsExactly("ADMIN", "DEV", "USER");
   }
+
+  @Test
+  void seedsNationwideRegionsAndConnectsEveryDummyPlace() {
+    Integer regionCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM region", Integer.class);
+    Integer unmappedPlaceCount =
+        jdbcTemplate.queryForObject(
+            """
+            SELECT COUNT(*)
+            FROM place
+            LEFT JOIN region_place ON region_place.place_id = place.place_id
+            WHERE region_place.region_place_id IS NULL
+            """,
+            Integer.class);
+
+    assertThat(regionCount).isEqualTo(256);
+    assertThat(unmappedPlaceCount).isZero();
+    assertThat(hasRegion("서울특별시", "해당 없음", "종로구")).isTrue();
+    assertThat(hasRegion("경기도", "수원시", "팔달구")).isTrue();
+    assertThat(hasRegion("세종특별자치시", "해당 없음", "해당 없음")).isTrue();
+  }
+
+  private boolean hasRegion(String si, String gun, String gu) {
+    Integer count =
+        jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM region WHERE si = ? AND gun = ? AND gu = ?",
+            Integer.class,
+            si,
+            gun,
+            gu);
+    return count != null && count > 0;
+  }
 }

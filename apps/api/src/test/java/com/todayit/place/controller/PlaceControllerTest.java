@@ -25,6 +25,7 @@ import com.todayit.place.service.model.PlaceLocationResult;
 import com.todayit.place.service.model.PlaceResult;
 import com.todayit.place.service.model.PlaceScrapResult;
 import com.todayit.place.service.model.PlaceSort;
+import com.todayit.place.service.model.PlaceWeekday;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -79,13 +80,25 @@ class PlaceControllerTest {
             Category.RESTAURANT,
             10,
             List.of("https://placehold.co/1200x800?text=Restaurant"));
-    when(placeQueryService.findPlaces(1, 5, PlaceSort.POPULAR))
+    when(placeQueryService.findPlaces(
+            "종로구",
+            List.of(Category.RESTAURANT, Category.CAFE_DESSERT),
+            PlaceWeekday.MONDAY,
+            1,
+            5,
+            PlaceSort.POPULAR))
         .thenReturn(new PageResult<>(List.of(place), 1, 5, 6));
 
     // When
     mockMvc
         .perform(
-            get("/api/v1/places").param("page", "1").param("size", "5").param("sort", "POPULAR"))
+            get("/api/v1/places")
+                .param("region", "종로구")
+                .param("categories", "RESTAURANT", "CAFE_DESSERT")
+                .param("weekdays", "MONDAY")
+                .param("page", "1")
+                .param("size", "5")
+                .param("sort", "POPULAR"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.content[0].placeId").value(1))
@@ -100,7 +113,94 @@ class PlaceControllerTest {
         .andExpect(jsonPath("$.data.totalPages").value(2));
 
     // Then
-    verify(placeQueryService).findPlaces(1, 5, PlaceSort.POPULAR);
+    verify(placeQueryService)
+        .findPlaces(
+            "종로구",
+            List.of(Category.RESTAURANT, Category.CAFE_DESSERT),
+            PlaceWeekday.MONDAY,
+            1,
+            5,
+            PlaceSort.POPULAR);
+  }
+
+  /**
+   * 지원하지 않는 장소 카테고리를 잘못된 요청으로 처리하는지 검증합니다.
+   *
+   * @throws Exception MockMvc 요청 처리 중 예외
+   */
+  @Test
+  @DisplayName("지원하지 않는 카테고리 필터는 400 응답을 반환한다")
+  void returnsBadRequestForInvalidCategory() throws Exception {
+    // When
+    mockMvc
+        .perform(get("/api/v1/places").param("categories", "INVALID_CATEGORY"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("INVALID_PLACE_CATEGORY"))
+        .andExpect(jsonPath("$.message").value("카테고리 필터 값이 올바르지 않습니다."));
+
+    // Then
+    verifyNoInteractions(placeQueryService);
+  }
+
+  /**
+   * 지원하지 않는 영업 요일을 잘못된 요청으로 처리하는지 검증합니다.
+   *
+   * @throws Exception MockMvc 요청 처리 중 예외
+   */
+  @Test
+  @DisplayName("지원하지 않는 요일 필터는 400 응답을 반환한다")
+  void returnsBadRequestForInvalidWeekday() throws Exception {
+    // When
+    mockMvc
+        .perform(get("/api/v1/places").param("weekdays", "FUNDAY"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("INVALID_PLACE_WEEKDAY"))
+        .andExpect(jsonPath("$.message").value("요일 필터 값이 올바르지 않습니다."));
+
+    // Then
+    verifyNoInteractions(placeQueryService);
+  }
+
+  /**
+   * 빈 장소 카테고리 값을 잘못된 요청으로 처리하는지 검증합니다.
+   *
+   * @throws Exception MockMvc 요청 처리 중 예외
+   */
+  @Test
+  @DisplayName("빈 카테고리 필터는 400 응답을 반환한다")
+  void returnsBadRequestForEmptyCategory() throws Exception {
+    // When
+    mockMvc
+        .perform(get("/api/v1/places").param("categories", ""))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("INVALID_PLACE_CATEGORY"))
+        .andExpect(jsonPath("$.message").value("카테고리 필터 값이 올바르지 않습니다."));
+
+    // Then
+    verifyNoInteractions(placeQueryService);
+  }
+
+  /**
+   * 빈 영업 요일 값을 잘못된 요청으로 처리하는지 검증합니다.
+   *
+   * @throws Exception MockMvc 요청 처리 중 예외
+   */
+  @Test
+  @DisplayName("빈 요일 필터는 400 응답을 반환한다")
+  void returnsBadRequestForEmptyWeekday() throws Exception {
+    // When
+    mockMvc
+        .perform(get("/api/v1/places").param("weekdays", ""))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("INVALID_PLACE_WEEKDAY"))
+        .andExpect(jsonPath("$.message").value("요일 필터 값이 올바르지 않습니다."));
+
+    // Then
+    verifyNoInteractions(placeQueryService);
   }
 
   /** 특정 장소를 포함한 코스 목록을 페이지 정보와 함께 반환하는지 검증합니다. */

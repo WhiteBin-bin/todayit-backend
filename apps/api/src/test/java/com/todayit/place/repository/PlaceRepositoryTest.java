@@ -2,7 +2,9 @@ package com.todayit.place.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.todayit.place.entity.Category;
 import com.todayit.place.entity.Place;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,6 +40,7 @@ class PlaceRepositoryTest {
   void setUp() {
     jdbcTemplate.update("DELETE FROM place_member_like");
     jdbcTemplate.update("DELETE FROM place_scrap");
+    jdbcTemplate.update("DELETE FROM region_place");
     jdbcTemplate.update("DELETE FROM hours");
     jdbcTemplate.update("DELETE FROM place_image");
     jdbcTemplate.update("DELETE FROM place");
@@ -60,11 +63,163 @@ class PlaceRepositoryTest {
         """);
 
     // When
-    Page<Place> result = placeRepository.findByIsActiveTrueAndIsDeletedFalse(PageRequest.of(0, 10));
+    Page<Place> result =
+        placeRepository.findPlaces(
+            List.of(0), false, List.of(Category.values()), false, false, 0, PageRequest.of(0, 10));
 
     // Then
     assertThat(result.getTotalElements()).isEqualTo(1);
     assertThat(result.getContent()).hasSize(1);
     assertThat(result.getContent().getFirst().getSnapshot().name()).isEqualTo("활성 장소");
+  }
+
+  /** 지역, 카테고리와 영업 요일 조건을 모두 만족하는 장소만 반환하는지 검증합니다. */
+  @Test
+  @DisplayName("지역, 다중 카테고리, 영업 요일이 모두 일치하는 장소만 조회한다")
+  @Transactional
+  void findsPlacesMatchingAllFilters() {
+    // Given
+    Integer regionId =
+        jdbcTemplate.queryForObject(
+            "INSERT INTO region (si, gun, gu) VALUES ('서울특별시', '해당 없음', '종로구') RETURNING region_id",
+            Integer.class);
+    Integer restaurantId = insertPlace("월요일 식당", "RESTAURANT");
+    Integer cafeId = insertPlace("화요일 카페", "CAFE_DESSERT");
+    Integer barId = insertPlace("월요일 바", "BAR");
+    linkRegion(regionId, restaurantId);
+    linkRegion(regionId, cafeId);
+    linkRegion(regionId, barId);
+    insertHours(restaurantId, "2026-10-05T09:00:00");
+    insertHours(cafeId, "2026-10-06T09:00:00");
+    insertHours(barId, "2026-10-05T18:00:00");
+
+    // When
+    Page<Place> result =
+        placeRepository.findPlaces(
+            List.of(regionId),
+            true,
+            List.of(Category.RESTAURANT, Category.CAFE_DESSERT),
+            true,
+            true,
+            1,
+            PageRequest.of(0, 10));
+
+    // Then
+    assertThat(result.getTotalElements()).isEqualTo(1);
+    assertThat(result.getContent().getFirst().getSnapshot().name()).isEqualTo("월요일 식당");
+  }
+
+  /** 시 단위 필터는 모든 하위 구를, 시·구 경로 필터는 선택한 구만 반환하는지 검증합니다. */
+  @Test
+  @DisplayName("상위 지역은 모든 하위 지역을 포함하고 전체 경로는 선택한 하위 지역만 조회한다")
+  @Transactional
+  void findsPlacesInAllDistrictsOfSelectedCity() {
+    // Given
+    Integer jongnoRegionId = insertRegion("서울특별시", "해당 없음", "종로구");
+    Integer mapoRegionId = insertRegion("서울특별시", "해당 없음", "마포구");
+    Integer suwonRegionId = insertRegion("경기도", "수원시", "팔달구");
+    Integer jongnoPlaceId = insertPlace("종로 장소", "RESTAURANT");
+    Integer mapoPlaceId = insertPlace("마포 장소", "CAFE_DESSERT");
+    Integer suwonPlaceId = insertPlace("수원 장소", "BAR");
+    linkRegion(jongnoRegionId, jongnoPlaceId);
+    linkRegion(mapoRegionId, mapoPlaceId);
+    linkRegion(suwonRegionId, suwonPlaceId);
+
+    // When
+    Page<Place> result =
+        placeRepository.findPlaces(
+            List.of(jongnoRegionId, mapoRegionId),
+            true,
+            List.of(Category.values()),
+            false,
+            false,
+            0,
+            PageRequest.of(0, 10));
+
+    // Then
+    assertThat(result.getContent())
+        .extracting(place -> place.getSnapshot().name())
+        .containsExactlyInAnyOrder("종로 장소", "마포 장소");
+
+    Page<Place> districtResult =
+        placeRepository.findPlaces(
+            List.of(jongnoRegionId),
+            true,
+            List.of(Category.values()),
+            false,
+            false,
+            0,
+            PageRequest.of(0, 10));
+    assertThat(districtResult.getContent())
+        .extracting(place -> place.getSnapshot().name())
+        .containsExactly("종로 장소");
+  }
+
+  /**
+   * 필터 테스트에 사용할 지역을 생성합니다.
+   *
+   * @param si 시·도
+   * @param gun 시·군
+   * @param gu 구
+   * @return 생성한 지역 식별자
+   */
+  private Integer insertRegion(String si, String gun, String gu) {
+    return jdbcTemplate.queryForObject(
+        "INSERT INTO region (si, gun, gu) VALUES (?, ?, ?) RETURNING region_id",
+        Integer.class,
+        si,
+        gun,
+        gu);
+  }
+
+  /**
+   * 필터 테스트에 사용할 활성 장소를 생성합니다.
+   *
+   * @param name 장소명
+   * @param category 장소 카테고리
+   * @return 생성한 장소 식별자
+   */
+  private Integer insertPlace(String name, String category) {
+    return jdbcTemplate.queryForObject(
+        """
+        INSERT INTO place (
+            name, latitude, longitude, address, category, view_count, is_active, is_deleted
+        ) VALUES (?, 37.50000000, 127.00000000, '종로구 주소', ?, 0, TRUE, FALSE)
+        RETURNING place_id
+        """,
+        Integer.class,
+        name,
+        category);
+  }
+
+  /**
+   * 지역과 장소의 관계를 생성합니다.
+   *
+   * @param regionId 지역 식별자
+   * @param placeId 장소 식별자
+   */
+  private void linkRegion(int regionId, int placeId) {
+    jdbcTemplate.update(
+        "INSERT INTO region_place (region_id, place_id) VALUES (?, ?)", regionId, placeId);
+  }
+
+  /**
+   * 장소의 영업시간을 생성합니다.
+   *
+   * @param placeId 장소 식별자
+   * @param openDate 영업 시작 날짜와 시각
+   */
+  private void insertHours(int placeId, String openDate) {
+    jdbcTemplate.update(
+        """
+        INSERT INTO hours (place_id, open_date, start_at, end_at)
+        VALUES (?, CAST(? AS TIMESTAMP WITH TIME ZONE),
+                CAST(? AS TIMESTAMP WITH TIME ZONE),
+                CAST(? AS TIMESTAMP WITH TIME ZONE) + INTERVAL '1 hour')
+        """,
+        placeId,
+        openDate,
+        openDate,
+        openDate);
   }
 }

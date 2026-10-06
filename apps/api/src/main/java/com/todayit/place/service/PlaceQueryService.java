@@ -1,6 +1,8 @@
 package com.todayit.place.service;
 
 import com.todayit.common.pagination.PageResult;
+import com.todayit.course.service.RegionPlaceQueryService;
+import com.todayit.place.entity.Category;
 import com.todayit.place.entity.Place;
 import com.todayit.place.entity.PlaceImage;
 import com.todayit.place.exception.PlaceNotFoundException;
@@ -12,6 +14,8 @@ import com.todayit.place.service.model.PlaceLocationResult;
 import com.todayit.place.service.model.PlaceResult;
 import com.todayit.place.service.model.PlaceScrapSort;
 import com.todayit.place.service.model.PlaceSort;
+import com.todayit.place.service.model.PlaceWeekday;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -28,6 +32,7 @@ public class PlaceQueryService implements PlaceScrapQueryService {
   private final PlaceRepository placeRepository;
   private final PlaceImageRepository placeImageRepository;
   private final PlaceScrapRepository placeScrapRepository;
+  private final RegionPlaceQueryService regionPlaceQueryService;
 
   /**
    * 장소 조회에 필요한 Repository를 받습니다.
@@ -35,33 +40,60 @@ public class PlaceQueryService implements PlaceScrapQueryService {
    * @param placeRepository 장소 Repository
    * @param placeImageRepository 장소 이미지 Repository
    * @param placeScrapRepository 장소 스크랩 Repository
+   * @param regionPlaceQueryService 장소 필터용 지역 조회 Service 계약
    */
   public PlaceQueryService(
       PlaceRepository placeRepository,
       PlaceImageRepository placeImageRepository,
-      PlaceScrapRepository placeScrapRepository) {
+      PlaceScrapRepository placeScrapRepository,
+      RegionPlaceQueryService regionPlaceQueryService) {
     this.placeRepository = placeRepository;
     this.placeImageRepository = placeImageRepository;
     this.placeScrapRepository = placeScrapRepository;
+    this.regionPlaceQueryService = regionPlaceQueryService;
   }
 
   /**
    * 활성화되고 삭제되지 않은 장소를 페이지 단위로 조회합니다. 장소 이미지도 페이지 내 장소를 기준으로 일괄 조회하여 결과에 포함합니다.
    *
+   * @param region 단일 시·도·시·군·구 이름 또는 상위 지역부터 입력한 경로
+   * @param categories 장소 카테고리 목록
+   * @param weekday 영업 요일
    * @param page 페이지 번호
    * @param size 페이지 크기
    * @param sort 정렬 기준
    * @return 장소 목록과 페이지 정보
    */
   @Transactional(readOnly = true)
-  public PageResult<PlaceResult> findPlaces(int page, int size, PlaceSort sort) {
+  public PageResult<PlaceResult> findPlaces(
+      String region,
+      List<Category> categories,
+      PlaceWeekday weekday,
+      int page,
+      int size,
+      PlaceSort sort) {
     Sort order =
         sort == PlaceSort.LATEST
             ? Sort.by(Sort.Direction.DESC, "createdAt")
             : Sort.by(Sort.Direction.DESC, "viewCount");
 
+    boolean regionFiltered = region != null;
+    List<Integer> regionIds =
+        regionFiltered ? regionPlaceQueryService.findRegionIds(region) : List.of(0);
+    boolean categoryFiltered = categories != null && !categories.isEmpty();
+    List<Category> categoryFilters =
+        categoryFiltered ? List.copyOf(categories) : Arrays.asList(Category.values());
+    boolean weekdayFiltered = weekday != null;
+    int weekdayFilter = weekdayFiltered ? weekday.getIsoValue() : 0;
     Page<Place> placePage =
-        placeRepository.findByIsActiveTrueAndIsDeletedFalse(PageRequest.of(page, size, order));
+        placeRepository.findPlaces(
+            regionIds,
+            regionFiltered,
+            categoryFilters,
+            categoryFiltered,
+            weekdayFiltered,
+            weekdayFilter,
+            PageRequest.of(page, size, order));
     List<Place> places = placePage.getContent();
     Map<Integer, List<String>> imageUrlsByPlaceId = findImageUrlsByPlaceId(places);
     List<PlaceResult> content =

@@ -20,6 +20,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.List;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -31,12 +32,21 @@ public interface PlaceApiDocs {
   /**
    * 장소 목록을 페이지 단위로 조회합니다.
    *
+   * @param region 단일 시·도·시·군·구 이름 또는 상위 지역부터 입력한 경로
+   * @param categories 장소 카테고리 목록
+   * @param weekdays 영업 요일
    * @param page 페이지 번호
    * @param size 페이지 크기
    * @param sort 정렬 기준
    * @return 장소 목록과 페이지 정보
    */
-  @Operation(summary = "장소 목록 조회", description = "활성화되고 삭제되지 않은 장소 목록을 페이지 단위로 조회합니다.")
+  @Operation(
+      summary = "장소 필터 조회",
+      description =
+          "지역, 카테고리, 영업 요일을 선택해 활성 장소 목록을 페이지 단위로 조회합니다. "
+              + "시·도 또는 시·군을 선택하면 모든 하위 지역을 포함하며 구만 단독으로 선택할 수도 있습니다. "
+              + "상위 지역과 하위 지역을 함께 전달하면 해당 경로만 조회합니다. "
+              + "예: 서울특별시, 수원시, 중구, 서울특별시 동대문구, 수원시 팔달구")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -50,15 +60,29 @@ public interface PlaceApiDocs {
                             "{\"success\":true,\"data\":{\"content\":[{\"placeId\":1,\"name\":\"오늘의 식당\",\"latitude\":37.57000000,\"longitude\":126.98500000,\"address\":\"서울특별시 종로구 종로 1\",\"category\":\"RESTAURANT\",\"viewCount\":15,\"imageUrls\":[\"https://example.com/place.jpg\"]}],\"page\":0,\"size\":20,\"totalElements\":1,\"totalPages\":1}}"))),
     @ApiResponse(
         responseCode = "400",
-        description = "잘못된 페이지 요청",
+        description = "잘못된 필터 또는 페이지 요청",
         content =
             @Content(
                 mediaType = MediaType.APPLICATION_JSON_VALUE,
                 schema = @Schema(implementation = ErrorResponse.class),
-                examples =
-                    @ExampleObject(
-                        value =
-                            "{\"success\":false,\"code\":\"INVALID_PAGINATION\",\"message\":\"페이지 요청값이 올바르지 않습니다.\"}"))),
+                examples = {
+                  @ExampleObject(
+                      name = "잘못된 카테고리",
+                      value =
+                          "{\"success\":false,\"code\":\"INVALID_PLACE_CATEGORY\",\"message\":\"카테고리 필터 값이 올바르지 않습니다.\"}"),
+                  @ExampleObject(
+                      name = "잘못된 요일",
+                      value =
+                          "{\"success\":false,\"code\":\"INVALID_PLACE_WEEKDAY\",\"message\":\"요일 필터 값이 올바르지 않습니다.\"}"),
+                  @ExampleObject(
+                      name = "잘못된 지역 경로",
+                      value =
+                          "{\"success\":false,\"code\":\"INVALID_REGION_PATH\",\"message\":\"지역 필터 값이 올바르지 않습니다.\"}"),
+                  @ExampleObject(
+                      name = "잘못된 페이지",
+                      value =
+                          "{\"success\":false,\"code\":\"INVALID_PAGINATION\",\"message\":\"페이지 요청값이 올바르지 않습니다.\"}")
+                })),
     @ApiResponse(
         responseCode = "500",
         description = "서버 내부 오류",
@@ -72,7 +96,7 @@ public interface PlaceApiDocs {
                             "{\"success\":false,\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"서버 내부 오류가 발생했습니다.\"}")))
   })
   ResponseEntity<CommonResponse<PageResponse<PlaceResponse>>> findPlaces(
-      int page, int size, PlaceSort sort);
+      String region, List<String> categories, String weekdays, int page, int size, PlaceSort sort);
 
   /**
    * 장소의 지도 표시 정보를 조회합니다.
@@ -303,7 +327,15 @@ public interface PlaceApiDocs {
   ResponseEntity<CommonResponse<PlaceScrapResponse>> cancelPlaceScrap(
       int placeId, Authentication authentication);
 
-  /** 특정 장소의 공개 코스 목록을 조회합니다. */
+  /**
+   * 특정 장소의 공개 코스 목록을 조회합니다.
+   *
+   * @param placeId 장소 식별자
+   * @param page 페이지 번호
+   * @param size 페이지 크기
+   * @param sort 코스 정렬 기준
+   * @return 장소를 포함한 공개 코스 목록과 페이지 정보
+   */
   @Operation(summary = "장소별 코스 조회", description = "특정 장소를 포함한 공개 코스 목록을 페이지 단위로 조회합니다.")
   @ApiResponses({
     @ApiResponse(
@@ -353,7 +385,13 @@ public interface PlaceApiDocs {
   ResponseEntity<CommonResponse<PageResponse<CourseResponse>>> findCoursesByPlace(
       int placeId, int page, int size, CourseSort sort);
 
-  /** 인증된 회원의 장소 좋아요를 생성합니다. */
+  /**
+   * 인증된 회원의 장소 좋아요를 생성합니다.
+   *
+   * @param placeId 장소 식별자
+   * @param authentication 인증된 회원 정보
+   * @return 장소 좋아요 결과
+   */
   @Operation(
       summary = "장소 좋아요",
       description = "인증된 회원의 장소 좋아요를 생성합니다.",
