@@ -1,6 +1,7 @@
 package com.todayit.place.dto.response;
 
 import com.todayit.place.service.model.PlaceLocationResult;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 
 /**
@@ -11,8 +12,25 @@ import java.math.BigDecimal;
  * @param longitude 경도
  * @param address 주소
  */
+@Schema(description = "장소 지도 조회 응답")
 public record PlaceLocationResponse(
-    int placeId, BigDecimal latitude, BigDecimal longitude, String address) {
+    @Schema(description = "장소 식별자입니다.", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
+        int placeId,
+    @Schema(
+            description = "장소의 위도입니다.",
+            example = "37.5665",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        BigDecimal latitude,
+    @Schema(
+            description = "장소의 경도입니다.",
+            example = "126.9780",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        BigDecimal longitude,
+    @Schema(
+            description = "장소 주소입니다.",
+            example = "서울특별시 중구 세종대로 110",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        String address) {
 
   /**
    * 장소 위치 조회 결과를 API 응답으로 변환합니다.

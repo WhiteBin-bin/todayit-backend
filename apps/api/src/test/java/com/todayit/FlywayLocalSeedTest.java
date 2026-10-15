@@ -3,6 +3,7 @@ package com.todayit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -28,7 +29,12 @@ class FlywayLocalSeedTest {
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @Test
+  @DisplayName("지역과 회원 생성 후 회원별 권한을 연결한다")
   void seedsOneDummyMemberForEachRole() {
+    // Given
+    List<String> expectedRoleNames = List.of("ADMIN", "DEV", "USER");
+
+    // When
     List<String> roleNames =
         jdbcTemplate.queryForList(
             """
@@ -45,6 +51,66 @@ class FlywayLocalSeedTest {
             """,
             String.class);
 
-    assertThat(roleNames).containsExactly("ADMIN", "DEV", "USER");
+    // Then
+    assertThat(roleNames).containsExactlyElementsOf(expectedRoleNames);
+  }
+
+  @Test
+  @DisplayName("전국 지역 생성 후 모든 더미 장소를 지역에 연결한다")
+  void seedsNationwideRegionsAndConnectsEveryDummyPlace() {
+    // Given
+    int expectedRegionCount = 256;
+
+    // When
+    Integer regionCount =
+        jdbcTemplate.queryForObject("SELECT COUNT(*) FROM \"todayit\".region", Integer.class);
+    Integer placeCount =
+        jdbcTemplate.queryForObject("SELECT COUNT(*) FROM \"todayit\".place", Integer.class);
+    Integer unmappedPlaceCount =
+        jdbcTemplate.queryForObject(
+            """
+            SELECT COUNT(*)
+            FROM "todayit".place
+            LEFT JOIN "todayit".region_place ON region_place.place_id = place.place_id
+            WHERE region_place.region_place_id IS NULL
+            """,
+            Integer.class);
+
+    // Then
+    assertThat(regionCount).isEqualTo(expectedRegionCount);
+    assertThat(placeCount).isPositive();
+    assertThat(unmappedPlaceCount).isZero();
+    assertThat(hasRegion("서울특별시", "해당 없음", "종로구")).isTrue();
+    assertThat(hasRegion("경기도", "수원시", "팔달구")).isTrue();
+    assertThat(hasRegion("세종특별자치시", "해당 없음", "해당 없음")).isTrue();
+  }
+
+  @Test
+  @DisplayName("회원과 장소 생성 후 더미 코스와 코스별 장소를 연결한다")
+  void seedsCoursesAfterMembersAndPlaces() {
+    // Given
+    int expectedCourseCount = 2;
+    int expectedCoursePlaceCount = 6;
+
+    // When
+    Integer courseCount =
+        jdbcTemplate.queryForObject("SELECT COUNT(*) FROM \"todayit\".course", Integer.class);
+    Integer coursePlaceCount =
+        jdbcTemplate.queryForObject("SELECT COUNT(*) FROM \"todayit\".course_place", Integer.class);
+
+    // Then
+    assertThat(courseCount).isEqualTo(expectedCourseCount);
+    assertThat(coursePlaceCount).isEqualTo(expectedCoursePlaceCount);
+  }
+
+  private boolean hasRegion(String si, String gun, String gu) {
+    Integer count =
+        jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM \"todayit\".region WHERE si = ? AND gun = ? AND gu = ?",
+            Integer.class,
+            si,
+            gun,
+            gu);
+    return count != null && count > 0;
   }
 }

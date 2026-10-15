@@ -2,6 +2,7 @@ package com.todayit.place.dto.response;
 
 import com.todayit.place.entity.Category;
 import com.todayit.place.service.model.PlaceResult;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -17,15 +18,42 @@ import java.util.List;
  * @param viewCount 조회수
  * @param imageUrls 장소 이미지 URL 목록
  */
+@Schema(description = "장소 목록 응답의 장소 정보")
 public record PlaceResponse(
-    int placeId,
-    String name,
-    BigDecimal latitude,
-    BigDecimal longitude,
-    String address,
-    Category category,
-    int viewCount,
-    List<String> imageUrls) {
+    @Schema(description = "장소 식별자입니다.", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
+        int placeId,
+    @Schema(
+            description = "장소 이름입니다.",
+            example = "오늘 카페",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        String name,
+    @Schema(
+            description = "장소의 위도입니다.",
+            example = "37.5665",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        BigDecimal latitude,
+    @Schema(
+            description = "장소의 경도입니다.",
+            example = "126.9780",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        BigDecimal longitude,
+    @Schema(
+            description = "장소 주소입니다.",
+            example = "서울특별시 중구 세종대로 110",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        String address,
+    @Schema(
+            description = "장소의 이용 목적과 성격을 구분하는 카테고리입니다.",
+            example = "CAFE_DESSERT",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        Category category,
+    @Schema(description = "장소 조회수입니다.", example = "10", requiredMode = Schema.RequiredMode.REQUIRED)
+        int viewCount,
+    @Schema(
+            description = "장소 이미지 URL 목록입니다. 이미지가 없으면 빈 목록을 반환합니다.",
+            example = "[\"https://example.com/images/place-1.jpg\"]",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        List<String> imageUrls) {
 
   /**
    * 장소 조회 결과를 API 응답으로 변환합니다.

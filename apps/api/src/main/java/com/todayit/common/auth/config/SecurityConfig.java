@@ -4,6 +4,7 @@ import com.todayit.common.auth.filter.JwtAuthenticationFilter;
 import com.todayit.common.auth.handler.RestAccessDeniedHandler;
 import com.todayit.common.auth.handler.RestAuthenticationEntryPoint;
 import com.todayit.common.auth.jwt.JwtProperties;
+import jakarta.servlet.DispatcherType;
 import java.util.List;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -102,6 +103,9 @@ public class SecurityConfig {
         .authorizeHttpRequests(
             authorize ->
                 authorize
+                    // MVC 오류 응답을 만들 때 원래의 상태 코드를 인증 오류로 덮어쓰지 않음
+                    .dispatcherTypeMatchers(DispatcherType.ERROR)
+                    .permitAll()
                     // 로그인, 회원가입 -> 인증 안 된 사용자가 호출해야함
                     .requestMatchers(
                         HttpMethod.POST,
@@ -139,7 +143,7 @@ public class SecurityConfig {
                         "/v3/api-docs.yaml")
                     .permitAll()
 
-                    // 위에를 제외한 모든 요청은 인증된 사용자만 접근 가능하도록 설정
+                    // 위를 제외한 모든 요청은 인증된 사용자만 접근 가능하도록 설정
                     .anyRequest()
                     .authenticated())
 

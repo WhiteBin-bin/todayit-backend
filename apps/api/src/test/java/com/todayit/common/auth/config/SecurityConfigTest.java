@@ -19,6 +19,7 @@ import com.todayit.course.service.CoursePlaceQueryService;
 import com.todayit.member.service.LoginFacade;
 import com.todayit.member.service.model.LoginResult;
 import com.todayit.member.service.model.MemberLoginResult;
+import com.todayit.place.service.PlaceCommandService;
 import com.todayit.place.service.PlaceQueryService;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -61,6 +62,8 @@ public class SecurityConfigTest {
   @MockitoBean private RefreshTokenService refreshTokenService;
 
   @MockitoBean private PlaceQueryService placeQueryService;
+
+  @MockitoBean private PlaceCommandService placeCommandService;
 
   @MockitoBean private CoursePlaceQueryService coursePlaceQueryService;
 
