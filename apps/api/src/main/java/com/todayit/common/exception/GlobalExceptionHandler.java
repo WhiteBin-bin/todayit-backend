@@ -37,6 +37,7 @@ public class GlobalExceptionHandler {
       case UNAUTHORIZED -> HttpStatus.UNAUTHORIZED;
       case NOT_FOUND -> HttpStatus.NOT_FOUND;
       case INTERNAL_SERVER_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
+      case CONFLICT -> HttpStatus.CONFLICT;
     };
   }
 }

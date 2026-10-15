@@ -18,6 +18,7 @@ import com.todayit.common.pagination.PageResult;
 import com.todayit.course.service.CoursePlaceQueryService;
 import com.todayit.member.service.LoginFacade;
 import com.todayit.member.service.model.LoginResult;
+import com.todayit.member.service.model.MemberLoginResult;
 import com.todayit.place.service.PlaceQueryService;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -74,8 +75,9 @@ public class SecurityConfigTest {
     // Given
     String url = "/api/v1/auth/login";
 
-    LoginResult loginResult =
-        new LoginResult("member-1", List.of("USER"), "access-token", "refresh-token", 1800L);
+    MemberLoginResult member = new MemberLoginResult("member-1", "테스트", false, List.of("USER"));
+
+    LoginResult loginResult = new LoginResult(member, "access-token", "refresh-token", 1800L);
 
     when(loginFacade.login(any())).thenReturn(loginResult);
 

@@ -7,7 +7,34 @@ import com.todayit.common.exception.ErrorStatus;
 public enum MemberErrorCode implements ErrorCode {
   LOGIN_FAILED("LOGIN_FAILED", "이메일 또는 비밀번호가 올바르지 않습니다.", ErrorStatus.UNAUTHORIZED),
 
-  LOGIN_LOCKED("LOGIN_LOCKED", "로그인 시도 횟수를 초과했습니다. 비밀번호를 변경해주세요.", ErrorStatus.UNAUTHORIZED);
+  LOGIN_LOCKED("LOGIN_LOCKED", "로그인 시도 횟수를 초과했습니다. 비밀번호를 변경해주세요.", ErrorStatus.UNAUTHORIZED),
+
+  EMAIL_VERIFICATION_CODE_EXPIRED(
+      "EMAIL_VERIFICATION_CODE_EXPIRED", "인증번호가 만료되었거나 존재하지 않습니다.", ErrorStatus.BAD_REQUEST),
+
+  EMAIL_VERIFICATION_CODE_INVALID(
+      "EMAIL_VERIFICATION_CODE_INVALID", "인증번호가 올바르지 않습니다.", ErrorStatus.BAD_REQUEST),
+
+  EMAIL_VERIFICATION_RESEND_TOO_SOON(
+      "EMAIL_VERIFICATION_RESEND_TOO_SOON", "인증번호는 1분 후 다시 요청할 수 있습니다.", ErrorStatus.BAD_REQUEST),
+
+  EMAIL_VERIFICATION_TOKEN_INVALID(
+      "EMAIL_VERIFICATION_TOKEN_INVALID", "이메일 인증 정보가 유효하지 않습니다.", ErrorStatus.BAD_REQUEST),
+
+  EMAIL_ALREADY_EXISTS("EMAIL_ALREADY_EXISTS", "이미 사용 중인 이메일입니다.", ErrorStatus.CONFLICT),
+
+  NICKNAME_ALREADY_EXISTS("NICKNAME_ALREADY_EXISTS", "이미 사용 중인 닉네임입니다.", ErrorStatus.CONFLICT),
+
+  EMAIL_DELIVERY_FAILED(
+      "EMAIL_DELIVERY_FAILED", "인증 이메일 발송에 실패했습니다.", ErrorStatus.INTERNAL_SERVER_ERROR),
+
+  EMAIL_VERIFICATION_SEND_LIMIT_EXCEEDED(
+      "EMAIL_VERIFICATION_SEND_LIMIT_EXCEEDED",
+      "이메일 인증 요청 횟수를 초과했습니다. 30분 후 다시 시도해 주세요.",
+      ErrorStatus.BAD_REQUEST),
+
+  REFRESH_TOKEN_INVALID(
+      "REFRESH_TOKEN_INVALID", "Refresh Token이 유효하지 않습니다.", ErrorStatus.UNAUTHORIZED);
 
   private final String code;
   private final String message;

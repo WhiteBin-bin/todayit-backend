@@ -1,0 +1,300 @@
+package com.todayit.member.service;
+
+import com.todayit.common.exception.BusinessException;
+import com.todayit.common.exception.InvalidRequestException;
+import com.todayit.member.entity.Agreement;
+import com.todayit.member.entity.BlocklistMatchType;
+import com.todayit.member.entity.EmailVerificationPurpose;
+import com.todayit.member.entity.Member;
+import com.todayit.member.entity.MemberAgreement;
+import com.todayit.member.entity.MemberProvider;
+import com.todayit.member.entity.MemberRole;
+import com.todayit.member.exception.InvalidEmailVerificationTokenException;
+import com.todayit.member.exception.MemberErrorCode;
+import com.todayit.member.repository.AgreementRepository;
+import com.todayit.member.repository.MemberAgreementRepository;
+import com.todayit.member.repository.MemberRepository;
+import com.todayit.member.repository.MemberRoleRepository;
+import com.todayit.member.repository.NicknameBlocklistRepository;
+import com.todayit.member.repository.PasswordBlocklistRepository;
+import com.todayit.member.service.command.SignupCommand;
+import com.todayit.member.util.EmailNormalizer;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import org.hibernate.exception.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+/** 로컬 회원가입 관련 기능을 처리합니다. */
+@Service
+public class SignupService {
+
+  private final MemberRepository memberRepository;
+  private final PasswordEncoder passwordEncoder;
+  private final EmailVerificationService emailVerificationService;
+  private final MemberRoleRepository memberRoleRepository;
+  private final MemberAgreementRepository memberAgreementRepository;
+  private final PasswordBlocklistRepository passwordBlocklistRepository;
+  private final NicknameBlocklistRepository nicknameBlocklistRepository;
+  private final AgreementRepository agreementRepository;
+
+  private static final String DEFAULT_ROLE_NAME = "USER";
+  private static final Logger LOG = LoggerFactory.getLogger(SignupService.class);
+
+  /**
+   * 회원가입에 필요한 저장소와 서비스를 받습니다.
+   *
+   * @param memberRepository 회원 Repository
+   * @param passwordEncoder 비밀번호 암호화
+   * @param emailVerificationService 이메일 인증 Service
+   * @param memberRoleRepository 회원 권한 Repository
+   * @param memberAgreementRepository 회원 약관 동의 Repository
+   * @param passwordBlocklistRepository 비밀번호 금칙어 Repository
+   * @param nicknameBlocklistRepository 닉네임 금칙어 Repository
+   * @param agreementRepository 약관 Repository
+   */
+  public SignupService(
+      MemberRepository memberRepository,
+      PasswordEncoder passwordEncoder,
+      EmailVerificationService emailVerificationService,
+      MemberRoleRepository memberRoleRepository,
+      MemberAgreementRepository memberAgreementRepository,
+      PasswordBlocklistRepository passwordBlocklistRepository,
+      NicknameBlocklistRepository nicknameBlocklistRepository,
+      AgreementRepository agreementRepository) {
+
+    this.memberRepository = memberRepository;
+    this.passwordEncoder = passwordEncoder;
+    this.emailVerificationService = emailVerificationService;
+    this.memberRoleRepository = memberRoleRepository;
+    this.memberAgreementRepository = memberAgreementRepository;
+    this.passwordBlocklistRepository = passwordBlocklistRepository;
+    this.nicknameBlocklistRepository = nicknameBlocklistRepository;
+    this.agreementRepository = agreementRepository;
+  }
+
+  /**
+   * 로컬 회원가입에 사용할 수 있는 이메일인지 확인합니다.
+   *
+   * @param email 확인할 이메일
+   * @return 사용 가능하면 true
+   */
+  @Transactional(readOnly = true)
+  public boolean isEmailAvailable(String email) {
+    String normalizedEmail = EmailNormalizer.normalize(email);
+
+    return !memberRepository.existsByEmailAndProvider(normalizedEmail, MemberProvider.LOCAL);
+  }
+
+  /**
+   * 닉네임의 형식과 금칙어를 검사하고 사용 가능 여부를 확인합니다.
+   *
+   * @param nickname 확인할 닉네임
+   * @return 사용 가능한 닉네임이면 true
+   * @throws InvalidRequestException 형식이 올바르지 않거나 금칙어인 경우
+   */
+  @Transactional(readOnly = true)
+  public boolean isNicknameAvailable(String nickname) {
+    if (nickname == null || nickname.isBlank()) {
+      throw new InvalidRequestException("닉네임은 필수입니다.");
+    }
+
+    if (nickname.length() < 2 || nickname.length() > 8) {
+      throw new InvalidRequestException("닉네임은 2자 이상 8자 이하이어야 합니다.");
+    }
+
+    if (!nickname.matches("[가-힣A-Za-z0-9]+")) {
+      throw new InvalidRequestException("닉네임은 한글, 영문, 숫자만 사용할 수 있습니다.");
+    }
+
+    if (nicknameBlocklistRepository.existsBlockedNickname(nickname)) {
+      throw new InvalidRequestException("사용할 수 없는 닉네임입니다.");
+    }
+
+    return !memberRepository.existsByNormalizedNickname(nickname);
+  }
+
+  /**
+   * 이메일 인증을 확인한 뒤 로컬 회원을 생성하고 기본 권한과 약관 동의 정보를 저장합니다.
+   *
+   * @param command 회원가입에 필요한 정보
+   * @return 저장된 회원
+   * @throws BusinessException 이미 사용 중인 로컬 이메일인 경우
+   * @throws InvalidRequestException 필수 약관에 동의하지 않은 경우
+   * @throws InvalidEmailVerificationTokenException 이메일 인증 정보가 유효하지 않은 경우
+   * @throws IllegalStateException 필수 약관 또는 기본 USER 권한 정보가 존재하지 않는 경우
+   */
+  @Transactional
+  public Member createLocalMember(SignupCommand command) {
+    String normalizedEmail = EmailNormalizer.normalize(command.email());
+    // 이미 가입된 LOCAL 이메일인지 확인
+    if (memberRepository.existsByEmailAndProvider(normalizedEmail, MemberProvider.LOCAL)) {
+      throw new BusinessException(MemberErrorCode.EMAIL_ALREADY_EXISTS);
+    }
+
+    // 현재 적용 중인 약관 조회
+    List<Agreement> currentAgreements = agreementRepository.findByDeletedFalse();
+
+    // 현재 적용 중인 필수 약관이 없으면 회원가입을 진행하지 않음
+    boolean hasRequiredAgreement = currentAgreements.stream().anyMatch(Agreement::isRequired);
+
+    if (!hasRequiredAgreement) {
+      throw new IllegalStateException("필수 약관 정보가 없습니다.");
+    }
+
+    // 약관 코드를 실제 DB 약관 정보와 연결
+    Map<String, Agreement> agreementsByCode =
+        currentAgreements.stream()
+            .collect(Collectors.toMap(Agreement::getCode, agreement -> agreement));
+
+    // 존재하지 않거나 현재 적용되지 않는 약관 코드는 거부
+    boolean hasUnknownAgreement =
+        command.agreements().keySet().stream()
+            .anyMatch(code -> !agreementsByCode.containsKey(code));
+
+    if (hasUnknownAgreement) {
+      throw new InvalidRequestException("유효하지 않은 약관 코드가 포함되어 있습니다.");
+    }
+
+    // 동의 여부는 반드시 true 또는 false
+    if (command.agreements().values().stream().anyMatch(agreed -> agreed == null)) {
+      throw new InvalidRequestException("약관 동의 여부를 확인해 주세요.");
+    }
+
+    // DB에서 필수로 설정한 약관은 반드시 동의해야 함
+    boolean hasMissingRequiredAgreement =
+        currentAgreements.stream()
+            .filter(Agreement::isRequired)
+            .anyMatch(
+                agreement -> !Boolean.TRUE.equals(command.agreements().get(agreement.getCode())));
+
+    if (hasMissingRequiredAgreement) {
+      throw new InvalidRequestException("필수 약관과 동의 항목을 확인해 주세요.");
+    }
+
+    emailVerificationService.validateVerificationToken(
+        normalizedEmail, EmailVerificationPurpose.SIGNUP, command.emailVerificationToken());
+
+    if (passwordBlocklistRepository.existsByWordAndMatchTypeAndEnabledTrue(
+        command.password(), BlocklistMatchType.EXACT)) {
+      throw new InvalidRequestException("쉽게 추측되거나 유출된 비밀번호입니다. 다른 비밀번호를 입력해 주세요.");
+    }
+
+    // 회원가입 직전 닉네임 형식, 금칙어 및 중복 확인
+    if (!isNicknameAvailable(command.nickname())) {
+      throw new BusinessException(MemberErrorCode.NICKNAME_ALREADY_EXISTS);
+    }
+
+    String encodedPassword = passwordEncoder.encode(command.password());
+
+    Member member = Member.createLocal(normalizedEmail, encodedPassword, command.nickname());
+
+    // 생성된 회원 정보를 DB에 저장
+    Member savedMember;
+
+    try {
+      savedMember = memberRepository.save(member);
+
+      // INSERT를 즉시 실행하여 UNIQUE 제약 위반을 여기에서 확인
+      memberRepository.flush();
+
+    } catch (DataIntegrityViolationException exception) {
+
+      Throwable cause = exception;
+
+      while (cause != null) {
+        if (cause instanceof ConstraintViolationException constraintException) {
+
+          String constraintName = constraintException.getConstraintName();
+
+          // 이메일 + 가입 방식 UNIQUE 제약 위반 (기존 및 정규화 기준)
+          if ("uk_member_email_provider".equalsIgnoreCase(constraintName)
+              || "uk_member_email_provider_normalized".equalsIgnoreCase(constraintName)) {
+            throw new BusinessException(MemberErrorCode.EMAIL_ALREADY_EXISTS);
+          }
+
+          // 닉네임 UNIQUE 제약 위반
+          if ("uk_member_nickname_normalized".equalsIgnoreCase(constraintName)) {
+            throw new BusinessException(MemberErrorCode.NICKNAME_ALREADY_EXISTS);
+          }
+        }
+
+        cause = cause.getCause();
+      }
+
+      // 그 외 DB 제약 위반은 기존 예외를 유지
+      throw exception;
+    }
+
+    // 신규 회원에게 부여할 기본 USER 권한 식별자 조회
+    Integer userRoleId =
+        memberRoleRepository
+            .findRoleIdByName(DEFAULT_ROLE_NAME)
+            .orElseThrow(() -> new IllegalStateException("USER 권한 정보가 없습니다."));
+
+    // 회원과 USER 권한 연결 정보 저장
+    memberRoleRepository.save(MemberRole.create(savedMember.getId(), userRoleId));
+
+    // 약관 코드를 실제 agreement_id로 변환해서 동의 정보 저장
+    command
+        .agreements()
+        .forEach(
+            (code, agreed) -> {
+              Integer agreementId = agreementsByCode.get(code).getId();
+
+              memberAgreementRepository.save(
+                  MemberAgreement.create(agreementId, savedMember.getId(), agreed));
+            });
+
+    // 회원가입에 사용한 이메일 인증 토큰 재사용 방지를 위해 삭제
+    invalidateVerificationTokenAfterCommit(command.emailVerificationToken());
+
+    return savedMember;
+  }
+
+  /**
+   * DB 커밋이 성공한 이후 이메일 인증 토큰을 무효화합니다.
+   *
+   * @param verificationToken 이메일 인증 토큰
+   */
+  private void invalidateVerificationTokenAfterCommit(String verificationToken) {
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      emailVerificationService.invalidateVerificationToken(verificationToken);
+      return;
+    }
+
+    TransactionSynchronizationManager.registerSynchronization(
+        new EmailVerificationTokenCleanupService(emailVerificationService, verificationToken));
+  }
+
+  /** 트랜잭션 커밋 완료 후 인증 토큰을 정리합니다. */
+  private static final class EmailVerificationTokenCleanupService
+      implements TransactionSynchronization {
+
+    private final EmailVerificationService emailVerificationService;
+    private final String verificationToken;
+
+    private EmailVerificationTokenCleanupService(
+        EmailVerificationService emailVerificationService, String verificationToken) {
+      this.emailVerificationService = emailVerificationService;
+      this.verificationToken = verificationToken;
+    }
+
+    @Override
+    public void afterCommit() {
+      try {
+        emailVerificationService.invalidateVerificationToken(verificationToken);
+      } catch (DataAccessException exception) {
+        LOG.error("회원가입 완료 후 이메일 인증 토큰 삭제에 실패했습니다.", exception);
+      }
+    }
+  }
+}
