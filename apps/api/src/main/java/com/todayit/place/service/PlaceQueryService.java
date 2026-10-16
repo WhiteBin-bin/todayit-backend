@@ -18,6 +18,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -27,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 /** 장소 조회 업무를 처리하는 Query Service입니다. */
 @Service
 public class PlaceQueryService implements PlaceScrapQueryService {
+
+  private static final Logger LOG = LoggerFactory.getLogger(PlaceQueryService.class);
 
   private final PlaceRepository placeRepository;
   private final PlaceImageRepository placeImageRepository;
@@ -88,6 +92,14 @@ public class PlaceQueryService implements PlaceScrapQueryService {
     List<PlaceResult> content =
         places.stream().map(place -> toResult(place, imageUrlsByPlaceId)).toList();
 
+    LOG.info(
+        "장소 목록 조회: regionFiltered={}, categoryFiltered={}, page={}, size={}, sort={}, resultCount={}",
+        regionFiltered,
+        categoryFiltered,
+        page,
+        size,
+        sort,
+        content.size());
     return new PageResult<>(
         content, placePage.getNumber(), placePage.getSize(), placePage.getTotalElements());
   }
@@ -106,6 +118,7 @@ public class PlaceQueryService implements PlaceScrapQueryService {
             .findByPlaceIdAndIsActiveTrueAndIsDeletedFalse(placeId)
             .orElseThrow(PlaceNotFoundException::new);
 
+    LOG.info("장소 위치 조회: placeId={}", placeId);
     return PlaceLocationResult.from(place.getSnapshot());
   }
 
@@ -145,6 +158,12 @@ public class PlaceQueryService implements PlaceScrapQueryService {
                 size,
                 Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("placeImageId"))));
 
+    LOG.info(
+        "장소 사진 조회: placeId={}, page={}, size={}, resultCount={}",
+        placeId,
+        page,
+        size,
+        imagePage.getNumberOfElements());
     return new PageResult<>(
         imagePage.getContent().stream()
             .map(image -> new PlaceImageResult(image.getPlaceImageId(), image.getImageUrl()))
@@ -176,6 +195,8 @@ public class PlaceQueryService implements PlaceScrapQueryService {
     List<PlaceResult> content =
         places.stream().map(place -> toResult(place, imageUrlsByPlaceId)).toList();
 
+    LOG.info(
+        "스크랩 장소 조회: page={}, size={}, sort={}, resultCount={}", page, size, sort, content.size());
     return new PageResult<>(
         content, placePage.getNumber(), placePage.getSize(), placePage.getTotalElements());
   }

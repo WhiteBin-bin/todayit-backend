@@ -18,14 +18,32 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @ExtendWith(MockitoExtension.class)
 class PlaceDetailQueryServiceTest {
+
+  private static final Logger LOG = LoggerFactory.getLogger(PlaceDetailQueryServiceTest.class);
+
+  @BeforeEach
+  void logTestStart(TestInfo testInfo) {
+    LOG.info("테스트 시작: {}", testInfo.getDisplayName());
+  }
+
+  @AfterEach
+  void logTestEnd(TestInfo testInfo) {
+    LOG.info("테스트 종료: {}", testInfo.getDisplayName());
+  }
+
   @Mock PlaceRepository places;
   @Mock PlaceMemberLikeRepository likes;
   @Mock PlaceScrapRepository scraps;

@@ -5,6 +5,8 @@ import com.todayit.course.entity.Course;
 import com.todayit.course.repository.CourseRepository;
 import com.todayit.course.service.model.CourseResult;
 import com.todayit.course.service.model.CourseSort;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -14,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 /** 코스 조회 업무를 처리하는 Query Service입니다. */
 @Service
 public class CourseQueryService implements CoursePlaceQueryService {
+
+  private static final Logger LOG = LoggerFactory.getLogger(CourseQueryService.class);
 
   private final CourseRepository courseRepository;
 
@@ -59,6 +63,13 @@ public class CourseQueryService implements CoursePlaceQueryService {
     Page<Course> coursePage =
         courseRepository.findPublicActiveByPlaceId(placeId, PageRequest.of(page, size, order));
 
+    LOG.info(
+        "장소별 코스 조회: placeId={}, page={}, size={}, sort={}, resultCount={}",
+        placeId,
+        page,
+        size,
+        sort,
+        coursePage.getNumberOfElements());
     return new PageResult<>(
         coursePage.getContent().stream()
             .map(course -> CourseResult.from(course.getSnapshot()))

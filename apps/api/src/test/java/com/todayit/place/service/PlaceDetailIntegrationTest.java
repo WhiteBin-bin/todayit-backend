@@ -4,8 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.todayit.place.service.model.PlaceDetailWithStayResult;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -17,6 +22,19 @@ import org.springframework.transaction.annotation.Transactional;
 @ActiveProfiles("test")
 @Transactional
 class PlaceDetailIntegrationTest {
+
+  private static final Logger LOG = LoggerFactory.getLogger(PlaceDetailIntegrationTest.class);
+
+  @BeforeEach
+  void logTestStart(TestInfo testInfo) {
+    LOG.info("테스트 시작: {}", testInfo.getDisplayName());
+  }
+
+  @AfterEach
+  void logTestEnd(TestInfo testInfo) {
+    LOG.info("테스트 종료: {}", testInfo.getDisplayName());
+  }
+
   @Autowired JdbcTemplate jdbc;
   @Autowired PlaceDetailFacade facade;
 

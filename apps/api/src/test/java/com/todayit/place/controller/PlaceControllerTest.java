@@ -32,12 +32,16 @@ import com.todayit.place.service.model.PlaceSort;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -45,6 +49,18 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 @ExtendWith(MockitoExtension.class)
 class PlaceControllerTest {
+
+  private static final Logger LOG = LoggerFactory.getLogger(PlaceControllerTest.class);
+
+  @BeforeEach
+  void logTestStart(TestInfo testInfo) {
+    LOG.info("테스트 시작: {}", testInfo.getDisplayName());
+  }
+
+  @AfterEach
+  void logTestEnd(TestInfo testInfo) {
+    LOG.info("테스트 종료: {}", testInfo.getDisplayName());
+  }
 
   @Mock private PlaceQueryService placeQueryService;
 
