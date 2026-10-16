@@ -18,14 +18,19 @@ import com.todayit.course.service.model.CourseSort;
 import com.todayit.place.entity.Category;
 import com.todayit.place.exception.PlaceNotFoundException;
 import com.todayit.place.service.PlaceCommandService;
+import com.todayit.place.service.PlaceDetailFacade;
 import com.todayit.place.service.PlaceQueryService;
+import com.todayit.place.service.model.PlaceDetailResult;
+import com.todayit.place.service.model.PlaceDetailWithStayResult;
 import com.todayit.place.service.model.PlaceImageResult;
 import com.todayit.place.service.model.PlaceLikeResult;
 import com.todayit.place.service.model.PlaceLocationResult;
+import com.todayit.place.service.model.PlaceOpeningHoursResult;
 import com.todayit.place.service.model.PlaceResult;
 import com.todayit.place.service.model.PlaceScrapResult;
 import com.todayit.place.service.model.PlaceSort;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +40,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,6 +52,8 @@ class PlaceControllerTest {
 
   @Mock private CoursePlaceQueryService coursePlaceQueryService;
 
+  @Mock private PlaceDetailFacade placeDetailFacade;
+
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -53,9 +61,70 @@ class PlaceControllerTest {
     mockMvc =
         MockMvcBuilders.standaloneSetup(
                 new PlaceController(
-                    placeQueryService, placeCommandService, coursePlaceQueryService))
+                    placeQueryService,
+                    placeCommandService,
+                    coursePlaceQueryService,
+                    placeDetailFacade))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
+  }
+
+  @Test
+  @DisplayName("장소 상세에 영업시간 리스트와 평균 체류 시간을 반환한다")
+  void returnsPlaceDetailWithOpeningHoursList() throws Exception {
+    // Given
+    PlaceOpeningHoursResult opening =
+        new PlaceOpeningHoursResult(
+            LocalDateTime.of(2026, 10, 16, 0, 0),
+            LocalDateTime.of(2026, 10, 16, 9, 0),
+            LocalDateTime.of(2026, 10, 16, 18, 0),
+            null,
+            null);
+    PlaceResult place =
+        new PlaceResult(
+            1,
+            "카페",
+            new BigDecimal("37.5"),
+            new BigDecimal("127.0"),
+            "서울",
+            Category.CAFE_DESSERT,
+            0,
+            List.of("https://example.com/place.jpg"));
+    PlaceDetailResult detail =
+        new PlaceDetailResult(place, "장소 설명", List.of(opening), false, false);
+    when(placeDetailFacade.getPlaceDetail(1, null))
+        .thenReturn(new PlaceDetailWithStayResult(detail, 0));
+    // When
+    ResultActions result = mockMvc.perform(get("/api/v1/places/1"));
+
+    // Then
+    result
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.placeId").value(1))
+        .andExpect(jsonPath("$.data.location.latitude").value(37.5))
+        .andExpect(jsonPath("$.data.description").value("장소 설명"))
+        .andExpect(jsonPath("$.data.openingHours").isArray())
+        .andExpect(jsonPath("$.data.openingHours[0].startAt").value("2026-10-16T09:00:00"))
+        .andExpect(jsonPath("$.data.images[0]").value("https://example.com/place.jpg"))
+        .andExpect(jsonPath("$.data.averageStayMinutes").value(0))
+        .andExpect(jsonPath("$.data.liked").value(false))
+        .andExpect(jsonPath("$.data.scrapped").value(false));
+  }
+
+  @Test
+  @DisplayName("선택 인증의 회원 식별자를 상세 조회에 전달한다")
+  void passesOptionalMemberToDetailLookup() throws Exception {
+    // Given
+    doThrow(new PlaceNotFoundException()).when(placeDetailFacade).getPlaceDetail(1, "member-1");
+    // When
+    ResultActions result =
+        mockMvc.perform(
+            get("/api/v1/places/1")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
+
+    // Then
+    result.andExpect(status().isNotFound());
+    verify(placeDetailFacade).getPlaceDetail(1, "member-1");
   }
 
   @Test
@@ -144,8 +213,8 @@ class PlaceControllerTest {
             "종로 맛집과 카페 코스",
             "종로에서 식사와 카페를 함께 즐기는 코스입니다.",
             com.todayit.course.entity.CourseTransport.WALKING,
-            java.time.LocalDateTime.of(2026, 10, 3, 11, 0),
-            java.time.LocalDateTime.of(2026, 10, 3, 15, 0),
+            LocalDateTime.of(2026, 10, 3, 11, 0),
+            LocalDateTime.of(2026, 10, 3, 15, 0),
             25);
     when(coursePlaceQueryService.findCoursesByPlace(1, 0, 20, CourseSort.LATEST))
         .thenReturn(new PageResult<>(List.of(course), 0, 20, 1));

@@ -7,6 +7,7 @@ import com.todayit.course.dto.response.CourseResponse;
 import com.todayit.course.service.CoursePlaceQueryService;
 import com.todayit.course.service.model.CourseSort;
 import com.todayit.place.controller.docs.PlaceApiDocs;
+import com.todayit.place.dto.response.PlaceDetailResponse;
 import com.todayit.place.dto.response.PlaceImageResponse;
 import com.todayit.place.dto.response.PlaceLikeResponse;
 import com.todayit.place.dto.response.PlaceLocationResponse;
@@ -15,6 +16,7 @@ import com.todayit.place.dto.response.PlaceScrapResponse;
 import com.todayit.place.entity.Category;
 import com.todayit.place.exception.InvalidPlaceCategoryFilterException;
 import com.todayit.place.service.PlaceCommandService;
+import com.todayit.place.service.PlaceDetailFacade;
 import com.todayit.place.service.PlaceQueryService;
 import com.todayit.place.service.model.PlaceSort;
 import java.util.Arrays;
@@ -42,6 +44,7 @@ public class PlaceController implements PlaceApiDocs {
   private static final Set<String> CATEGORY_FILTER_VALUES =
       Arrays.stream(Category.values()).map(Enum::name).collect(Collectors.toUnmodifiableSet());
 
+  private final PlaceDetailFacade placeDetailFacade;
   private final PlaceQueryService placeQueryService;
   private final PlaceCommandService placeCommandService;
   private final CoursePlaceQueryService coursePlaceQueryService;
@@ -49,6 +52,7 @@ public class PlaceController implements PlaceApiDocs {
   /**
    * 장소 기능을 처리할 서비스를 받습니다.
    *
+   * @param placeDetailFacade 장소 상세 조회 Facade
    * @param placeQueryService 장소 조회 Service
    * @param placeCommandService 장소 변경 Service
    * @param coursePlaceQueryService 코스 장소 조회 Service 계약
@@ -56,10 +60,28 @@ public class PlaceController implements PlaceApiDocs {
   public PlaceController(
       PlaceQueryService placeQueryService,
       PlaceCommandService placeCommandService,
-      CoursePlaceQueryService coursePlaceQueryService) {
+      CoursePlaceQueryService coursePlaceQueryService,
+      PlaceDetailFacade placeDetailFacade) {
+    this.placeDetailFacade = placeDetailFacade;
     this.placeQueryService = placeQueryService;
     this.placeCommandService = placeCommandService;
     this.coursePlaceQueryService = coursePlaceQueryService;
+  }
+
+  /**
+   * 장소 상세를 조회합니다.
+   *
+   * @param placeId 장소 식별자
+   * @param authentication 선택 인증 정보
+   * @return 장소 상세 응답
+   */
+  @GetMapping("/{placeId}")
+  public ResponseEntity<CommonResponse<PlaceDetailResponse>> getPlaceDetail(
+      @PathVariable int placeId, Authentication authentication) {
+    String memberId = authentication == null ? null : authentication.getName();
+    return ResponseEntity.ok(
+        CommonResponse.success(
+            PlaceDetailResponse.from(placeDetailFacade.getPlaceDetail(placeId, memberId))));
   }
 
   /**

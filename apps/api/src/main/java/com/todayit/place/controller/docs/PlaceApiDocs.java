@@ -6,6 +6,7 @@ import com.todayit.common.response.CommonResponse;
 import com.todayit.common.response.ErrorResponse;
 import com.todayit.course.dto.response.CourseResponse;
 import com.todayit.course.service.model.CourseSort;
+import com.todayit.place.dto.response.PlaceDetailResponse;
 import com.todayit.place.dto.response.PlaceImageResponse;
 import com.todayit.place.dto.response.PlaceLikeResponse;
 import com.todayit.place.dto.response.PlaceLocationResponse;
@@ -31,6 +32,65 @@ import org.springframework.security.core.Authentication;
 /** 장소 조회와 스크랩 API 명세입니다. */
 @Tag(name = "장소", description = "장소 조회와 스크랩 API")
 public interface PlaceApiDocs {
+  /**
+   * 활성화되고 삭제되지 않은 장소의 상세 정보와 요청 회원의 좋아요·스크랩 여부를 조회합니다.
+   *
+   * @param placeId 장소 식별자
+   * @param authentication 선택 인증 정보, 비회원이면 null
+   * @return 장소 기본 정보, 영업시간 목록, 이미지와 평균 체류 시간을 포함한 상세 응답
+   */
+  @Operation(
+      summary = "장소 상세 조회",
+      description = "장소의 상세 정보와 좋아요·스크랩 여부를 조회합니다. 인증은 선택사항입니다.",
+      security = {@SecurityRequirement(), @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)})
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "조회 성공",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":true,\"data\":{\"placeId\":1,\"name\":\"오늘 카페\",\"category\":\"CAFE_DESSERT\",\"address\":\"서울특별시 종로구 종로 1\",\"location\":{\"latitude\":37.57,\"longitude\":126.985},\"description\":\"조용한 분위기의 카페입니다.\",\"openingHours\":[{\"openDate\":\"2026-10-16T00:00:00\",\"startAt\":\"2026-10-16T09:00:00\",\"endAt\":\"2026-10-16T18:00:00\",\"breakStartAt\":\"2026-10-16T12:00:00\",\"breakEndAt\":\"2026-10-16T13:00:00\"}],\"images\":[\"https://example.com/images/place-1.jpg\"],\"averageStayMinutes\":60,\"liked\":true,\"scrapped\":false}}"))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "장소 식별자의 형식이 올바르지 않음",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"INVALID_REQUEST\",\"message\":\"요청값이 올바르지 않습니다.\"}"))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "장소가 없거나 비활성·삭제 상태",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"PLACE_NOT_FOUND\",\"message\":\"장소를 찾을 수 없습니다.\"}"))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 내부 오류",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"서버 내부 오류가 발생했습니다.\"}")))
+  })
+  ResponseEntity<CommonResponse<PlaceDetailResponse>> getPlaceDetail(
+      @Parameter(description = "장소 식별자입니다.", example = "1", required = true) int placeId,
+      @Parameter(hidden = true) Authentication authentication);
 
   /**
    * 장소 목록을 페이지 단위로 조회합니다.

@@ -18,6 +18,19 @@ public class CourseQueryService implements CoursePlaceQueryService {
   private final CourseRepository courseRepository;
 
   /**
+   * 해당 장소가 포함된 모든 코스의 체류 시간을 평균 내어 분 단위 정수로 반올림합니다.
+   *
+   * @param placeId 장소 식별자
+   * @return 평균 체류 시간(분), 등록된 체류 시간이 없으면 0
+   */
+  @Override
+  @Transactional(readOnly = true)
+  public long getAverageStayMinutes(int placeId) {
+    Double average = courseRepository.findAverageStayMinutes(placeId);
+    return average == null ? 0 : Math.round(average);
+  }
+
+  /**
    * 코스 조회에 필요한 Repository를 받습니다.
    *
    * @param courseRepository 코스 Repository

@@ -10,6 +10,15 @@ import org.springframework.data.repository.query.Param;
 public interface PlaceMemberLikeRepository extends JpaRepository<PlaceMemberLike, Integer> {
 
   /**
+   * 회원의 장소 좋아요 여부를 확인합니다.
+   *
+   * @param memberId 회원 식별자
+   * @param placeId 장소 식별자
+   * @return 좋아요 존재 여부
+   */
+  boolean existsByMemberIdAndPlacePlaceId(String memberId, int placeId);
+
+  /**
    * 회원의 장소 좋아요를 생성합니다.
    *
    * @param memberId 회원 식별자
