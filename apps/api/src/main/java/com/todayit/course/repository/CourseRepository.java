@@ -10,12 +10,13 @@ import org.springframework.data.repository.query.Param;
 /** 코스 정보를 조회하고 저장하는 JPA Repository입니다. */
 public interface CourseRepository extends JpaRepository<Course, Integer> {
   /**
-   * 해당 장소가 포함된 모든 코스의 체류 시간 평균을 조회합니다.
+   * 해당 장소가 포함된 모든 코스에서 0분을 제외한 체류 시간 평균을 조회합니다.
    *
    * @param placeId 장소 식별자
-   * @return 평균 체류 시간(분), 데이터가 없으면 null
+   * @return 평균 체류 시간(분), 0분을 제외한 데이터가 없으면 null
    */
-  @Query("select avg(cp.stayMinute) from CoursePlace cp where cp.placeId = :placeId")
+  @Query(
+      "select avg(cp.stayMinute) from CoursePlace cp where cp.placeId = :placeId and cp.stayMinute <> 0")
   Double findAverageStayMinutes(@Param("placeId") int placeId);
 
   /**

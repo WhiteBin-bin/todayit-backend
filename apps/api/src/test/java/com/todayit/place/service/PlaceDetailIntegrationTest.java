@@ -48,6 +48,66 @@ class PlaceDetailIntegrationTest {
         Integer.class);
   }
 
+  private void createCourseWithStayMinutes(int placeId, int... stayMinutes) {
+    String memberId = "stay-average-test-member";
+    jdbc.update(
+        "INSERT INTO member(member_id, provider, nickname) VALUES (?, 'GOOGLE', '평균 체류 테스트 회원')",
+        memberId);
+    int courseId =
+        jdbc.queryForObject(
+            """
+        INSERT INTO course(member_id,title,transport,start_at,end_at,status,visibility)
+        VALUES (?, '평균 체류 테스트 코스', 'WALKING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'ACTIVE', 'PUBLIC')
+        RETURNING course_id
+        """,
+            Integer.class,
+            memberId);
+    for (int order = 0; order < stayMinutes.length; order++) {
+      if (stayMinutes[order] == 0) {
+        jdbc.update(
+            "INSERT INTO course_place(course_id,place_id,\"order\") VALUES (?,?,?)",
+            courseId,
+            placeId,
+            order);
+      } else {
+        jdbc.update(
+            "INSERT INTO course_place(course_id,place_id,\"order\",stay_minute) VALUES (?,?,?,?)",
+            courseId,
+            placeId,
+            order,
+            stayMinutes[order]);
+      }
+    }
+  }
+
+  @Test
+  @DisplayName("미입력 기본값 0분은 평균에서 제외하고 입력된 체류 시간만 평균 낸다")
+  void excludesDefaultZeroStayMinutesFromAverage() {
+    // Given
+    int placeId = createPlace();
+    createCourseWithStayMinutes(placeId, 0, 60, 90);
+
+    // When
+    PlaceDetailWithStayResult result = facade.getPlaceDetail(placeId, null);
+
+    // Then
+    assertThat(result.averageStayMinutes()).isEqualTo(75);
+  }
+
+  @Test
+  @DisplayName("체류 시간이 모두 미입력 기본값 0분이면 평균 체류 시간은 0분이다")
+  void returnsZeroWhenAllStayMinutesAreDefaultZero() {
+    // Given
+    int placeId = createPlace();
+    createCourseWithStayMinutes(placeId, 0, 0);
+
+    // When
+    PlaceDetailWithStayResult result = facade.getPlaceDetail(placeId, null);
+
+    // Then
+    assertThat(result.averageStayMinutes()).isZero();
+  }
+
   @Test
   @DisplayName("관련 데이터가 없는 장소는 평균 0분과 빈 영업시간 및 이미지 목록을 반환한다")
   void returnsZeroAndEmptyListsWhenNoRelatedRecordsExist() {

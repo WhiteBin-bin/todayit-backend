@@ -60,7 +60,8 @@ public record PlaceDetailResponse(
             requiredMode = Schema.RequiredMode.REQUIRED)
         List<String> images,
     @Schema(
-            description = "해당 장소가 포함된 모든 코스의 체류 시간 평균을 반올림한 분 단위 값입니다. 데이터가 없으면 0을 반환합니다.",
+            description =
+                "해당 장소가 포함된 모든 코스에서 0분을 제외한 체류 시간 평균을 반올림한 분 단위 값입니다. 유효한 데이터가 없으면 0을 반환합니다.",
             example = "60",
             requiredMode = Schema.RequiredMode.REQUIRED)
         long averageStayMinutes,
