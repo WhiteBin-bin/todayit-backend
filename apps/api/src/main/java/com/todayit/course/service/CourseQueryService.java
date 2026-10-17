@@ -22,7 +22,7 @@ public class CourseQueryService implements CoursePlaceQueryService {
   private final CourseRepository courseRepository;
 
   /**
-   * 해당 장소가 포함된 모든 코스에서 0분을 제외한 체류 시간을 평균 내어 분 단위 정수로 반올림합니다.
+   * 공개 여부와 관계없이 해당 장소가 포함된 활성 코스에서 0분을 제외한 체류 시간을 평균 내어 분 단위 정수로 반올림합니다.
    *
    * @param placeId 장소 식별자
    * @return 평균 체류 시간(분), 0분을 제외한 체류 시간이 없으면 0

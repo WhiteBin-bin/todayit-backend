@@ -49,19 +49,26 @@ class PlaceDetailIntegrationTest {
   }
 
   private void createCourseWithStayMinutes(int placeId, int... stayMinutes) {
+    createCourseWithStayMinutes(placeId, "ACTIVE", "PUBLIC", stayMinutes);
+  }
+
+  private void createCourseWithStayMinutes(
+      int placeId, String status, String visibility, int... stayMinutes) {
     String memberId = "stay-average-test-member";
     jdbc.update(
-        "INSERT INTO member(member_id, provider, nickname) VALUES (?, 'GOOGLE', '평균 체류 테스트 회원')",
+        "INSERT INTO member(member_id, provider, nickname) VALUES (?, 'GOOGLE', '평균 체류 테스트 회원') ON CONFLICT DO NOTHING",
         memberId);
     int courseId =
         jdbc.queryForObject(
             """
         INSERT INTO course(member_id,title,transport,start_at,end_at,status,visibility)
-        VALUES (?, '평균 체류 테스트 코스', 'WALKING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'ACTIVE', 'PUBLIC')
+        VALUES (?, '평균 체류 테스트 코스', 'WALKING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?)
         RETURNING course_id
         """,
             Integer.class,
-            memberId);
+            memberId,
+            status,
+            visibility);
     for (int order = 0; order < stayMinutes.length; order++) {
       if (stayMinutes[order] == 0) {
         jdbc.update(
@@ -78,6 +85,38 @@ class PlaceDetailIntegrationTest {
             stayMinutes[order]);
       }
     }
+  }
+
+  @Test
+  @DisplayName("활성 공개·비공개 코스는 평균에 포함하고 임시저장·삭제 코스는 제외한다")
+  void averagesOnlyActiveCoursesRegardlessOfVisibility() {
+    // Given
+    int placeId = createPlace();
+    createCourseWithStayMinutes(placeId, "ACTIVE", "PUBLIC", 0, 60);
+    createCourseWithStayMinutes(placeId, "ACTIVE", "PRIVATE", 90);
+    createCourseWithStayMinutes(placeId, "DRAFT", "PUBLIC", 600);
+    createCourseWithStayMinutes(placeId, "DELETED", "PRIVATE", 900);
+
+    // When
+    PlaceDetailWithStayResult result = facade.getPlaceDetail(placeId, null);
+
+    // Then
+    assertThat(result.averageStayMinutes()).isEqualTo(75);
+  }
+
+  @Test
+  @DisplayName("임시저장·삭제 코스만 존재하면 평균 체류 시간은 0분이다")
+  void returnsZeroWhenOnlyDraftAndDeletedCoursesExist() {
+    // Given
+    int placeId = createPlace();
+    createCourseWithStayMinutes(placeId, "DRAFT", "PUBLIC", 60);
+    createCourseWithStayMinutes(placeId, "DELETED", "PRIVATE", 90);
+
+    // When
+    PlaceDetailWithStayResult result = facade.getPlaceDetail(placeId, null);
+
+    // Then
+    assertThat(result.averageStayMinutes()).isZero();
   }
 
   @Test
@@ -127,8 +166,8 @@ class PlaceDetailIntegrationTest {
   }
 
   @Test
-  @DisplayName("모든 코스에서 해당 장소의 체류 시간만 평균 내고 회원 상태를 반환한다")
-  void averagesOnlyMatchingPlaceAcrossAllCoursesAndReturnsMemberStates() {
+  @DisplayName("활성 코스에서 해당 장소의 체류 시간만 평균 내고 회원 상태를 반환한다")
+  void averagesOnlyMatchingPlaceAcrossActiveCoursesAndReturnsMemberStates() {
     // Given
     int placeId = createPlace();
     int otherPlaceId = createPlace();
