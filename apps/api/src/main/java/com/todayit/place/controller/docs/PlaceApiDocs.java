@@ -7,10 +7,10 @@ import com.todayit.common.response.ErrorResponse;
 import com.todayit.course.dto.response.CourseResponse;
 import com.todayit.course.service.model.CourseSort;
 import com.todayit.place.dto.response.PlaceDetailResponse;
+import com.todayit.place.dto.response.PlaceFilterResponse;
 import com.todayit.place.dto.response.PlaceImageResponse;
 import com.todayit.place.dto.response.PlaceLikeResponse;
 import com.todayit.place.dto.response.PlaceLocationResponse;
-import com.todayit.place.dto.response.PlaceResponse;
 import com.todayit.place.dto.response.PlaceScrapResponse;
 import com.todayit.place.entity.Category;
 import com.todayit.place.service.model.PlaceSort;
@@ -95,6 +95,7 @@ public interface PlaceApiDocs {
   /**
    * 장소 목록을 페이지 단위로 조회합니다.
    *
+   * @param authentication 선택 인증 정보
    * @param region 단일 시·도·시·군·구 이름 또는 상위 지역부터 입력한 경로
    * @param categories 장소 카테고리 목록
    * @param page 페이지 번호
@@ -105,7 +106,8 @@ public interface PlaceApiDocs {
   @Operation(
       summary = "장소 필터 조회",
       description =
-          "지역·카테고리로 활성 장소를 페이지 단위로 조회합니다. " + "지역은 단독 또는 상하위 조합으로 선택하며, 선택한 지역의 하위 지역도 포함합니다.")
+          "지역·카테고리로 활성 장소를 페이지 단위로 조회합니다. 지역은 단독 또는 상하위 조합으로 선택하며, 선택한 지역의 하위 지역도 포함합니다. 인증은 선택사항이며, 비회원의 liked는 false입니다.",
+      security = {@SecurityRequirement(), @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)})
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -116,7 +118,7 @@ public interface PlaceApiDocs {
                 examples =
                     @ExampleObject(
                         value =
-                            "{\"success\":true,\"data\":{\"content\":[{\"placeId\":1,\"name\":\"오늘의 식당\",\"latitude\":37.57000000,\"longitude\":126.98500000,\"address\":\"서울특별시 종로구 종로 1\",\"category\":\"RESTAURANT\",\"viewCount\":15,\"imageUrls\":[\"https://example.com/place.jpg\"]}],\"page\":0,\"size\":20,\"totalElements\":1,\"totalPages\":1}}"))),
+                            "{\"success\":true,\"data\":{\"content\":[{\"placeId\":1,\"name\":\"오늘의 식당\",\"latitude\":37.57000000,\"longitude\":126.98500000,\"address\":\"서울특별시 종로구 종로 1\",\"category\":\"RESTAURANT\",\"viewCount\":15,\"liked\":false,\"imageUrls\":[\"https://example.com/place.jpg\"]}],\"page\":0,\"size\":20,\"totalElements\":1,\"totalPages\":1}}"))),
     @ApiResponse(
         responseCode = "400",
         description = "잘못된 필터 또는 페이지 요청",
@@ -150,7 +152,7 @@ public interface PlaceApiDocs {
                         value =
                             "{\"success\":false,\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"서버 내부 오류가 발생했습니다.\"}")))
   })
-  ResponseEntity<CommonResponse<PageResponse<PlaceResponse>>> findPlaces(
+  ResponseEntity<CommonResponse<PageResponse<PlaceFilterResponse>>> findPlaces(
       @Parameter(description = "지역 이름 또는 상하위 지역 경로입니다. 생략하면 전체 지역을 조회합니다.", example = "서울특별시 동대문구")
           String region,
       @Parameter(
@@ -194,7 +196,8 @@ public interface PlaceApiDocs {
                 @ExampleObject(name = "최신순", value = "LATEST"),
                 @ExampleObject(name = "조회수순", value = "POPULAR")
               })
-          PlaceSort sort);
+          PlaceSort sort,
+      @Parameter(hidden = true) Authentication authentication);
 
   /**
    * 장소의 지도 표시 정보를 조회합니다.

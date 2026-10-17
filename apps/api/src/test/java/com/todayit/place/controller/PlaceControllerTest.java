@@ -86,6 +86,32 @@ class PlaceControllerTest {
   }
 
   @Test
+  @DisplayName("PAPI-002 인증된 회원의 장소 목록에 좋아요 여부를 반환한다")
+  void returnsAuthenticatedMemberLikesInList() throws Exception {
+    PlaceResult place =
+        new PlaceResult(
+            1,
+            "Liked",
+            BigDecimal.ONE,
+            BigDecimal.ONE,
+            "Address",
+            Category.RESTAURANT,
+            0,
+            List.of(),
+            true);
+    when(placeQueryService.findPlaces(null, null, 0, 20, PlaceSort.LATEST, "member-1"))
+        .thenReturn(new PageResult<>(List.of(place), 0, 20, 1));
+
+    mockMvc
+        .perform(
+            get("/api/v1/places")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.content[0].liked").value(true));
+    verify(placeQueryService).findPlaces(null, null, 0, 20, PlaceSort.LATEST, "member-1");
+  }
+
+  @Test
   @DisplayName("장소 상세에 영업시간 리스트와 평균 체류 시간을 반환한다")
   void returnsPlaceDetailWithOpeningHoursList() throws Exception {
     // Given
@@ -105,7 +131,8 @@ class PlaceControllerTest {
             "서울",
             Category.CAFE_DESSERT,
             0,
-            List.of("https://example.com/place.jpg"));
+            List.of("https://example.com/place.jpg"),
+            false);
     PlaceDetailResult detail =
         new PlaceDetailResult(place, "장소 설명", List.of(opening), false, false);
     when(placeDetailFacade.getPlaceDetail(1, null))
@@ -156,9 +183,15 @@ class PlaceControllerTest {
             "서울특별시 종로구 종로 1",
             Category.RESTAURANT,
             10,
-            List.of("https://placehold.co/1200x800?text=Restaurant"));
+            List.of("https://placehold.co/1200x800?text=Restaurant"),
+            false);
     when(placeQueryService.findPlaces(
-            "종로구", List.of(Category.RESTAURANT, Category.CAFE_DESSERT), 1, 5, PlaceSort.POPULAR))
+            "종로구",
+            List.of(Category.RESTAURANT, Category.CAFE_DESSERT),
+            1,
+            5,
+            PlaceSort.POPULAR,
+            null))
         .thenReturn(new PageResult<>(List.of(place), 1, 5, 6));
 
     // When
@@ -173,6 +206,7 @@ class PlaceControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.content[0].placeId").value(1))
+        .andExpect(jsonPath("$.data.content[0].liked").value(false))
         .andExpect(jsonPath("$.data.content[0].name").value("오늘의 식당"))
         .andExpect(jsonPath("$.data.content[0].address").value("서울특별시 종로구 종로 1"))
         .andExpect(
@@ -186,7 +220,12 @@ class PlaceControllerTest {
     // Then
     verify(placeQueryService)
         .findPlaces(
-            "종로구", List.of(Category.RESTAURANT, Category.CAFE_DESSERT), 1, 5, PlaceSort.POPULAR);
+            "종로구",
+            List.of(Category.RESTAURANT, Category.CAFE_DESSERT),
+            1,
+            5,
+            PlaceSort.POPULAR,
+            null);
   }
 
   @Test

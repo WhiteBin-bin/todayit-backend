@@ -1,6 +1,8 @@
 package com.todayit.place.repository;
 
 import com.todayit.place.entity.PlaceMemberLike;
+import java.util.List;
+import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -17,6 +19,19 @@ public interface PlaceMemberLikeRepository extends JpaRepository<PlaceMemberLike
    * @return 좋아요 존재 여부
    */
   boolean existsByMemberIdAndPlacePlaceId(String memberId, int placeId);
+
+  /**
+   * 현재 페이지의 장소 중 회원이 좋아요한 장소 식별자를 일괄 조회합니다.
+   *
+   * @param memberId 요청 회원 식별자
+   * @param placeIds 현재 페이지의 장소 식별자 목록
+   * @return 좋아요한 장소 식별자 집합
+   */
+  @Query(
+      "select memberLike.place.placeId from PlaceMemberLike memberLike "
+          + "where memberLike.memberId = :memberId and memberLike.place.placeId in :placeIds")
+  Set<Integer> findLikedPlaceIds(
+      @Param("memberId") String memberId, @Param("placeIds") List<Integer> placeIds);
 
   /**
    * 회원의 장소 좋아요를 생성합니다.

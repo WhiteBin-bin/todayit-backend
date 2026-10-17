@@ -8,10 +8,10 @@ import com.todayit.course.service.CoursePlaceQueryService;
 import com.todayit.course.service.model.CourseSort;
 import com.todayit.place.controller.docs.PlaceApiDocs;
 import com.todayit.place.dto.response.PlaceDetailResponse;
+import com.todayit.place.dto.response.PlaceFilterResponse;
 import com.todayit.place.dto.response.PlaceImageResponse;
 import com.todayit.place.dto.response.PlaceLikeResponse;
 import com.todayit.place.dto.response.PlaceLocationResponse;
-import com.todayit.place.dto.response.PlaceResponse;
 import com.todayit.place.dto.response.PlaceScrapResponse;
 import com.todayit.place.entity.Category;
 import com.todayit.place.exception.InvalidPlaceCategoryFilterException;
@@ -87,6 +87,7 @@ public class PlaceController implements PlaceApiDocs {
   /**
    * 활성화되고 삭제되지 않은 장소 목록을 조회합니다.
    *
+   * @param authentication 선택 인증 정보
    * @param region 단일 시·도·시·군·구 이름 또는 상위 지역부터 입력한 경로
    * @param categories 장소 카테고리 목록
    * @param page 페이지 번호
@@ -95,19 +96,26 @@ public class PlaceController implements PlaceApiDocs {
    * @return 장소 목록과 페이지 정보
    */
   @GetMapping
-  public ResponseEntity<CommonResponse<PageResponse<PlaceResponse>>> findPlaces(
+  public ResponseEntity<CommonResponse<PageResponse<PlaceFilterResponse>>> findPlaces(
       @RequestParam(required = false) String region,
       @RequestParam(required = false) List<String> categories,
       @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
       @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size,
-      @RequestParam(defaultValue = "LATEST") PlaceSort sort) {
+      @RequestParam(defaultValue = "LATEST") PlaceSort sort,
+      Authentication authentication) {
     PaginationValidator.validate(page, size);
     List<Category> categoryFilters = parseCategories(categories);
     return ResponseEntity.ok(
         CommonResponse.success(
             PageResponse.from(
-                placeQueryService.findPlaces(region, categoryFilters, page, size, sort),
-                PlaceResponse::from)));
+                placeQueryService.findPlaces(
+                    region,
+                    categoryFilters,
+                    page,
+                    size,
+                    sort,
+                    authentication == null ? null : authentication.getName()),
+                PlaceFilterResponse::from)));
   }
 
   /**
