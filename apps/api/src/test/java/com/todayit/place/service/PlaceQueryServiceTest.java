@@ -63,7 +63,7 @@ class PlaceQueryServiceTest {
   @Mock private Place place;
 
   @Test
-  @DisplayName("P-002 회원의 좋아요 여부를 페이지 내 장소 기준으로 일괄 조회한다")
+  @DisplayName("회원의 좋아요 여부를 페이지 내 장소 기준으로 일괄 조회한다")
   void returnsLikesForAuthenticatedMemberInOneQuery() {
     Place otherPlace = org.mockito.Mockito.mock(Place.class);
     when(place.getPlaceId()).thenReturn(1);
@@ -104,14 +104,14 @@ class PlaceQueryServiceTest {
             regionPlaceQueryService);
 
     PageResult<PlaceResult> result =
-        service.findPlaces(null, null, 0, 20, PlaceSort.LATEST, "member-1");
+        service.findPlaces(null, null, null, null, 0, 20, PlaceSort.LATEST, "member-1");
 
     assertThat(result.content()).extracting(PlaceResult::liked).containsExactly(true, false);
     verify(placeMemberLikeRepository).findLikedPlaceIds("member-1", List.of(1, 2));
   }
 
   @Test
-  @DisplayName("P-002 인증된 회원의 빈 장소 목록은 좋아요를 조회하지 않는다")
+  @DisplayName("인증된 회원의 빈 장소 목록은 좋아요를 조회하지 않는다")
   void skipsLikesForEmptyAuthenticatedPage() {
     PageRequest pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
     when(placeRepository.findPlaces(List.of(0), false, List.of(Category.values()), false, pageable))
@@ -124,9 +124,12 @@ class PlaceQueryServiceTest {
             placeScrapRepository,
             regionPlaceQueryService);
 
-    assertThat(service.findPlaces(null, null, 0, 20, PlaceSort.LATEST, "member-1").content())
+    assertThat(
+            service
+                .findPlaces(null, null, null, null, 0, 20, PlaceSort.LATEST, "member-1")
+                .content())
         .isEmpty();
-    org.mockito.Mockito.verifyNoInteractions(placeMemberLikeRepository);
+    org.mockito.Mockito.verifyNoInteractions(placeMemberLikeRepository, regionPlaceQueryService);
   }
 
   @Test
@@ -158,7 +161,7 @@ class PlaceQueryServiceTest {
 
     // When
     PageResult<PlaceResult> result =
-        placeQueryService.findPlaces(null, List.of(), 1, 2, PlaceSort.POPULAR, null);
+        placeQueryService.findPlaces(null, null, null, List.of(), 1, 2, PlaceSort.POPULAR, null);
 
     // Then
     assertThat(result.content())
@@ -173,7 +176,7 @@ class PlaceQueryServiceTest {
                 15,
                 List.of("https://placehold.co/1200x800?text=Restaurant"),
                 false));
-    org.mockito.Mockito.verifyNoInteractions(placeMemberLikeRepository);
+    org.mockito.Mockito.verifyNoInteractions(placeMemberLikeRepository, regionPlaceQueryService);
     assertThat(result.page()).isEqualTo(1);
     assertThat(result.size()).isEqualTo(2);
     assertThat(result.totalElements()).isEqualTo(3);
@@ -192,7 +195,7 @@ class PlaceQueryServiceTest {
   void findsPlacesWithFilters() {
     // Given
     PageRequest pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
-    when(regionPlaceQueryService.findRegionIds(" 서울특별시 동대문구 ")).thenReturn(List.of(10));
+    when(regionPlaceQueryService.findRegionIds("11", null, "230")).thenReturn(List.of(10));
     when(placeRepository.findPlaces(
             List.of(10), true, List.of(Category.RESTAURANT, Category.CAFE_DESSERT), true, pageable))
         .thenReturn(Page.empty(pageable));
@@ -207,7 +210,9 @@ class PlaceQueryServiceTest {
     // When
     PageResult<PlaceResult> result =
         placeQueryService.findPlaces(
-            " 서울특별시 동대문구 ",
+            "11",
+            null,
+            "230",
             List.of(Category.RESTAURANT, Category.CAFE_DESSERT),
             0,
             20,

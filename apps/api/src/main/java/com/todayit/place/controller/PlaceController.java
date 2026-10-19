@@ -88,7 +88,9 @@ public class PlaceController implements PlaceApiDocs {
    * 활성화되고 삭제되지 않은 장소 목록을 조회합니다.
    *
    * @param authentication 선택 인증 정보
-   * @param region 단일 시·도·시·군·구 이름 또는 상위 지역부터 입력한 경로
+   * @param si 시·도 코드 2자리, 생략 가능
+   * @param gun 시·군 코드 3자리, 생략 가능
+   * @param gu 구 코드 3자리, 생략 가능
    * @param categories 장소 카테고리 목록
    * @param page 페이지 번호
    * @param size 페이지 크기
@@ -97,7 +99,9 @@ public class PlaceController implements PlaceApiDocs {
    */
   @GetMapping
   public ResponseEntity<CommonResponse<PageResponse<PlaceFilterResponse>>> findPlaces(
-      @RequestParam(required = false) String region,
+      @RequestParam(required = false) String si,
+      @RequestParam(required = false) String gun,
+      @RequestParam(required = false) String gu,
       @RequestParam(required = false) List<String> categories,
       @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
       @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size,
@@ -109,7 +113,9 @@ public class PlaceController implements PlaceApiDocs {
         CommonResponse.success(
             PageResponse.from(
                 placeQueryService.findPlaces(
-                    region,
+                    si,
+                    gun,
+                    gu,
                     categoryFilters,
                     page,
                     size,

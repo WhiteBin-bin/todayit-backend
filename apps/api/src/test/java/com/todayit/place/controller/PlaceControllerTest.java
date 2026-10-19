@@ -86,7 +86,57 @@ class PlaceControllerTest {
   }
 
   @Test
-  @DisplayName("PAPI-002 인증된 회원의 장소 목록에 좋아요 여부를 반환한다")
+  @DisplayName("시도 코드만으로 조회한다")
+  void forwardsSiOnly() throws Exception {
+    // Given
+    when(placeQueryService.findPlaces("41", null, null, null, 0, 20, PlaceSort.LATEST, null))
+        .thenReturn(new PageResult<>(List.of(), 0, 20, 0));
+
+    // When & Then
+    mockMvc.perform(get("/api/v1/places").param("si", "41")).andExpect(status().isOk());
+    verify(placeQueryService).findPlaces("41", null, null, null, 0, 20, PlaceSort.LATEST, null);
+  }
+
+  @Test
+  @DisplayName("시군 코드만으로 조회한다")
+  void forwardsGunOnly() throws Exception {
+    // Given
+    when(placeQueryService.findPlaces(null, "110", null, null, 0, 20, PlaceSort.LATEST, null))
+        .thenReturn(new PageResult<>(List.of(), 0, 20, 0));
+
+    // When & Then
+    mockMvc.perform(get("/api/v1/places").param("gun", "110")).andExpect(status().isOk());
+    verify(placeQueryService).findPlaces(null, "110", null, null, 0, 20, PlaceSort.LATEST, null);
+  }
+
+  @Test
+  @DisplayName("구 코드만으로 조회한다")
+  void forwardsGuOnly() throws Exception {
+    // Given
+    when(placeQueryService.findPlaces(null, null, "111", null, 0, 20, PlaceSort.LATEST, null))
+        .thenReturn(new PageResult<>(List.of(), 0, 20, 0));
+
+    // When & Then
+    mockMvc.perform(get("/api/v1/places").param("gu", "111")).andExpect(status().isOk());
+    verify(placeQueryService).findPlaces(null, null, "111", null, 0, 20, PlaceSort.LATEST, null);
+  }
+
+  @Test
+  @DisplayName("지역 코드 세 조건을 모두 적용한다")
+  void forwardsAllCodes() throws Exception {
+    // Given
+    when(placeQueryService.findPlaces("41", "110", "111", null, 0, 20, PlaceSort.LATEST, null))
+        .thenReturn(new PageResult<>(List.of(), 0, 20, 0));
+
+    // When & Then
+    mockMvc
+        .perform(get("/api/v1/places").param("si", "41").param("gun", "110").param("gu", "111"))
+        .andExpect(status().isOk());
+    verify(placeQueryService).findPlaces("41", "110", "111", null, 0, 20, PlaceSort.LATEST, null);
+  }
+
+  @Test
+  @DisplayName("인증된 회원의 장소 목록에 좋아요 여부를 반환한다")
   void returnsAuthenticatedMemberLikesInList() throws Exception {
     PlaceResult place =
         new PlaceResult(
@@ -99,7 +149,7 @@ class PlaceControllerTest {
             0,
             List.of(),
             true);
-    when(placeQueryService.findPlaces(null, null, 0, 20, PlaceSort.LATEST, "member-1"))
+    when(placeQueryService.findPlaces(null, null, null, null, 0, 20, PlaceSort.LATEST, "member-1"))
         .thenReturn(new PageResult<>(List.of(place), 0, 20, 1));
 
     mockMvc
@@ -108,7 +158,8 @@ class PlaceControllerTest {
                 .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.content[0].liked").value(true));
-    verify(placeQueryService).findPlaces(null, null, 0, 20, PlaceSort.LATEST, "member-1");
+    verify(placeQueryService)
+        .findPlaces(null, null, null, null, 0, 20, PlaceSort.LATEST, "member-1");
   }
 
   @Test
@@ -186,7 +237,9 @@ class PlaceControllerTest {
             List.of("https://placehold.co/1200x800?text=Restaurant"),
             false);
     when(placeQueryService.findPlaces(
-            "종로구",
+            "11",
+            null,
+            "110",
             List.of(Category.RESTAURANT, Category.CAFE_DESSERT),
             1,
             5,
@@ -198,7 +251,8 @@ class PlaceControllerTest {
     mockMvc
         .perform(
             get("/api/v1/places")
-                .param("region", "종로구")
+                .param("si", "11")
+                .param("gu", "110")
                 .param("categories", "RESTAURANT", "CAFE_DESSERT")
                 .param("page", "1")
                 .param("size", "5")
@@ -220,12 +274,47 @@ class PlaceControllerTest {
     // Then
     verify(placeQueryService)
         .findPlaces(
-            "종로구",
+            "11",
+            null,
+            "110",
             List.of(Category.RESTAURANT, Category.CAFE_DESSERT),
             1,
             5,
             PlaceSort.POPULAR,
             null);
+  }
+
+  @Test
+  @DisplayName("술집은 독립 카테고리 필터로 받지 않는다")
+  void rejectsRemovedBarCategory() throws Exception {
+    // When & Then
+    mockMvc
+        .perform(get("/api/v1/places").param("categories", "BAR"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_PLACE_CATEGORY"));
+    verifyNoInteractions(placeQueryService);
+  }
+
+  @Test
+  @DisplayName("기존 영화·공연 카테고리 필터는 받지 않는다")
+  void rejectsRemovedMovieCategory() throws Exception {
+    // When & Then
+    mockMvc
+        .perform(get("/api/v1/places").param("categories", "MOVIE_PERFORMANCE"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_PLACE_CATEGORY"));
+    verifyNoInteractions(placeQueryService);
+  }
+
+  @Test
+  @DisplayName("스파 카테고리 필터는 받지 않는다")
+  void rejectsRemovedSpaCategory() throws Exception {
+    // When & Then
+    mockMvc
+        .perform(get("/api/v1/places").param("categories", "RELAXATION_SPA"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_PLACE_CATEGORY"));
+    verifyNoInteractions(placeQueryService);
   }
 
   @Test

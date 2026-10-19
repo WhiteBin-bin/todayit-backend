@@ -65,7 +65,9 @@ public class PlaceQueryService implements PlaceScrapQueryService {
   /**
    * 활성화되고 삭제되지 않은 장소를 페이지 단위로 조회합니다. 장소 이미지도 페이지 내 장소를 기준으로 일괄 조회하여 결과에 포함합니다.
    *
-   * @param region 단일 시·도·시·군·구 이름 또는 상위 지역부터 입력한 경로
+   * @param si 시·도 코드 2자리, 생략 가능
+   * @param gun 시·군 코드 3자리, 생략 가능
+   * @param gu 구 코드 3자리, 생략 가능
    * @param categories 장소 카테고리 목록
    * @param page 페이지 번호
    * @param size 페이지 크기
@@ -75,7 +77,9 @@ public class PlaceQueryService implements PlaceScrapQueryService {
    */
   @Transactional(readOnly = true)
   public PageResult<PlaceResult> findPlaces(
-      String region,
+      String si,
+      String gun,
+      String gu,
       List<Category> categories,
       int page,
       int size,
@@ -86,9 +90,9 @@ public class PlaceQueryService implements PlaceScrapQueryService {
             ? Sort.by(Sort.Direction.DESC, "createdAt")
             : Sort.by(Sort.Direction.DESC, "viewCount");
 
-    boolean regionFiltered = region != null;
+    boolean regionFiltered = si != null || gun != null || gu != null;
     List<Integer> regionIds =
-        regionFiltered ? regionPlaceQueryService.findRegionIds(region) : List.of(0);
+        regionFiltered ? regionPlaceQueryService.findRegionIds(si, gun, gu) : List.of(0);
     boolean categoryFiltered = categories != null && !categories.isEmpty();
     List<Category> categoryFilters =
         categoryFiltered ? List.copyOf(categories) : Arrays.asList(Category.values());
