@@ -1,0 +1,69 @@
+package com.todayit.recommendation.rule;
+unit RecommendationRuleUnit;
+
+import com.todayit.recommendation.model.CourseCandidate;
+import com.todayit.recommendation.model.RecommendationContext;
+
+rule "비공개·임시저장 또는 삭제된 코스는 추천 목록에서 제외"
+when
+    $candidate : /candidates[ visible == false || deleted == true ]
+then
+    $candidate.setEligible(false);
+    $candidate.setFinalScore(0.0);
+end
+
+rule "비회원이거나 개인화 동의 철회 시 인기순으로 대체"
+when
+    $ctx : /context[ member == false || personalizedConsent == false ]
+    $candidate : /candidates[ visible == true, deleted == false ]
+then
+    $candidate.setEligible(true);
+    $candidate.setFallbackToPopular(true);
+    $candidate.setFinalScore($candidate.getPopularityRawScore());
+end
+
+rule "모든 신호(지역·행동·콘셉트)가 전혀 없을 때 인기순으로 대체"
+when
+    $ctx : /context[ member == true, personalizedConsent == true, hasPreferredDong == false, hasSelectedConcepts == false, hasHistory == false ]
+    $candidate : /candidates[ visible == true, deleted == false ]
+then
+    $candidate.setEligible(true);
+    $candidate.setFallbackToPopular(true);
+    $candidate.setFinalScore($candidate.getPopularityRawScore());
+end
+
+rule "모든 신호(지역 R + 기본 B + 행동 H) 존재 시 표준 가중치(40:30:30) 계산"
+when
+    $ctx : /context[ member == true, personalizedConsent == true, hasPreferredDong == true, hasHistory == true ]
+    $candidate : /candidates[ visible == true, deleted == false ]
+then
+    $candidate.setEligible(true);
+    $candidate.applyFinalScore(0.4, 0.3, 0.3);
+end
+
+rule "선호지역(R)만 누락 시 기본점수(B)와 행동점수(H) 50:50 재정규화"
+when
+    $ctx : /context[ member == true, personalizedConsent == true, hasPreferredDong == false, hasHistory == true ]
+    $candidate : /candidates[ visible == true, deleted == false ]
+then
+    $candidate.setEligible(true);
+    $candidate.applyFinalScore(0.0, 0.5, 0.5);
+end
+
+rule "개인행동(H)만 누락 시 지역(R)과 기본점수(B) 40:30(4/7 : 3/7) 재정규화"
+when
+    $ctx : /context[ member == true, personalizedConsent == true, hasPreferredDong == true, hasHistory == false ]
+    $candidate : /candidates[ visible == true, deleted == false ]
+then
+    $candidate.setEligible(true);
+    $candidate.applyFinalScore(4.0 / 7.0, 3.0 / 7.0, 0.0);
+end
+
+rule "지역(R)과 행동(H) 모두 없고 콘셉트(C)만 있을 때 기본점수(B) 100% 적용"
+when
+    $ctx : /context[ member == true, personalizedConsent == true, hasPreferredDong == false, hasHistory == false, hasSelectedConcepts == true ]
+    $candidate : /candidates[ visible == true, deleted == false ]
+then
+    $candidate.setEligible(true);
+    $candidate.applyFinalScore(0.0, 1.0, 0.0);
+end

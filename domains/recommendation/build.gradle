@@ -6,4 +6,5 @@ description = 'Recommendation domain'
 
 dependencies {
     implementation 'org.drools:drools-ruleunits-engine:10.2.0'
+    runtimeOnly 'org.drools:drools-wiring-dynamic:10.2.0'
 }

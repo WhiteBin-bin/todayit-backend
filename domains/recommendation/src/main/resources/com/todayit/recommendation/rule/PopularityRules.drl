@@ -1,0 +1,20 @@
+package com.todayit.recommendation.rule;
+unit PopularityRuleUnit;
+
+import com.todayit.recommendation.model.PopularityCandidate;
+
+rule "공개·확정 및 미삭제 대상 인기 원점수 계산"
+when
+    $candidate : /candidates[ visible == true, deleted == false ]
+then
+    $candidate.setEligible(true);
+    $candidate.applyWeightedScore(1.0, 2.0, 0.1);
+end
+
+rule "비공개·임시저장 또는 삭제 대상 인기 목록 제외"
+when
+    $candidate : /candidates[ visible == false || deleted == true ]
+then
+    $candidate.setEligible(false);
+    $candidate.setPopularityScore(0.0);
+end
