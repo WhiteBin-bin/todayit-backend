@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.todayit.common.exception.BusinessException;
 import com.todayit.common.exception.GlobalExceptionHandler;
 import com.todayit.member.dto.request.EmailVerificationConfirmRequest;
 import com.todayit.member.dto.request.EmailVerificationRequest;
@@ -16,14 +17,19 @@ import com.todayit.member.dto.request.LoginRequest;
 import com.todayit.member.dto.request.SignupRequest;
 import com.todayit.member.entity.EmailVerificationPurpose;
 import com.todayit.member.entity.Member;
+import com.todayit.member.entity.MemberProvider;
 import com.todayit.member.exception.LoginFailedException;
 import com.todayit.member.exception.LoginLockedException;
+import com.todayit.member.exception.MemberErrorCode;
 import com.todayit.member.service.EmailVerificationService;
+import com.todayit.member.service.GoogleLoginService;
 import com.todayit.member.service.LoginFacade;
 import com.todayit.member.service.LogoutService;
+import com.todayit.member.service.SignupFacade;
 import com.todayit.member.service.SignupService;
 import com.todayit.member.service.TokenRefreshService;
 import com.todayit.member.service.model.EmailVerificationConfirmResult;
+import com.todayit.member.service.model.GoogleLoginResult;
 import com.todayit.member.service.model.LoginResult;
 import com.todayit.member.service.model.MemberLoginResult;
 import com.todayit.member.service.model.TokenRefreshResult;
@@ -55,6 +61,10 @@ class AuthControllerTest {
 
   @Mock private TokenRefreshService tokenRefreshService;
 
+  @Mock private GoogleLoginService googleLoginService;
+
+  @Mock private SignupFacade signupFacade;
+
   private MockMvc mockMvc;
   private ObjectMapper objectMapper;
 
@@ -66,7 +76,9 @@ class AuthControllerTest {
             logoutService,
             signupService,
             emailVerificationService,
-            tokenRefreshService);
+            tokenRefreshService,
+            googleLoginService,
+            signupFacade);
 
     mockMvc =
         MockMvcBuilders.standaloneSetup(authController)
@@ -338,7 +350,7 @@ class AuthControllerTest {
 
     Member member = Member.createLocal("test@test.com", "encoded-password", "테스트");
 
-    when(signupService.createLocalMember(any())).thenReturn(member);
+    when(signupFacade.signup(any())).thenReturn(member);
 
     // When
     ResultActions response =
@@ -357,7 +369,7 @@ class AuthControllerTest {
         .andExpect(jsonPath("$.data.coupleConnected").value(false))
         .andExpect(jsonPath("$.data.createdAt").exists());
 
-    verify(signupService).createLocalMember(any());
+    verify(signupFacade).signup(any());
   }
 
   @Test
@@ -390,7 +402,7 @@ class AuthControllerTest {
         .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
         .andExpect(jsonPath("$.message").value("이메일 인증 토큰은 필수입니다."));
 
-    verify(signupService, never()).createLocalMember(any());
+    verify(signupFacade, never()).signup(any());
   }
 
   @Test
@@ -543,7 +555,7 @@ class AuthControllerTest {
         .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
         .andExpect(jsonPath("$.message").value("비밀번호는 UTF-8 기준 72바이트 이하로 입력해 주세요."));
 
-    verify(signupService, never()).createLocalMember(any());
+    verify(signupFacade, never()).signup(any());
   }
 
   @Test
@@ -638,7 +650,7 @@ class AuthControllerTest {
         .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
         .andExpect(jsonPath("$.message").value("이메일은 100자 이하로 입력해 주세요."));
 
-    verify(signupService, never()).createLocalMember(any());
+    verify(signupFacade, never()).signup(any());
   }
 
   @Test
@@ -657,5 +669,190 @@ class AuthControllerTest {
         .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
     verify(emailVerificationService, never()).issueCode(any(), any());
+  }
+
+  @Test
+  @DisplayName("신규 Google 사용자는 로그인 토큰 대신 signupToken을 반환한다")
+  void returnsSignupTokenForNewGoogleMember() throws Exception {
+    // Given
+    String redirectUri = "http://localhost:3000/oauth/google/callback";
+
+    // 신규 회원이므로 DB 회원 정보나 Access Token은 아직 없음
+    when(googleLoginService.login("google-code", redirectUri))
+        .thenReturn(GoogleLoginResult.newMember("signup-token"));
+
+    // When
+    ResultActions response =
+        mockMvc.perform(
+            post("/api/v1/auth/oauth/google")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                                    {
+                                      "authorizationCode": "google-code",
+                                      "redirectUri": "http://localhost:3000/oauth/google/callback"
+                                    }
+                                    """));
+
+    // Then
+    response
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.isNewMember").value(true))
+        .andExpect(jsonPath("$.data.signupToken").value("signup-token"))
+
+        // 신규 회원에게는 Today-it 로그인 토큰을 발급하지 않음
+        .andExpect(jsonPath("$.data.accessToken").doesNotExist())
+        .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
+        .andExpect(jsonPath("$.data.member").doesNotExist());
+
+    verify(googleLoginService).login("google-code", redirectUri);
+  }
+
+  @Test
+  @DisplayName("기존 Google 회원은 Access Token과 Refresh Token을 반환한다")
+  void returnsLoginTokensForExistingGoogleMember() throws Exception {
+    // Given
+    String redirectUri = "http://localhost:3000/oauth/google/callback";
+
+    MemberLoginResult member = new MemberLoginResult("member-1", "테스트", false, List.of("USER"));
+
+    LoginResult loginResult = new LoginResult(member, "access-token", "refresh-token", 1800L);
+
+    // 이미 Google 계정으로 가입된 회원의 로그인 결과
+    when(googleLoginService.login("google-code", redirectUri))
+        .thenReturn(GoogleLoginResult.existingMember(loginResult));
+
+    // When
+    ResultActions response =
+        mockMvc.perform(
+            post("/api/v1/auth/oauth/google")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                                    {
+                                      "authorizationCode": "google-code",
+                                      "redirectUri": "http://localhost:3000/oauth/google/callback"
+                                    }
+                                    """));
+
+    // Then
+    response
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.isNewMember").value(false))
+        .andExpect(jsonPath("$.data.accessToken").value("access-token"))
+        .andExpect(jsonPath("$.data.refreshToken").value("refresh-token"))
+        .andExpect(jsonPath("$.data.expiresIn").value(1800))
+        .andExpect(jsonPath("$.data.member.memberId").value("member-1"))
+        .andExpect(jsonPath("$.data.member.nickname").value("테스트"))
+        .andExpect(jsonPath("$.data.member.roles[0]").value("USER"))
+
+        // 기존 회원에게는 별도의 가입 토큰을 발급하지 않음
+        .andExpect(jsonPath("$.data.signupToken").doesNotExist());
+
+    verify(googleLoginService).login("google-code", redirectUri);
+  }
+
+  @Test
+  @DisplayName("Google 인가 코드가 비어 있으면 400을 반환한다")
+  void rejectsMissingGoogleAuthorizationCode() throws Exception {
+    // When
+    ResultActions response =
+        mockMvc.perform(
+            post("/api/v1/auth/oauth/google")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                                    {
+                                      "authorizationCode": "",
+                                      "redirectUri": "http://localhost:3000/oauth/google/callback"
+                                    }
+                                    """));
+
+    // Then
+    response
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+    // 입력값이 유효하지 않으면 Google 인증 서비스 자체를 호출하지 않음
+    verify(googleLoginService, never()).login(any(), any());
+  }
+
+  @Test
+  @DisplayName("GOOGLE 회원가입에 성공하면 회원 정보와 201 응답을 반환한다")
+  void returnsCreatedGoogleMemberAfterSignup() throws Exception {
+    // Given
+    SignupRequest request =
+        new SignupRequest(
+            MemberProvider.GOOGLE,
+            null,
+            null,
+            null,
+            "google-signup-token",
+            "구글회원",
+            Map.of(
+                "TOS", true,
+                "ACCOUNT_PRIVACY", true));
+
+    Member member = Member.createGoogle("google@test.com", "google-user-123", "구글회원");
+
+    when(signupFacade.signup(any())).thenReturn(member);
+
+    // When
+    ResultActions response =
+        mockMvc.perform(
+            post("/api/v1/auth/signup")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)));
+
+    // Then
+    response
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.memberId").value(member.getId()))
+        .andExpect(jsonPath("$.data.email").value("google@test.com"))
+        .andExpect(jsonPath("$.data.nickname").value("구글회원"));
+
+    // Controller가 GOOGLE 가입 정보를 Facade에 전달했는지 확인
+    verify(signupFacade)
+        .signup(
+            org.mockito.ArgumentMatchers.argThat(
+                command ->
+                    command.provider() == MemberProvider.GOOGLE
+                        && "google-signup-token".equals(command.signupToken())));
+  }
+
+  @Test
+  @DisplayName("Google 이메일이 인증되지 않았으면 401을 반환한다")
+  void rejectsUnverifiedGoogleEmail() throws Exception {
+
+    // Given
+    String redirectUri = "http://localhost:3000/oauth/google/callback";
+
+    when(googleLoginService.login("google-code", redirectUri))
+        .thenThrow(new BusinessException(MemberErrorCode.GOOGLE_EMAIL_NOT_VERIFIED));
+
+    // When
+    ResultActions response =
+        mockMvc.perform(
+            post("/api/v1/auth/oauth/google")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                                    {
+                                      "authorizationCode": "google-code",
+                                      "redirectUri": "http://localhost:3000/oauth/google/callback"
+                                    }
+                                    """));
+
+    // Then
+    response
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("GOOGLE_EMAIL_NOT_VERIFIED"))
+        .andExpect(jsonPath("$.message").value("인증된 Google 이메일이 필요합니다."));
+
+    verify(googleLoginService).login("google-code", redirectUri);
   }
 }

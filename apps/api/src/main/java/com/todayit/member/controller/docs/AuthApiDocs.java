@@ -5,6 +5,7 @@ import com.todayit.common.response.CommonResponse;
 import com.todayit.common.response.ErrorResponse;
 import com.todayit.member.dto.request.EmailVerificationConfirmRequest;
 import com.todayit.member.dto.request.EmailVerificationRequest;
+import com.todayit.member.dto.request.GoogleLoginRequest;
 import com.todayit.member.dto.request.LoginRequest;
 import com.todayit.member.dto.request.LogoutRequest;
 import com.todayit.member.dto.request.SignupRequest;
@@ -12,6 +13,7 @@ import com.todayit.member.dto.request.TokenRefreshRequest;
 import com.todayit.member.dto.response.EmailAvailabilityResponse;
 import com.todayit.member.dto.response.EmailVerificationConfirmResponse;
 import com.todayit.member.dto.response.EmailVerificationResponse;
+import com.todayit.member.dto.response.GoogleLoginResponse;
 import com.todayit.member.dto.response.LoginResponse;
 import com.todayit.member.dto.response.SignupResponse;
 import com.todayit.member.dto.response.TokenRefreshResponse;
@@ -28,10 +30,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 
-/** 로컬 로그인, 회원가입, 이메일 인증 및 토큰 갱신 API 명세입니다. */
-@Tag(name = "인증", description = "로컬 로그인, 회원가입, 이메일 인증 및 토큰 관리 API")
+/** 로그인, 회원가입, 이메일 인증 및 토큰 관리 API 명세입니다. */
+@Tag(name = "인증", description = "로컬·Google 로그인, 회원가입, 이메일 인증 및 토큰 관리 API")
 public interface AuthApiDocs {
-
   /**
    * 이메일과 비밀번호로 로그인합니다.
    *
@@ -49,7 +50,7 @@ public interface AuthApiDocs {
                 examples =
                     @ExampleObject(
                         value =
-                            "{\"success\":true,\"data\":{\"accessToken\":\"eyJ...\",\"refreshToken\":\"example-refresh-token\",\"expiresIn\":3600,\"member\":{\"memberId\":\"123e4567-e89b-12d3-a456-426614174000\",\"nickname\":\"오늘이\",\"coupleConnected\":false,\"roles\":[\"USER\"]}}}"))),
+                            "{\"success\":true,\"data\":{\"accessToken\":\"eyJ...\",\"refreshToken\":\"example-refresh-token\",\"expiresIn\":3600,\"member\":{\"memberId\":\"123e4567-e89b-12d3-a456-426614174000\",\"nickname\":\"유저\",\"coupleConnected\":false,\"roles\":[\"USER\"]}}}"))),
     @ApiResponse(
         responseCode = "400",
         description = "이메일 또는 비밀번호 누락",
@@ -80,6 +81,126 @@ public interface AuthApiDocs {
                 }))
   })
   ResponseEntity<CommonResponse<LoginResponse>> login(LoginRequest request);
+
+  /**
+   * Google 인가 코드로 로그인하거나 신규 회원가입을 준비합니다.
+   *
+   * @param request Google 인가 코드와 Redirect URI
+   * @return 기존 회원의 로그인 토큰 또는 신규 회원 임시 가입 토큰
+   */
+  @Operation(
+      summary = "Google 로그인",
+      description =
+          "Google Authorization Code를 검증합니다. "
+              + "가입된 Google 회원은 Access/Refresh Token을 발급받고, "
+              + "신규 사용자는 30분 유효한 signupToken을 발급받습니다. "
+              + "같은 이메일의 로컬 계정과 자동으로 연결하지 않습니다.")
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "기존 회원 로그인 또는 신규 회원 인증 성공",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                examples = {
+                  @ExampleObject(
+                      name = "기존 Google 회원",
+                      value =
+                          """
+                                                    {
+                                                      "success": true,
+                                                      "data": {
+                                                        "isNewMember": false,
+                                                        "accessToken": "eyJ...",
+                                                        "refreshToken": "example-refresh-token",
+                                                        "expiresIn": 1800,
+                                                        "member": {
+                                                          "memberId": "123e4567-e89b-12d3-a456-426614174000",
+                                                          "nickname": "유저",
+                                                          "coupleConnected": false,
+                                                          "roles": ["USER"]
+                                                        }
+                                                      }
+                                                    }
+                                                    """),
+                  @ExampleObject(
+                      name = "신규 Google 사용자",
+                      value =
+                          """
+                                                    {
+                                                      "success": true,
+                                                      "data": {
+                                                        "isNewMember": true,
+                                                        "signupToken": "example-signup-token"
+                                                      }
+                                                    }
+                                                    """)
+                })),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Google 인가 코드 또는 Redirect URI 누락",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                          {
+                                            "success": false,
+                                            "code": "INVALID_REQUEST",
+                                            "message": "Google 인가 코드는 필수입니다."
+                                          }
+                                          """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "Google 인증 실패 또는 이메일 미인증",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples = {
+                  @ExampleObject(
+                      name = "Google 인증 실패",
+                      value =
+                          """
+                                                  {
+                                                    "success": false,
+                                                    "code": "GOOGLE_AUTHENTICATION_FAILED",
+                                                    "message": "Google 인증에 실패했습니다."
+                                                  }
+                                                  """),
+                  @ExampleObject(
+                      name = "Google 이메일 미인증",
+                      value =
+                          """
+                                                  {
+                                                    "success": false,
+                                                    "code": "GOOGLE_EMAIL_NOT_VERIFIED",
+                                                    "message": "인증된 Google 이메일이 필요합니다."
+                                                  }
+                                                  """)
+                })),
+    @ApiResponse(
+        responseCode = "500",
+        description = "Google 인증 서버 통신 장애",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                                            {
+                                              "success": false,
+                                              "code": "GOOGLE_AUTH_SERVER_ERROR",
+                                              "message": "Google 인증 서버에 연결할 수 없습니다."
+                                            }
+                                            """)))
+  })
+  ResponseEntity<CommonResponse<GoogleLoginResponse>> googleLogin(GoogleLoginRequest request);
 
   /**
    * 현재 기기의 로그인 세션을 종료합니다.
@@ -158,38 +279,57 @@ public interface AuthApiDocs {
    * @return 생성된 회원 정보
    */
   @Operation(
-      summary = "회원가입",
+      summary = "회원가입 (LOCAL / GOOGLE)",
       description =
-          "이메일 인증 완료 토큰과 약관 동의 정보를 받아 로컬 회원을 생성합니다."
-              + " 필수 약관은 TOS, ACCOUNT_PRIVACY이며 동의값은 true여야 합니다."
-              + " PREFERENCE, PROFILE_IMAGE는 선택 약관입니다."
-              + " 프로필 이미지는 회원가입 이후 별도 API에서 등록합니다.",
+          "LOCAL은 이메일 인증 토큰과 비밀번호를 사용합니다. "
+              + "GOOGLE은 Google 로그인 API에서 발급한 signupToken을 사용합니다. "
+              + "필수 약관은 TOS, ACCOUNT_PRIVACY이며 동의값은 true여야 합니다. "
+              + "PREFERENCE, PROFILE_IMAGE는 선택 약관입니다. "
+              + "프로필 이미지는 가입 후 별도 API에서 등록합니다.",
       requestBody =
           @RequestBody(
               required = true,
-              description = "회원가입 정보 및 필수·선택 약관 동의 여부",
+              description = "가입 방식별 인증 정보, 닉네임 및 약관 동의 여부",
               content =
                   @Content(
                       mediaType = MediaType.APPLICATION_JSON_VALUE,
                       schema = @Schema(implementation = SignupRequest.class),
-                      examples =
-                          @ExampleObject(
-                              name = "회원가입 요청 예시",
-                              value =
-                                  """
-                                {
-                                  "email": "user@example.com",
-                                  "emailVerificationToken": "example-verification-token",
-                                  "password": "ExamplePassword123!",
-                                  "nickname": "오늘이",
-                                  "agreements": {
-                                    "TOS": true,
-                                    "ACCOUNT_PRIVACY": true,
-                                    "PREFERENCE": false,
-                                    "PROFILE_IMAGE": false
-                                  }
-                                }
-                                """))))
+                      examples = {
+                        @ExampleObject(
+                            name = "LOCAL 회원가입",
+                            value =
+                                """
+                                                  {
+                                                    "provider": "LOCAL",
+                                                    "email": "user@example.com",
+                                                    "emailVerificationToken": "example-verification-token",
+                                                    "password": "ExamplePassword123!",
+                                                    "nickname": "유저",
+                                                    "agreements": {
+                                                      "TOS": true,
+                                                      "ACCOUNT_PRIVACY": true,
+                                                      "PREFERENCE": false,
+                                                      "PROFILE_IMAGE": false
+                                                    }
+                                                  }
+                                                  """),
+                        @ExampleObject(
+                            name = "GOOGLE 회원가입",
+                            value =
+                                """
+                                                  {
+                                                    "provider": "GOOGLE",
+                                                    "signupToken": "example-signup-token",
+                                                    "nickname": "유저",
+                                                    "agreements": {
+                                                      "TOS": true,
+                                                      "ACCOUNT_PRIVACY": true,
+                                                      "PREFERENCE": false,
+                                                      "PROFILE_IMAGE": false
+                                                    }
+                                                  }
+                                                  """)
+                      })))
   @ApiResponses({
     @ApiResponse(
         responseCode = "201",
@@ -200,10 +340,10 @@ public interface AuthApiDocs {
                 examples =
                     @ExampleObject(
                         value =
-                            "{\"success\":true,\"data\":{\"memberId\":\"123e4567-e89b-12d3-a456-426614174000\",\"email\":\"user@example.com\",\"nickname\":\"오늘이\",\"coupleConnected\":false,\"createdAt\":\"2026-10-11T09:00:00\"}}"))),
+                            "{\"success\":true,\"data\":{\"memberId\":\"123e4567-e89b-12d3-a456-426614174000\",\"email\":\"user@example.com\",\"nickname\":\"유저\",\"coupleConnected\":false,\"createdAt\":\"2026-10-11T09:00:00\"}}"))),
     @ApiResponse(
         responseCode = "400",
-        description = "필수 입력, 약관 동의 또는 이메일 인증 정보 오류",
+        description = "필수 입력, 약관 동의, 이메일 인증 또는 Google 가입 토큰 오류",
         content =
             @Content(
                 mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -214,7 +354,7 @@ public interface AuthApiDocs {
                             "{\"success\":false,\"code\":\"EMAIL_VERIFICATION_TOKEN_INVALID\",\"message\":\"이메일 인증 정보가 유효하지 않습니다.\"}"))),
     @ApiResponse(
         responseCode = "409",
-        description = "이메일 또는 닉네임 중복",
+        description = "이메일, 닉네임 또는 Google 계정 중복",
         content =
             @Content(
                 mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -227,7 +367,11 @@ public interface AuthApiDocs {
                   @ExampleObject(
                       name = "닉네임 중복",
                       value =
-                          "{\"success\":false,\"code\":\"NICKNAME_ALREADY_EXISTS\",\"message\":\"이미 사용 중인 닉네임입니다.\"}")
+                          "{\"success\":false,\"code\":\"NICKNAME_ALREADY_EXISTS\",\"message\":\"이미 사용 중인 닉네임입니다.\"}"),
+                  @ExampleObject(
+                      name = "Google 계정 중복",
+                      value =
+                          "{\"success\":false,\"code\":\"GOOGLE_ACCOUNT_ALREADY_EXISTS\",\"message\":\"이미 가입된 Google 계정입니다.\"}")
                 }))
   })
   ResponseEntity<CommonResponse<SignupResponse>> signup(SignupRequest request);

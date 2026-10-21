@@ -30,6 +30,10 @@ public class Member {
   @Column(name = "provider", nullable = false, length = 20)
   private MemberProvider provider;
 
+  // Google·Kakao에서 발급한 사용자 고유 식별자
+  @Column(name = "provider_user_id", length = 255)
+  private String providerUserId;
+
   @Column(name = "is_active", nullable = false)
   private boolean active;
 
@@ -45,7 +49,9 @@ public class Member {
       MemberProvider provider,
       String nickname,
       boolean active,
-      LocalDateTime createdAt) {
+      LocalDateTime createdAt,
+      String providerUserId) {
+
     this.id = id;
     this.email = email;
     this.password = password;
@@ -53,6 +59,9 @@ public class Member {
     this.nickname = nickname;
     this.active = active;
     this.createdAt = createdAt;
+
+    // Google 등 소셜 서비스에서 발급한 사용자 고유 식별자
+    this.providerUserId = providerUserId;
   }
 
   /**
@@ -71,7 +80,31 @@ public class Member {
         MemberProvider.LOCAL,
         nickname,
         true,
-        LocalDateTime.now());
+        LocalDateTime.now(),
+        null);
+  }
+
+  /**
+   * Google 인증을 완료한 사용자의 회원 정보를 생성합니다.
+   *
+   * <p>Google 회원은 자체 비밀번호를 저장하지 않고, Google 계정 고유 ID를 provider_user_id에 저장합니다.
+   *
+   * @param email Google에서 인증된 이메일
+   * @param providerUserId Google 계정 고유 식별자(sub)
+   * @param nickname 사용자가 등록한 닉네임
+   * @return 생성된 Google 회원
+   */
+  public static Member createGoogle(String email, String providerUserId, String nickname) {
+
+    return new Member(
+        UUID.randomUUID().toString(),
+        email,
+        null,
+        MemberProvider.GOOGLE,
+        nickname,
+        true,
+        LocalDateTime.now(),
+        providerUserId);
   }
 
   public String getId() {
@@ -88,6 +121,14 @@ public class Member {
 
   public String getNickname() {
     return nickname;
+  }
+
+  public MemberProvider getProvider() {
+    return provider;
+  }
+
+  public String getProviderUserId() {
+    return providerUserId;
   }
 
   public LocalDateTime getCreatedAt() {

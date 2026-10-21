@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.todayit.common.exception.BusinessException;
 import com.todayit.common.exception.InvalidRequestException;
+import com.todayit.member.client.external.GoogleIdentity;
 import com.todayit.member.entity.Agreement;
 import com.todayit.member.entity.BlocklistMatchType;
 import com.todayit.member.entity.EmailVerificationPurpose;
@@ -18,6 +19,7 @@ import com.todayit.member.entity.Member;
 import com.todayit.member.entity.MemberAgreement;
 import com.todayit.member.entity.MemberProvider;
 import com.todayit.member.entity.MemberRole;
+import com.todayit.member.exception.MemberErrorCode;
 import com.todayit.member.repository.AgreementRepository;
 import com.todayit.member.repository.MemberAgreementRepository;
 import com.todayit.member.repository.MemberRepository;
@@ -507,5 +509,200 @@ class SignupServiceTest {
     verify(memberRoleRepository, never()).save(any(MemberRole.class));
     verify(memberAgreementRepository, never()).save(any(MemberAgreement.class));
     verify(emailVerificationService, never()).invalidateVerificationToken(any());
+  }
+
+  @Test
+  @DisplayName("Google 회원가입 시 비밀번호 없이 회원과 권한 및 약관을 저장한다")
+  void createsGoogleMemberWithAgreements() {
+    // Given
+    GoogleIdentity identity = new GoogleIdentity("google-user-123", "google@test.com", true);
+
+    SignupCommand command =
+        new SignupCommand(
+            MemberProvider.GOOGLE,
+            null,
+            null,
+            null,
+            "signup-token",
+            "구글회원",
+            Map.of(
+                "TOS", true,
+                "ACCOUNT_PRIVACY", true));
+
+    when(agreementRepository.findByDeletedFalse()).thenReturn(CURRENT_AGREEMENTS);
+
+    when(memberRepository.save(any(Member.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    when(memberRoleRepository.findRoleIdByName("USER")).thenReturn(Optional.of(1));
+
+    // When
+    Member member = signupService.createGoogleMember(command, identity);
+
+    // Then
+    assertThat(member.getProvider()).isEqualTo(MemberProvider.GOOGLE);
+    assertThat(member.getEmail()).isEqualTo("google@test.com");
+    assertThat(member.getPassword()).isNull();
+    assertThat(member.getProviderUserId()).isEqualTo("google-user-123");
+    assertThat(member.getNickname()).isEqualTo("구글회원");
+
+    verify(memberRepository).save(any(Member.class));
+    verify(memberRepository).flush();
+    verify(memberRoleRepository).save(any(MemberRole.class));
+    verify(memberAgreementRepository, times(2)).save(any(MemberAgreement.class));
+
+    // Google 회원가입은 이메일 인증과 비밀번호 암호화를 수행하지 않음
+    verify(passwordEncoder, never()).encode(any());
+    verify(emailVerificationService, never()).validateVerificationToken(any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("이미 가입된 Google 고유 ID로는 중복 가입할 수 없다")
+  void rejectsDuplicateGoogleAccount() {
+    // Given
+    GoogleIdentity identity = new GoogleIdentity("google-user-123", "google@test.com", true);
+
+    SignupCommand command =
+        new SignupCommand(
+            MemberProvider.GOOGLE,
+            null,
+            null,
+            null,
+            "signup-token",
+            "구글회원",
+            Map.of(
+                "TOS", true,
+                "ACCOUNT_PRIVACY", true));
+
+    // 같은 Google 계정의 회원이 이미 DB에 존재함
+    Member existingMember = Member.createGoogle("google@test.com", "google-user-123", "기존회원");
+
+    when(memberRepository.findByProviderAndProviderUserId(MemberProvider.GOOGLE, "google-user-123"))
+        .thenReturn(Optional.of(existingMember));
+
+    // When & Then
+    assertThatThrownBy(() -> signupService.createGoogleMember(command, identity))
+        .isInstanceOf(BusinessException.class)
+        .satisfies(
+            exception ->
+                assertThat(((BusinessException) exception).getErrorCode())
+                    .isEqualTo(MemberErrorCode.GOOGLE_ACCOUNT_ALREADY_EXISTS));
+
+    // 중복 계정인 경우 새 회원을 저장하지 않음
+    verify(memberRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("Google 회원도 필수 약관에 동의하지 않으면 가입할 수 없다")
+  void rejectsGoogleSignupWithoutRequiredAgreements() {
+    // Given
+    GoogleIdentity identity = new GoogleIdentity("google-user-123", "google@test.com", true);
+
+    SignupCommand command =
+        new SignupCommand(
+            MemberProvider.GOOGLE,
+            null,
+            null,
+            null,
+            "signup-token",
+            "구글회원",
+            Map.of(
+                "TOS", false,
+                "ACCOUNT_PRIVACY", true));
+
+    when(agreementRepository.findByDeletedFalse()).thenReturn(CURRENT_AGREEMENTS);
+
+    // When & Then
+    assertThatThrownBy(() -> signupService.createGoogleMember(command, identity))
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("필수 약관과 동의 항목을 확인해 주세요.");
+
+    verify(memberRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("서비스 직접 호출 시에도 비밀번호 필수 문자 조합을 검사한다")
+  void rejectsPasswordWithoutRequiredCharacters() {
+
+    // Given
+    SignupCommand command =
+        new SignupCommand(
+            "test@test.com", "verification-token", "abcdefghij", "오늘이", Map.of("TOS", true));
+
+    // When & Then
+    assertThatThrownBy(() -> signupService.createLocalMember(command))
+        .isInstanceOf(InvalidRequestException.class)
+        .hasMessage("비밀번호는 영문, 숫자, 특수문자를 각각 1개 이상 포함해야 합니다.");
+
+    // 유효하지 않은 비밀번호는 DB에 저장하지 않음
+    verify(memberRepository, never()).save(any(Member.class));
+  }
+
+  @Test
+  @DisplayName("닉네임 중복 확인 시 앞뒤 공백을 제거한다")
+  void normalizesNicknameBeforeAvailabilityCheck() {
+
+    // When
+    boolean available = signupService.isNicknameAvailable("  오늘이  ");
+
+    // Then
+    assertThat(available).isTrue();
+
+    // 공백 제거된 값으로 금칙어를 검사했는지 확인
+    verify(nicknameBlocklistRepository).existsBlockedNickname("오늘이");
+
+    // 공백 제거된 값으로 중복을 검사했는지 확인
+    verify(memberRepository).existsByNormalizedNickname("오늘이");
+  }
+
+  @Test
+  @DisplayName("Google 고유 ID UNIQUE 위반은 계정 중복 오류로 변환한다")
+  void convertsGoogleUserIdUniqueViolationToBusinessException() {
+
+    // Given
+    GoogleIdentity identity = new GoogleIdentity("google-user-123", "google@test.com", true);
+
+    SignupCommand command =
+        new SignupCommand(
+            MemberProvider.GOOGLE,
+            null,
+            null,
+            null,
+            "signup-token",
+            "구글회원",
+            Map.of(
+                "TOS", true,
+                "ACCOUNT_PRIVACY", true));
+
+    when(agreementRepository.findByDeletedFalse()).thenReturn(CURRENT_AGREEMENTS);
+
+    when(memberRepository.save(any(Member.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    // 동시 가입 시 DB에서 발생할 수 있는 UNIQUE 제약 위반 재현
+    ConstraintViolationException constraintException =
+        new ConstraintViolationException(
+            "Google 계정 고유 ID 중복",
+            new SQLException("duplicate key", "23505"),
+            "uk_member_provider_user_id");
+
+    doThrow(new DataIntegrityViolationException("DB UNIQUE 위반", constraintException))
+        .when(memberRepository)
+        .flush();
+
+    // When & Then
+    assertThatThrownBy(() -> signupService.createGoogleMember(command, identity))
+        .isInstanceOf(BusinessException.class)
+        .satisfies(
+            exception ->
+                assertThat(((BusinessException) exception).getErrorCode())
+                    .isEqualTo(MemberErrorCode.GOOGLE_ACCOUNT_ALREADY_EXISTS));
+
+    // 회원 저장 실패 후에는 권한과 약관 동의를 저장하지 않음
+    verify(memberRepository).flush();
+
+    verify(memberRoleRepository, never()).save(any(MemberRole.class));
+
+    verify(memberAgreementRepository, never()).save(any(MemberAgreement.class));
   }
 }
