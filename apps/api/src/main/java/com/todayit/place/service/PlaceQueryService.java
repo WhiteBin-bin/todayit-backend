@@ -2,6 +2,7 @@ package com.todayit.place.service;
 
 import com.todayit.common.pagination.PageResult;
 import com.todayit.course.service.RegionPlaceQueryService;
+import com.todayit.course.service.model.RegionFilter;
 import com.todayit.place.entity.Category;
 import com.todayit.place.entity.Place;
 import com.todayit.place.entity.PlaceImage;
@@ -70,8 +71,8 @@ public class PlaceQueryService implements PlaceScrapQueryService {
    * @param categories 장소 카테고리 목록
    * @param page 페이지 번호
    * @param size 페이지 크기
-   * @param memberId 선택 회원 식별자, 비회원이면 null
    * @param sort 정렬 기준
+   * @param memberId 선택 회원 식별자, 비회원이면 null
    * @return 장소 목록과 페이지 정보
    */
   @Transactional(readOnly = true)
@@ -83,14 +84,41 @@ public class PlaceQueryService implements PlaceScrapQueryService {
       int size,
       PlaceSort sort,
       String memberId) {
+    List<RegionFilter> regions =
+        sidoCode == null && sigunguCode == null
+            ? null
+            : List.of(
+                new RegionFilter(sidoCode, sigunguCode == null ? List.of() : List.of(sigunguCode)));
+    return findPlaces(regions, categories, page, size, sort, memberId);
+  }
+
+  /**
+   * 활성화되고 삭제되지 않은 장소를 지역 필터 목록 및 카테고리 조건으로 페이지 단위 조회합니다.
+   *
+   * @param regions 지역 필터 목록
+   * @param categories 장소 카테고리 목록
+   * @param page 페이지 번호
+   * @param size 페이지 크기
+   * @param sort 정렬 기준
+   * @param memberId 선택 회원 식별자, 비회원이면 null
+   * @return 장소 목록과 페이지 정보
+   */
+  @Transactional(readOnly = true)
+  public PageResult<PlaceResult> findPlaces(
+      List<RegionFilter> regions,
+      List<Category> categories,
+      int page,
+      int size,
+      PlaceSort sort,
+      String memberId) {
     Sort order =
         sort == PlaceSort.LATEST
             ? Sort.by(Sort.Direction.DESC, "createdAt")
             : Sort.by(Sort.Direction.DESC, "viewCount");
 
-    boolean regionFiltered = sidoCode != null || sigunguCode != null;
+    boolean regionFiltered = regions != null && !regions.isEmpty();
     List<Integer> regionIds =
-        regionFiltered ? regionPlaceQueryService.findRegionIds(sidoCode, sigunguCode) : List.of(0);
+        regionFiltered ? regionPlaceQueryService.findRegionIds(regions) : List.of(0);
     boolean categoryFiltered = categories != null && !categories.isEmpty();
     List<Category> categoryFilters =
         categoryFiltered ? List.copyOf(categories) : Arrays.asList(Category.values());

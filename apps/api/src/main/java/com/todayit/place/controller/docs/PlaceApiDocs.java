@@ -29,19 +29,21 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 
-/** 장소 조회와 스크랩 API 명세입니다. */
-@Tag(name = "장소", description = "장소 조회와 스크랩 API")
+/** 장소 API의 Swagger 문서를 정의하는 인터페이스입니다. */
+@Tag(name = "장소", description = "장소 조회 및 상호작용 관련 API")
 public interface PlaceApiDocs {
+
   /**
-   * 활성화되고 삭제되지 않은 장소의 상세 정보와 요청 회원의 좋아요·스크랩 여부를 조회합니다.
+   * 장소 식별자로 상세 정보를 조회합니다.
    *
    * @param placeId 장소 식별자
-   * @param authentication 선택 인증 정보, 비회원이면 null
-   * @return 장소 기본 정보, 영업시간 목록, 이미지와 평균 체류 시간을 포함한 상세 응답
+   * @param authentication 선택 인증 정보
+   * @return 장소 상세 응답
    */
   @Operation(
       summary = "장소 상세 조회",
-      description = "장소의 상세 정보와 좋아요·스크랩 여부를 조회합니다. 인증은 선택사항입니다.",
+      description =
+          "장소의 기본 정보, 영업시간, 편의시설, 이미지 목록, 좋아요 여부, 스크랩 여부 등 상세 정보를 조회합니다. 인증은 선택사항이며, 비회원의 liked·scrapped는 false입니다.",
       security = {@SecurityRequirement(), @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)})
   @ApiResponses({
     @ApiResponse(
@@ -56,7 +58,7 @@ public interface PlaceApiDocs {
                             "{\"success\":true,\"data\":{\"placeId\":1,\"name\":\"오늘 카페\",\"category\":\"CAFE_DESSERT\",\"address\":\"서울특별시 종로구 종로 1\",\"location\":{\"latitude\":37.57,\"longitude\":126.985},\"description\":\"조용한 분위기의 카페입니다.\",\"openingHours\":[{\"openDate\":\"2026-10-16T00:00:00\",\"startAt\":\"2026-10-16T09:00:00\",\"endAt\":\"2026-10-16T18:00:00\",\"breakStartAt\":\"2026-10-16T12:00:00\",\"breakEndAt\":\"2026-10-16T13:00:00\"}],\"images\":[\"https://example.com/images/place-1.jpg\"],\"averageStayMinutes\":60,\"liked\":true,\"scrapped\":false}}"))),
     @ApiResponse(
         responseCode = "400",
-        description = "장소 식별자의 형식이 올바르지 않음",
+        description = "잘못된 장소 식별자",
         content =
             @Content(
                 mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -96,8 +98,7 @@ public interface PlaceApiDocs {
    * 장소 목록을 페이지 단위로 조회합니다.
    *
    * @param authentication 선택 인증 정보
-   * @param sidoCode 시·도 코드 2자리, 생략 가능
-   * @param sigunguCode 시·군·구 코드 3자리, 생략 가능
+   * @param regions 지역 필터 JSON 문자열, 생략 가능
    * @param categories 장소 카테고리 목록
    * @param page 페이지 번호
    * @param size 페이지 크기
@@ -107,7 +108,7 @@ public interface PlaceApiDocs {
   @Operation(
       summary = "장소 필터 조회",
       description =
-          "지역·카테고리로 활성 장소를 페이지 단위로 조회합니다. sidoCode·sigunguCode 코드는 각각 선택사항이며, 전달된 조건을 모두 만족하는 지역의 장소를 조회합니다. 인증은 선택사항이며, 비회원의 liked는 false입니다.",
+          "지역·카테고리로 활성 장소를 페이지 단위로 조회합니다. regions는 시도 및 시군구 목록을 담은 JSON 배열 문자열이며 시도당 시군구는 최대 3개까지 지정 가능합니다. 생략 시 전체 지역을 조회합니다. 인증은 선택사항이며, 비회원의 liked는 false입니다.",
       security = {@SecurityRequirement(), @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)})
   @ApiResponses({
     @ApiResponse(
@@ -137,6 +138,10 @@ public interface PlaceApiDocs {
                       value =
                           "{\"success\":false,\"code\":\"INVALID_REGION_PATH\",\"message\":\"지역 필터 값이 올바르지 않습니다.\"}"),
                   @ExampleObject(
+                      name = "시군구 제한 초과",
+                      value =
+                          "{\"success\":false,\"code\":\"EXCEEDED_SIGUNGU_LIMIT\",\"message\":\"시군구 필터는 시도당 최대 3개까지 선택할 수 있습니다.\"}"),
+                  @ExampleObject(
                       name = "잘못된 페이지",
                       value =
                           "{\"success\":false,\"code\":\"INVALID_PAGINATION\",\"message\":\"페이지 요청값이 올바르지 않습니다.\"}")
@@ -154,8 +159,12 @@ public interface PlaceApiDocs {
                             "{\"success\":false,\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"서버 내부 오류가 발생했습니다.\"}")))
   })
   ResponseEntity<CommonResponse<PageResponse<PlaceFilterResponse>>> findPlaces(
-      @Parameter(description = "시·도 코드 2자리입니다. 생략 가능합니다.", example = "41") String sidoCode,
-      @Parameter(description = "시·군·구 코드 3자리입니다. 생략 가능합니다.", example = "110") String sigunguCode,
+      @Parameter(
+              description =
+                  "지역 필터 JSON 배열 문자열입니다. 시도당 시군구 코드는 최대 3개까지 지정할 수 있으며, 빈 배열이거나 생략하면 해당 시도 전체를 조회합니다.",
+              example =
+                  "[{\"sidoCode\":\"11\",\"sigunguCodes\":[\"680\",\"650\"]},{\"sidoCode\":\"41\",\"sigunguCodes\":[]}]")
+          String regions,
       @Parameter(
               description =
                   "카테고리를 복수 선택할 수 있습니다. 쉼표로 구분하며, 선택한 값 중 하나에 해당하는 장소를 조회합니다. 생략하면 전체 카테고리를 조회합니다.",
@@ -185,16 +194,13 @@ public interface PlaceApiDocs {
               schema = @Schema(minimum = "0"))
           int page,
       @Parameter(
-              description = "페이지 크기입니다. 1 이상이어야 합니다.",
+              description = "페이지당 결과 개수입니다. 1부터 100까지 가능합니다.",
               example = "20",
-              schema = @Schema(minimum = "1"))
+              schema = @Schema(minimum = "1", maximum = "100"))
           int size,
       @Parameter(
-              description = "정렬 기준입니다. LATEST는 최신순, POPULAR는 조회수순입니다.",
-              examples = {
-                @ExampleObject(name = "최신순", value = "LATEST"),
-                @ExampleObject(name = "조회수순", value = "POPULAR")
-              })
+              description = "정렬 기준입니다. LATEST(최신순), POPULAR(조회수순) 중 선택합니다. 생략하면 LATEST입니다.",
+              example = "LATEST")
           PlaceSort sort,
       @Parameter(hidden = true) Authentication authentication);
 
@@ -202,9 +208,9 @@ public interface PlaceApiDocs {
    * 장소의 지도 표시 정보를 조회합니다.
    *
    * @param placeId 장소 식별자
-   * @return 장소 위치 정보
+   * @return 장소 위치 응답
    */
-  @Operation(summary = "장소 지도 조회", description = "장소의 위도, 경도와 주소를 조회합니다.")
+  @Operation(summary = "장소 위치 조회", description = "장소의 식별자, 위도·경도 좌표와 주소를 조회합니다.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -217,8 +223,19 @@ public interface PlaceApiDocs {
                         value =
                             "{\"success\":true,\"data\":{\"placeId\":1,\"latitude\":37.57000000,\"longitude\":126.98500000,\"address\":\"서울특별시 종로구 종로 1\"}}"))),
     @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 장소 식별자",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"INVALID_REQUEST\",\"message\":\"요청값이 올바르지 않습니다.\"}"))),
+    @ApiResponse(
         responseCode = "404",
-        description = "장소를 찾을 수 없음",
+        description = "장소가 없거나 비활성·삭제 상태",
         content =
             @Content(
                 mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -243,14 +260,14 @@ public interface PlaceApiDocs {
       @Parameter(description = "장소 식별자입니다.", example = "1", required = true) int placeId);
 
   /**
-   * 장소의 사진 목록을 페이지 단위로 조회합니다.
+   * 장소 사진 목록을 페이지 단위로 조회합니다.
    *
    * @param placeId 장소 식별자
    * @param page 페이지 번호
    * @param size 페이지 크기
    * @return 장소 사진 목록과 페이지 정보
    */
-  @Operation(summary = "장소 사진 조회", description = "장소의 사진 목록을 페이지 단위로 조회합니다.")
+  @Operation(summary = "장소 사진 목록 조회", description = "장소에 등록된 사진을 최신 등록순으로 페이지 단위 조회합니다.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -261,21 +278,27 @@ public interface PlaceApiDocs {
                 examples =
                     @ExampleObject(
                         value =
-                            "{\"success\":true,\"data\":{\"content\":[{\"placeImageId\":10,\"imageUrl\":\"https://example.com/place-image.jpg\"}],\"page\":0,\"size\":20,\"totalElements\":1,\"totalPages\":1}}"))),
+                            "{\"success\":true,\"data\":{\"content\":[{\"placeImageId\":1,\"imageUrl\":\"https://example.com/place.jpg\"}],\"page\":0,\"size\":20,\"totalElements\":1,\"totalPages\":1}}"))),
     @ApiResponse(
         responseCode = "400",
-        description = "잘못된 페이지 요청",
+        description = "잘못된 장소 식별자 또는 페이지 요청",
         content =
             @Content(
                 mediaType = MediaType.APPLICATION_JSON_VALUE,
                 schema = @Schema(implementation = ErrorResponse.class),
-                examples =
-                    @ExampleObject(
-                        value =
-                            "{\"success\":false,\"code\":\"INVALID_PAGINATION\",\"message\":\"페이지 요청값이 올바르지 않습니다.\"}"))),
+                examples = {
+                  @ExampleObject(
+                      name = "잘못된 식별자",
+                      value =
+                          "{\"success\":false,\"code\":\"INVALID_REQUEST\",\"message\":\"요청값이 올바르지 않습니다.\"}"),
+                  @ExampleObject(
+                      name = "잘못된 페이지",
+                      value =
+                          "{\"success\":false,\"code\":\"INVALID_PAGINATION\",\"message\":\"페이지 요청값이 올바르지 않습니다.\"}")
+                })),
     @ApiResponse(
         responseCode = "404",
-        description = "장소를 찾을 수 없음",
+        description = "장소가 없거나 비활성·삭제 상태",
         content =
             @Content(
                 mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -304,152 +327,23 @@ public interface PlaceApiDocs {
               schema = @Schema(minimum = "0"))
           int page,
       @Parameter(
-              description = "페이지 크기입니다. 1 이상이어야 합니다.",
+              description = "페이지당 결과 개수입니다. 1부터 100까지 가능합니다.",
               example = "20",
-              schema = @Schema(minimum = "1"))
+              schema = @Schema(minimum = "1", maximum = "100"))
           int size);
 
   /**
-   * 인증된 회원의 장소 스크랩을 생성합니다.
-   *
-   * @param placeId 장소 식별자
-   * @param authentication 인증된 회원 정보
-   * @return 장소 스크랩 결과
-   */
-  @Operation(
-      summary = "장소 스크랩",
-      description = "인증된 회원의 장소 스크랩을 생성합니다.",
-      security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
-  @ApiResponses({
-    @ApiResponse(
-        responseCode = "201",
-        description = "스크랩 성공",
-        content =
-            @Content(
-                mediaType = MediaType.APPLICATION_JSON_VALUE,
-                examples =
-                    @ExampleObject(
-                        value =
-                            "{\"success\":true,\"data\":{\"placeId\":1,\"scrapped\":true,\"scrapCount\":3}}"))),
-    @ApiResponse(
-        responseCode = "400",
-        description = "이미 스크랩한 장소입니다",
-        content =
-            @Content(
-                mediaType = MediaType.APPLICATION_JSON_VALUE,
-                schema = @Schema(implementation = ErrorResponse.class),
-                examples =
-                    @ExampleObject(
-                        value =
-                            "{\"success\":false,\"code\":\"PLACE_ALREADY_SCRAPPED\",\"message\":\"이미 스크랩되었습니다.\"}"))),
-    @ApiResponse(
-        responseCode = "401",
-        description = "인증 필요",
-        content =
-            @Content(
-                mediaType = MediaType.APPLICATION_JSON_VALUE,
-                schema = @Schema(implementation = ErrorResponse.class),
-                examples =
-                    @ExampleObject(
-                        value =
-                            "{\"success\":false,\"code\":\"AUTHENTICATION_REQUIRED\",\"message\":\"인증이 필요합니다.\"}"))),
-    @ApiResponse(
-        responseCode = "404",
-        description = "장소를 찾을 수 없음",
-        content =
-            @Content(
-                mediaType = MediaType.APPLICATION_JSON_VALUE,
-                schema = @Schema(implementation = ErrorResponse.class),
-                examples =
-                    @ExampleObject(
-                        value =
-                            "{\"success\":false,\"code\":\"PLACE_NOT_FOUND\",\"message\":\"장소를 찾을 수 없습니다.\"}"))),
-    @ApiResponse(
-        responseCode = "500",
-        description = "서버 내부 오류",
-        content =
-            @Content(
-                mediaType = MediaType.APPLICATION_JSON_VALUE,
-                schema = @Schema(implementation = ErrorResponse.class),
-                examples =
-                    @ExampleObject(
-                        value =
-                            "{\"success\":false,\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"서버 내부 오류가 발생했습니다.\"}")))
-  })
-  ResponseEntity<CommonResponse<PlaceScrapResponse>> scrapPlace(
-      @Parameter(description = "장소 식별자입니다.", example = "1", required = true) int placeId,
-      @Parameter(hidden = true) Authentication authentication);
-
-  /**
-   * 인증된 회원의 장소 스크랩을 취소합니다.
-   *
-   * @param placeId 장소 식별자
-   * @param authentication 인증된 회원 정보
-   * @return 장소 스크랩 취소 결과
-   */
-  @Operation(
-      summary = "장소 스크랩 취소",
-      description = "인증된 회원의 장소 스크랩을 취소합니다.",
-      security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
-  @ApiResponses({
-    @ApiResponse(
-        responseCode = "200",
-        description = "스크랩 취소 성공",
-        content =
-            @Content(
-                mediaType = MediaType.APPLICATION_JSON_VALUE,
-                examples =
-                    @ExampleObject(
-                        value =
-                            "{\"success\":true,\"data\":{\"placeId\":1,\"scrapped\":false,\"scrapCount\":2}}"))),
-    @ApiResponse(
-        responseCode = "401",
-        description = "인증 필요",
-        content =
-            @Content(
-                mediaType = MediaType.APPLICATION_JSON_VALUE,
-                schema = @Schema(implementation = ErrorResponse.class),
-                examples =
-                    @ExampleObject(
-                        value =
-                            "{\"success\":false,\"code\":\"AUTHENTICATION_REQUIRED\",\"message\":\"인증이 필요합니다.\"}"))),
-    @ApiResponse(
-        responseCode = "404",
-        description = "장소를 찾을 수 없음",
-        content =
-            @Content(
-                mediaType = MediaType.APPLICATION_JSON_VALUE,
-                schema = @Schema(implementation = ErrorResponse.class),
-                examples =
-                    @ExampleObject(
-                        value =
-                            "{\"success\":false,\"code\":\"PLACE_NOT_FOUND\",\"message\":\"장소를 찾을 수 없습니다.\"}"))),
-    @ApiResponse(
-        responseCode = "500",
-        description = "서버 내부 오류",
-        content =
-            @Content(
-                mediaType = MediaType.APPLICATION_JSON_VALUE,
-                schema = @Schema(implementation = ErrorResponse.class),
-                examples =
-                    @ExampleObject(
-                        value =
-                            "{\"success\":false,\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"서버 내부 오류가 발생했습니다.\"}")))
-  })
-  ResponseEntity<CommonResponse<PlaceScrapResponse>> cancelPlaceScrap(
-      @Parameter(description = "장소 식별자입니다.", example = "1", required = true) int placeId,
-      @Parameter(hidden = true) Authentication authentication);
-
-  /**
-   * 특정 장소의 공개 코스 목록을 조회합니다.
+   * 특정 장소를 포함한 공개 코스 목록을 페이지 단위로 조회합니다.
    *
    * @param placeId 장소 식별자
    * @param page 페이지 번호
    * @param size 페이지 크기
-   * @param sort 정렬 기준
-   * @return 장소를 포함한 공개 코스 목록과 페이지 정보
+   * @param sort 코스 정렬 기준
+   * @return 코스 목록과 페이지 정보
    */
-  @Operation(summary = "장소별 코스 조회", description = "특정 장소를 포함한 공개 코스 목록을 페이지 단위로 조회합니다.")
+  @Operation(
+      summary = "장소 포함 코스 목록 조회",
+      description = "특정 장소를 경유하는 공개 코스 목록을 페이지 단위로 조회합니다. 장소가 없거나 비활성·삭제 상태이면 404를 반환합니다.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -460,21 +354,27 @@ public interface PlaceApiDocs {
                 examples =
                     @ExampleObject(
                         value =
-                            "{\"success\":true,\"data\":{\"content\":[{\"courseId\":1,\"title\":\"종로 맛집과 카페 코스\",\"courseSummary\":\"종로에서 식사와 카페를 함께 즐기는 코스입니다.\",\"transport\":\"WALKING\",\"startAt\":\"2026-10-03T11:00:00\",\"endAt\":\"2026-10-03T15:00:00\",\"viewCount\":25}],\"page\":0,\"size\":20,\"totalElements\":1,\"totalPages\":1}}"))),
+                            "{\"success\":true,\"data\":{\"content\":[{\"courseId\":1,\"title\":\"주말 데이트 코스\",\"description\":\"분위기 좋은 카페와 산책로를 엮은 코스입니다.\",\"places\":[{\"coursePlaceId\":1,\"placeId\":10,\"order\":1,\"durationMinute\":60,\"name\":\"성수 카페\",\"category\":\"CAFE_DESSERT\",\"address\":\"서울특별시 성동구 성수동 1가\",\"latitude\":37.54450000,\"longitude\":127.05600000}],\"viewCount\":120,\"bookmarkCount\":15,\"bookmarked\":false}],\"page\":0,\"size\":20,\"totalElements\":1,\"totalPages\":1}}"))),
     @ApiResponse(
         responseCode = "400",
-        description = "잘못된 페이지 요청",
+        description = "잘못된 장소 식별자 또는 페이지 요청",
         content =
             @Content(
                 mediaType = MediaType.APPLICATION_JSON_VALUE,
                 schema = @Schema(implementation = ErrorResponse.class),
-                examples =
-                    @ExampleObject(
-                        value =
-                            "{\"success\":false,\"code\":\"INVALID_PAGINATION\",\"message\":\"페이지 요청값이 올바르지 않습니다.\"}"))),
+                examples = {
+                  @ExampleObject(
+                      name = "잘못된 식별자",
+                      value =
+                          "{\"success\":false,\"code\":\"INVALID_REQUEST\",\"message\":\"요청값이 올바르지 않습니다.\"}"),
+                  @ExampleObject(
+                      name = "잘못된 페이지",
+                      value =
+                          "{\"success\":false,\"code\":\"INVALID_PAGINATION\",\"message\":\"페이지 요청값이 올바르지 않습니다.\"}")
+                })),
     @ApiResponse(
         responseCode = "404",
-        description = "장소를 찾을 수 없음",
+        description = "장소가 없거나 비활성·삭제 상태",
         content =
             @Content(
                 mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -503,43 +403,172 @@ public interface PlaceApiDocs {
               schema = @Schema(minimum = "0"))
           int page,
       @Parameter(
-              description = "페이지 크기입니다. 1 이상이어야 합니다.",
+              description = "페이지당 결과 개수입니다. 1부터 100까지 가능합니다.",
               example = "20",
-              schema = @Schema(minimum = "1"))
+              schema = @Schema(minimum = "1", maximum = "100"))
           int size,
       @Parameter(
-              description = "정렬 기준입니다. LATEST는 최신순, POPULAR는 조회수순입니다.",
-              examples = {
-                @ExampleObject(name = "최신순", value = "LATEST"),
-                @ExampleObject(name = "조회수순", value = "POPULAR")
-              })
+              description =
+                  "코스 정렬 기준입니다. LATEST(최신순), POPULAR(조회수순), BOOKMARK(스크랩순) 중 선택합니다. 생략하면 LATEST입니다.",
+              example = "LATEST")
           CourseSort sort);
 
   /**
-   * 인증된 회원의 장소 좋아요를 생성합니다.
+   * 장소 스크랩을 생성합니다.
    *
    * @param placeId 장소 식별자
    * @param authentication 인증된 회원 정보
-   * @return 장소 좋아요 결과
+   * @return 장소 스크랩 결과
    */
   @Operation(
-      summary = "장소 좋아요",
-      description = "인증된 회원의 장소 좋아요를 생성합니다.",
+      summary = "장소 스크랩 등록",
+      description = "인증된 회원이 장소를 스크랩합니다. 이미 스크랩한 장소이면 400을 반환합니다.",
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
   @ApiResponses({
     @ApiResponse(
         responseCode = "201",
-        description = "좋아요 성공",
+        description = "스크랩 생성 성공",
         content =
             @Content(
                 mediaType = MediaType.APPLICATION_JSON_VALUE,
                 examples =
                     @ExampleObject(
                         value =
-                            "{\"success\":true,\"data\":{\"placeId\":1,\"liked\":true,\"likeCount\":3}}"))),
+                            "{\"success\":true,\"data\":{\"placeId\":1,\"scrapped\":true,\"scrapCount\":1}}"))),
     @ApiResponse(
         responseCode = "400",
-        description = "이미 좋아요를 누른 장소입니다",
+        description = "이미 스크랩된 장소",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"PLACE_ALREADY_SCRAPPED\",\"message\":\"이미 스크랩되었습니다.\"}"))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"UNAUTHORIZED\",\"message\":\"인증이 필요합니다.\"}"))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "장소가 없거나 비활성·삭제 상태",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"PLACE_NOT_FOUND\",\"message\":\"장소를 찾을 수 없습니다.\"}"))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 내부 오류",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"서버 내부 오류가 발생했습니다.\"}")))
+  })
+  ResponseEntity<CommonResponse<PlaceScrapResponse>> scrapPlace(
+      @Parameter(description = "장소 식별자입니다.", example = "1", required = true) int placeId,
+      @Parameter(hidden = true) Authentication authentication);
+
+  /**
+   * 장소 스크랩을 취소합니다.
+   *
+   * @param placeId 장소 식별자
+   * @param authentication 인증된 회원 정보
+   * @return 장소 스크랩 결과
+   */
+  @Operation(
+      summary = "장소 스크랩 취소",
+      description = "인증된 회원의 장소 스크랩을 취소합니다. 스크랩하지 않은 상태여도 멱등하게 성공(scrapped=false)을 반환합니다.",
+      security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "스크랩 취소 성공",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":true,\"data\":{\"placeId\":1,\"scrapped\":false,\"scrapCount\":0}}"))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"UNAUTHORIZED\",\"message\":\"인증이 필요합니다.\"}"))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "장소가 없거나 비활성·삭제 상태",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"PLACE_NOT_FOUND\",\"message\":\"장소를 찾을 수 없습니다.\"}"))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 내부 오류",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"서버 내부 오류가 발생했습니다.\"}")))
+  })
+  ResponseEntity<CommonResponse<PlaceScrapResponse>> cancelPlaceScrap(
+      @Parameter(description = "장소 식별자입니다.", example = "1", required = true) int placeId,
+      @Parameter(hidden = true) Authentication authentication);
+
+  /**
+   * 장소 좋아요를 생성합니다.
+   *
+   * @param placeId 장소 식별자
+   * @param authentication 인증된 회원 정보
+   * @return 장소 좋아요 결과
+   */
+  @Operation(
+      summary = "장소 좋아요 등록",
+      description = "인증된 회원이 장소에 좋아요를 누릅니다. 이미 좋아요를 누른 장소이면 400을 반환합니다.",
+      security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "201",
+        description = "좋아요 생성 성공",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":true,\"data\":{\"placeId\":1,\"liked\":true,\"likeCount\":1}}"))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "이미 좋아요를 누른 장소",
         content =
             @Content(
                 mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -550,7 +579,7 @@ public interface PlaceApiDocs {
                             "{\"success\":false,\"code\":\"PLACE_ALREADY_LIKED\",\"message\":\"이미 좋아요를 눌렀습니다.\"}"))),
     @ApiResponse(
         responseCode = "401",
-        description = "인증 필요",
+        description = "인증 실패",
         content =
             @Content(
                 mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -558,10 +587,10 @@ public interface PlaceApiDocs {
                 examples =
                     @ExampleObject(
                         value =
-                            "{\"success\":false,\"code\":\"AUTHENTICATION_REQUIRED\",\"message\":\"인증이 필요합니다.\"}"))),
+                            "{\"success\":false,\"code\":\"UNAUTHORIZED\",\"message\":\"인증이 필요합니다.\"}"))),
     @ApiResponse(
         responseCode = "404",
-        description = "장소를 찾을 수 없음",
+        description = "장소가 없거나 비활성·삭제 상태",
         content =
             @Content(
                 mediaType = MediaType.APPLICATION_JSON_VALUE,
