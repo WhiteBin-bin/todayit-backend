@@ -18,6 +18,48 @@ class RecommendationEngineServiceTest {
   private final RecommendationEngineService service = new RecommendationEngineService();
 
   @Test
+  @DisplayName("비회원은 이전에 추천된 후보가 있어도 추천 결과를 받지 않는다")
+  void guestCannotReceiveRecommendationsEvenWhenCandidatesWerePreviouslyEligible() {
+    // given
+    CourseCandidate candidate =
+        new CourseCandidate("course-1", true, false, 1, 1, Set.of("CAFE"), 20, Instant.now());
+    service.evaluateAndRank(
+        new RecommendationContext("member-1", true, "1111051500", Set.of("CAFE"), false),
+        List.of(candidate));
+
+    // when
+    List<CourseCandidate> ranked =
+        service.evaluateAndRank(
+            new RecommendationContext(null, false, null, Set.of(), false), List.of(candidate));
+
+    // then
+    assertTrue(ranked.isEmpty());
+  }
+
+  @Test
+  @DisplayName("비공개 및 삭제 코스는 인기 점수 정규화에 영향을 주지 않는다")
+  void excludedCoursesDoNotChangePopularityNormalization() {
+    // given
+    RecommendationContext context =
+        new RecommendationContext("member-1", true, null, Set.of("CAFE"), false);
+    CourseCandidate eligible =
+        new CourseCandidate("visible", true, false, 1, 0, Set.of("CAFE"), 10, Instant.now());
+    CourseCandidate hidden =
+        new CourseCandidate("hidden", false, false, 1, 0, Set.of("CAFE"), 100, Instant.now());
+    CourseCandidate deleted =
+        new CourseCandidate("deleted", true, true, 1, 0, Set.of("CAFE"), 200, Instant.now());
+
+    // when
+    List<CourseCandidate> ranked =
+        service.evaluateAndRank(context, List.of(eligible, hidden, deleted));
+
+    // then
+    assertEquals(List.of(eligible), ranked);
+    assertEquals(1.0, eligible.getPopularityNormalizedScore());
+    assertEquals(100.0, eligible.getFinalScore());
+  }
+
+  @Test
   @DisplayName("기획서 검수 기준: R=0.75, C=1.0, P=0.5, H=0.6일 때 B=0.9이고 최종 점수는 정확히 75점이 된다")
   void shouldMatchSpecificationExampleScore75() {
     // given

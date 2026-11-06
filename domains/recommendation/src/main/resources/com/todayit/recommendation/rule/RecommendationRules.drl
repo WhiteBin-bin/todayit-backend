@@ -12,9 +12,18 @@ then
     $candidate.setFinalScore(0.0);
 end
 
-rule "비회원이거나 개인화 동의 철회 시 인기순으로 대체"
+rule "비회원은 추천 목록에서 제외"
 when
-    $ctx : /context[ member == false || personalizedConsent == false ]
+    $ctx : /context[ member == false ]
+    $candidate : /candidates[ visible == true, deleted == false ]
+then
+    $candidate.setEligible(false);
+    $candidate.setFinalScore(0.0);
+end
+
+rule "회원의 개인화 동의 철회 시 인기순으로 대체"
+when
+    $ctx : /context[ member == true, personalizedConsent == false ]
     $candidate : /candidates[ visible == true, deleted == false ]
 then
     $candidate.setEligible(true);
