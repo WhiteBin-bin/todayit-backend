@@ -31,6 +31,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -126,6 +127,7 @@ class PostgresPlaceSourceRepositoryTest {
     assertThat(row.get("is_deleted")).isEqualTo(false);
     assertThat(row.get("view_count")).isEqualTo(0);
     assertThat(row.get("description")).isEqualTo("소개");
+    assertThat(row.get("visitor_info")).isNull();
     assertThat(count("place_source")).isEqualTo(1);
     assertThat(count("region_place")).isEqualTo(1);
     assertThat(
@@ -135,6 +137,60 @@ class PostgresPlaceSourceRepositoryTest {
                 result.placeId()))
         .containsExactly("https://example.com/candidate.jpg");
     assertThat(count("external_place_raw")).isZero();
+  }
+
+  /* 편의 시설 저장 */
+  @Test
+  @DisplayName("소개 정보를 저장하고 재적재 시 같은 장소의 값을 갱신한다")
+  void storesVisitorInfoFromRawIntroductionAndUpdatesTheSamePlace() {
+    // given
+    successfulRaw("001", "VE030100", "110");
+    jdbc.update(
+        """
+        UPDATE external_place_raw
+        SET payload = jsonb_set(
+            jsonb_set(payload, '{list,contenttypeid}', to_jsonb('12'::text)),
+            '{intro,0,parking}', to_jsonb('가능<br>2시간 무료'::text))
+        WHERE source_id = '001'
+        """);
+
+    // when
+    PlaceIngestionResult first = ingestionService.ingestAllTourApi(10);
+
+    // then
+    assertThat(first.stored()).isEqualTo(1);
+    Integer placeId = jdbc.queryForObject("SELECT place_id FROM place", Integer.class);
+    String parkingSql = "SELECT visitor_info ->> 'PARKING' FROM place WHERE place_id = ?";
+    assertThat(jdbc.queryForObject(parkingSql, String.class, placeId)).isEqualTo("가능\n2시간 무료");
+
+    // given
+    jdbc.update(
+        """
+        UPDATE external_place_raw
+        SET payload = jsonb_set(payload, '{intro,0,parking}', to_jsonb('불가'::text))
+        WHERE source_id = '001'
+        """);
+    // when
+    PlaceIngestionResult updated = ingestionService.ingestAllTourApi(10);
+
+    // then
+    assertThat(updated.stored()).isEqualTo(1);
+    assertThat(jdbc.queryForObject(parkingSql, String.class, placeId)).isEqualTo("불가");
+
+    // given
+    jdbc.update(
+        """
+        UPDATE external_place_raw
+        SET payload = payload #- '{intro,0,parking}'
+        WHERE source_id = '001'
+        """);
+    // when
+    PlaceIngestionResult missing = ingestionService.ingestAllTourApi(10);
+
+    // then
+    assertThat(missing.stored()).isEqualTo(1);
+    assertThat(jdbc.queryForObject(parkingSql, String.class, placeId)).isEqualTo("불가");
+    assertThat(count("place")).isEqualTo(1);
   }
 
   /** 동일 원천을 재적재해도 장소·지역 연결과 최초 생성 시각이 유지되는지 검증합니다. */
@@ -764,6 +820,7 @@ class PostgresPlaceSourceRepositoryTest {
             "110",
             "VE030100",
             description,
+            Map.of(),
             List.of(new Image("https://example.com/candidate.jpg", null, null, null, null)));
     return new PlaceNormalizationResult(1, sourceId, Status.NORMALIZED, null, place);
   }
@@ -788,6 +845,7 @@ class PostgresPlaceSourceRepositoryTest {
             place.sigunguCode(),
             place.sourceCategoryCode(),
             place.description(),
+            place.introduction(),
             List.of(images));
     return new PlaceNormalizationResult(
         result.rawId(), result.sourceId(), result.status(), result.reason(), changed);
