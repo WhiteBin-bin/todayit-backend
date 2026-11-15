@@ -52,14 +52,34 @@ public interface PlaceApiDocs {
     @ApiResponse(
         responseCode = "400",
         description = "검색어 누락 또는 잘못된 페이지 요청",
-        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples = {
+                  @ExampleObject(
+                      name = "검색어 누락 또는 요청 형식 오류",
+                      value =
+                          "{\"success\":false,\"code\":\"INVALID_REQUEST\",\"message\":\"요청값이 올바르지 않습니다.\"}"),
+                  @ExampleObject(
+                      name = "잘못된 페이지 번호 또는 크기",
+                      value =
+                          "{\"success\":false,\"code\":\"INVALID_PAGINATION\",\"message\":\"페이지 요청값이 올바르지 않습니다.\"}")
+                })),
     @ApiResponse(
         responseCode = "500",
         description = "서버 내부 오류",
-        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"서버 내부 오류가 발생했습니다.\"}")))
   })
   ResponseEntity<CommonResponse<PageResponse<PlaceFilterResponse>>> searchPlaces(
-      @Parameter(description = "가게 이름 검색어입니다.", example = "강남", required = true) String keyword,
+      @Parameter(description = "가게 이름 검색어입니다.", example = "어니언 성수", required = true) String keyword,
       @Parameter(
               description = "페이지 번호입니다. 0부터 시작합니다.",
               example = "0",
@@ -91,7 +111,7 @@ public interface PlaceApiDocs {
                 examples =
                     @ExampleObject(
                         value =
-                            "{\"success\":true,\"data\":{\"placeId\":1,\"name\":\"오늘 카페\",\"category\":\"CAFE_DESSERT\",\"address\":\"서울특별시 종로구 종로 1\",\"location\":{\"latitude\":37.57,\"longitude\":126.985},\"description\":\"조용한 분위기의 카페입니다.\",\"openingHours\":[{\"openDate\":\"2026-10-16T00:00:00\",\"startAt\":\"2026-10-16T09:00:00\",\"endAt\":\"2026-10-16T18:00:00\",\"breakStartAt\":\"2026-10-16T12:00:00\",\"breakEndAt\":\"2026-10-16T13:00:00\"}],\"images\":[\"https://example.com/images/place-1.jpg\"],\"averageStayMinutes\":60,\"liked\":true,\"scrapped\":false}}"))),
+                            "{\"success\":true,\"data\":{\"placeId\":1,\"name\":\"오늘 카페\",\"category\":\"CAFE_DESSERT\",\"address\":\"서울특별시 종로구 종로 1\",\"location\":{\"latitude\":37.57,\"longitude\":126.985},\"description\":\"조용한 분위기의 카페입니다.\",\"openingHours\":[{\"openDate\":\"2026-10-16T00:00:00\",\"startAt\":\"2026-10-16T09:00:00\",\"endAt\":\"2026-10-16T18:00:00\",\"breakStartAt\":\"2026-10-16T12:00:00\",\"breakEndAt\":\"2026-10-16T13:00:00\"}],\"images\":[\"https://example.com/images/place-1.jpg\"],\"averageStayMinutes\":60,\"liked\":true,\"scrapped\":false,\"visitorInfo\":{\"PARKING\":\"주차 가능\",\"PET_ACCESS\":\"반려동물 동반 불가\"}}}"))),
     @ApiResponse(
         responseCode = "400",
         description = "잘못된 장소 식별자",

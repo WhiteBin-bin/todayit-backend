@@ -15,6 +15,7 @@ import com.todayit.common.pagination.PageResult;
 import com.todayit.course.service.CoursePlaceQueryService;
 import com.todayit.course.service.model.RegionFilter;
 import com.todayit.place.entity.Category;
+import com.todayit.place.entity.VisitorInfoType;
 import com.todayit.place.exception.PlaceNotFoundException;
 import com.todayit.place.service.PlaceCommandService;
 import com.todayit.place.service.PlaceDetailFacade;
@@ -31,6 +32,7 @@ import com.todayit.place.service.model.PlaceSort;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -332,7 +334,13 @@ class PlaceControllerTest {
             List.of("https://example.com/place.jpg"),
             false);
     PlaceDetailResult detail =
-        new PlaceDetailResult(place, "장소 설명", List.of(opening), false, false);
+        new PlaceDetailResult(
+            place,
+            "장소 설명",
+            List.of(opening),
+            false,
+            false,
+            Map.of(VisitorInfoType.PARKING, "주차 가능", VisitorInfoType.PET_ACCESS, "반려동물 동반 불가"));
     when(placeDetailFacade.getPlaceDetail(1, null))
         .thenReturn(new PlaceDetailWithStayResult(detail, 0));
 
@@ -345,6 +353,8 @@ class PlaceControllerTest {
         .andExpect(jsonPath("$.data.placeId").value(1))
         .andExpect(jsonPath("$.data.location.latitude").value(37.5))
         .andExpect(jsonPath("$.data.description").value("장소 설명"))
+        .andExpect(jsonPath("$.data.visitorInfo.PARKING").value("주차 가능"))
+        .andExpect(jsonPath("$.data.visitorInfo.PET_ACCESS").value("반려동물 동반 불가"))
         .andExpect(jsonPath("$.data.openingHours").isArray())
         .andExpect(jsonPath("$.data.openingHours[0].startAt").value("2026-10-16T09:00:00"))
         .andExpect(jsonPath("$.data.images[0]").value("https://example.com/place.jpg"))
