@@ -34,6 +34,42 @@ import org.springframework.security.core.Authentication;
 public interface PlaceApiDocs {
 
   /**
+   * 가게 이름으로 장소를 검색합니다.
+   *
+   * @param keyword 가게 이름 검색어, 필수
+   * @param page 0부터 시작하는 페이지 번호
+   * @param size 페이지 크기
+   * @param authentication 선택 인증 정보
+   * @return 검색 결과와 페이지 정보
+   */
+  @Operation(
+      summary = "가게 이름 검색",
+      description =
+          "가게 이름에 검색어의 글자가 하나 이상 포함된 활성 장소를 검색합니다. 공백과 영문 대소문자를 무시한 이름의 완전 일치를 우선합니다. 이후 글자 순서와 관계없이 글자별 검색어와 이름의 등장 횟수 중 작은 값을 합산하여 내림차순으로 정렬합니다. 동점이면 최신순, 장소 식별자 내림차순입니다. 저장된 이름은 원문 그대로 반환합니다. 빈 검색어는 빈 결과를 반환합니다. 인증은 선택사항이며 비회원의 liked는 false입니다.",
+      security = {@SecurityRequirement(), @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)})
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "검색 성공"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "검색어 누락 또는 잘못된 페이지 요청",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 내부 오류",
+        content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+  })
+  ResponseEntity<CommonResponse<PageResponse<PlaceFilterResponse>>> searchPlaces(
+      @Parameter(description = "가게 이름 검색어입니다.", example = "강남", required = true) String keyword,
+      @Parameter(
+              description = "페이지 번호입니다. 0부터 시작합니다.",
+              example = "0",
+              schema = @Schema(minimum = "0", defaultValue = "0"))
+          int page,
+      @Parameter(description = "페이지 크기입니다.", example = "20", schema = @Schema(defaultValue = "20"))
+          int size,
+      @Parameter(hidden = true) Authentication authentication);
+
+  /**
    * 장소 식별자로 상세 정보를 조회합니다.
    *
    * @param placeId 장소 식별자

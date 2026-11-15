@@ -37,6 +37,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.Logger;
@@ -82,6 +84,54 @@ class PlaceControllerTest {
                     placeDetailFacade))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
+  }
+
+  @Test
+  @DisplayName("검색 전용 엔드포인트로 가게 이름을 검색한다")
+  void searchesPlacesUsingDedicatedEndpoint() throws Exception {
+    // Given
+    when(placeQueryService.searchPlaces("gang", 0, 20, null))
+        .thenReturn(new PageResult<>(List.of(), 0, 20, 0));
+
+    // When
+    ResultActions result = mockMvc.perform(get("/api/v1/places/search").param("keyword", "gang"));
+    // Then
+    result.andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+    verify(placeQueryService).searchPlaces("gang", 0, 20, null);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"-1, 20", "0, 0", "0, -1"})
+  @DisplayName("검색 API는 잘못된 페이지 번호와 크기를 거부한다")
+  void rejectsInvalidSearchPagination(String page, String size) throws Exception {
+    // Given
+    String keyword = "어니언";
+
+    // When
+    ResultActions result =
+        mockMvc.perform(
+            get("/api/v1/places/search")
+                .param("keyword", keyword)
+                .param("page", page)
+                .param("size", size));
+
+    // Then
+    result.andExpect(status().isBadRequest());
+    verifyNoInteractions(placeQueryService);
+  }
+
+  @Test
+  @DisplayName("검색 API는 검색어가 누락되면 잘못된 요청을 반환한다")
+  void rejectsMissingSearchKeyword() throws Exception {
+    // Given
+    String endpoint = "/api/v1/places/search";
+
+    // When
+    ResultActions result = mockMvc.perform(get(endpoint));
+
+    // Then
+    result.andExpect(status().isBadRequest());
+    verifyNoInteractions(placeQueryService);
   }
 
   @Test

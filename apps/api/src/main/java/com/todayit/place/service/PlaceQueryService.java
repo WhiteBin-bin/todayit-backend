@@ -167,6 +167,49 @@ public class PlaceQueryService implements PlaceScrapQueryService {
   }
 
   /**
+   * 가게 이름으로 활성화되고 삭제되지 않은 장소를 검색합니다. 빈 검색어는 빈 결과를 반환합니다.
+   *
+   * @param keyword 가게 이름 검색어
+   * @param page 페이지 번호
+   * @param size 페이지 크기
+   * @param memberId 선택 회원 식별자, 비회원이면 null
+   * @return 검색 결과와 페이지 정보
+   */
+  @Transactional(readOnly = true)
+  public PageResult<PlaceResult> searchPlaces(String keyword, int page, int size, String memberId) {
+    if (keyword == null || keyword.isBlank()) {
+      return new PageResult<>(List.of(), page, size, 0);
+    }
+    Page<Place> results = placeRepository.searchByName(keyword, PageRequest.of(page, size));
+    List<Place> places = results.getContent();
+    Map<Integer, List<String>> images = findImageUrlsByPlaceId(places);
+    Set<Integer> liked =
+        memberId == null || places.isEmpty()
+            ? Set.of()
+            : placeMemberLikeRepository.findLikedPlaceIds(
+                memberId, places.stream().map(Place::getPlaceId).toList());
+    List<PlaceResult> content =
+        places.stream()
+            .map(
+                place -> {
+                  PlaceResult result = toResult(place, images);
+                  return new PlaceResult(
+                      result.placeId(),
+                      result.name(),
+                      result.latitude(),
+                      result.longitude(),
+                      result.address(),
+                      result.category(),
+                      result.viewCount(),
+                      result.imageUrls(),
+                      liked.contains(place.getPlaceId()));
+                })
+            .toList();
+    return new PageResult<>(
+        content, results.getNumber(), results.getSize(), results.getTotalElements());
+  }
+
+  /**
    * 활성화되고 삭제되지 않은 장소의 지도 정보를 조회합니다.
    *
    * @param placeId 장소 식별자

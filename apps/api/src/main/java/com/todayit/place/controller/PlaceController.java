@@ -133,6 +133,30 @@ public class PlaceController implements PlaceApiDocs {
   }
 
   /**
+   * 가게 이름으로 장소를 검색합니다.
+   *
+   * @param keyword 가게 이름 검색어
+   * @param page 페이지 번호
+   * @param size 페이지 크기
+   * @param authentication 선택 인증 정보
+   * @return 검색 결과와 페이지 정보
+   */
+  @GetMapping("/search")
+  public ResponseEntity<CommonResponse<PageResponse<PlaceFilterResponse>>> searchPlaces(
+      @RequestParam String keyword,
+      @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
+      @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size,
+      Authentication authentication) {
+    PaginationValidator.validate(page, size);
+    return ResponseEntity.ok(
+        CommonResponse.success(
+            PageResponse.from(
+                placeQueryService.searchPlaces(
+                    keyword, page, size, authentication == null ? null : authentication.getName()),
+                PlaceFilterResponse::from)));
+  }
+
+  /**
    * 지역 필터 JSON 문자열을 파싱하고 검증합니다.
    *
    * @param regionsJson 지역 필터 JSON 문자열
