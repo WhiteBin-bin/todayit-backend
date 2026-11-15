@@ -46,7 +46,7 @@ class TourApiPlaceNormalizationServiceTest {
   }
 
   /**
-   *  유형별 소개 항목을 매핑하고 빈 값은 제외하는지 검증합니다.
+   * 유형별 소개 항목을 매핑하고 빈 값은 제외하는지 검증합니다.
    *
    * @param type 원천 관광타입 코드
    * @param parkingKey 원천 주차 필드명
