@@ -25,6 +25,9 @@ public enum MemberErrorCode implements ErrorCode {
 
   NICKNAME_ALREADY_EXISTS("NICKNAME_ALREADY_EXISTS", "이미 사용 중인 닉네임입니다.", ErrorStatus.CONFLICT),
 
+  NICKNAME_CHANGE_TOO_SOON(
+      "NICKNAME_CHANGE_TOO_SOON", "닉네임은 마지막 변경 후 90일이 지나야 다시 변경할 수 있습니다.", ErrorStatus.BAD_REQUEST),
+
   EMAIL_DELIVERY_FAILED(
       "EMAIL_DELIVERY_FAILED", "인증 이메일 발송에 실패했습니다.", ErrorStatus.INTERNAL_SERVER_ERROR),
 
@@ -60,7 +63,15 @@ public enum MemberErrorCode implements ErrorCode {
       "KAKAO_AUTH_SERVER_ERROR", "Kakao 인증 서버에 연결할 수 없습니다.", ErrorStatus.INTERNAL_SERVER_ERROR),
 
   KAKAO_ACCOUNT_ALREADY_EXISTS(
-      "KAKAO_ACCOUNT_ALREADY_EXISTS", "이미 가입된 Kakao 계정입니다.", ErrorStatus.CONFLICT);
+      "KAKAO_ACCOUNT_ALREADY_EXISTS", "이미 가입된 Kakao 계정입니다.", ErrorStatus.CONFLICT),
+
+  MEMBER_NOT_FOUND("MEMBER_NOT_FOUND", "회원을 찾을 수 없습니다.", ErrorStatus.NOT_FOUND),
+
+  PROFILE_IMAGE_CONSENT_REQUIRED(
+      "PROFILE_IMAGE_CONSENT_REQUIRED", "프로필 이미지 등록을 위한 약관 동의가 필요합니다.", ErrorStatus.BAD_REQUEST),
+
+  PREFERENCE_CONSENT_REQUIRED(
+      "PREFERENCE_CONSENT_REQUIRED", "선호정보 저장을 위한 약관 동의가 필요합니다.", ErrorStatus.BAD_REQUEST);
 
   private final String code;
   private final String message;

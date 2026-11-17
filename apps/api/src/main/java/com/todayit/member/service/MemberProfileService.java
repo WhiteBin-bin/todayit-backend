@@ -1,0 +1,372 @@
+package com.todayit.member.service;
+
+import com.todayit.common.exception.BusinessException;
+import com.todayit.common.exception.InvalidRequestException;
+import com.todayit.course.entity.Region;
+import com.todayit.course.exception.InvalidRegionPathException;
+import com.todayit.course.repository.RegionRepository;
+import com.todayit.member.entity.Member;
+import com.todayit.member.entity.PreferredRegionCode;
+import com.todayit.member.exception.MemberErrorCode;
+import com.todayit.member.repository.MemberAgreementRepository;
+import com.todayit.member.repository.MemberRepository;
+import com.todayit.member.service.command.MemberProfileCommand;
+import com.todayit.member.service.model.MemberProfileDetailsResult;
+import com.todayit.member.service.model.MemberProfileResult;
+import com.todayit.theme.Theme;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/** 회원 프로필 변경과 약관 동의 검증을 처리합니다. */
+@Service
+public class MemberProfileService {
+
+  private static final String PROFILE_IMAGE_AGREEMENT_CODE = "PROFILE_IMAGE";
+  private static final String PREFERENCE_AGREEMENT_CODE = "PREFERENCE";
+
+  private static final Set<PreferredRegionCode> ALLOWED_PREFERRED_REGIONS =
+      Set.of(
+          // 서울특별시
+          new PreferredRegionCode("11", "440"),
+          new PreferredRegionCode("11", "200"),
+          new PreferredRegionCode("11", "680"),
+          new PreferredRegionCode("11", "710"),
+          new PreferredRegionCode("11", "110"),
+          new PreferredRegionCode("11", "170"),
+          new PreferredRegionCode("11", "560"),
+          new PreferredRegionCode("11", "140"),
+          new PreferredRegionCode("11", "650"),
+          new PreferredRegionCode("11", "215"),
+
+          // 경기도
+          new PreferredRegionCode("41", "115"),
+          new PreferredRegionCode("41", "135"),
+          new PreferredRegionCode("41", "285"),
+          new PreferredRegionCode("41", "480"),
+          new PreferredRegionCode("41", "820"),
+
+          // 인천광역시
+          new PreferredRegionCode("28", "185"),
+
+          // 부산광역시
+          new PreferredRegionCode("26", "500"),
+          new PreferredRegionCode("26", "350"),
+          new PreferredRegionCode("26", "230"),
+
+          // 강원특별자치도
+          new PreferredRegionCode("51", "150"),
+          new PreferredRegionCode("51", "210"),
+          new PreferredRegionCode("51", "110"),
+
+          // 제주특별자치도
+          new PreferredRegionCode("50", "110"),
+          new PreferredRegionCode("50", "130"),
+
+          // 기타 지역
+          new PreferredRegionCode("47", "130"),
+          new PreferredRegionCode("52", "111"),
+          new PreferredRegionCode("12", "130"),
+          new PreferredRegionCode("30", "140"),
+          new PreferredRegionCode("27", "110"),
+          new PreferredRegionCode("44", "131"));
+
+  private final MemberRepository memberRepository;
+  private final MemberAgreementRepository memberAgreementRepository;
+  private final SignupService signupService;
+  private final RegionRepository regionRepository;
+
+  /**
+   * 회원 프로필 변경에 필요한 서비스를 주입받습니다.
+   *
+   * @param memberRepository 회원 Repository
+   * @param memberAgreementRepository 회원 약관 동의 Repository
+   * @param signupService 닉네임 검증 서비스
+   * @param regionRepository 기존 지역 Repository
+   */
+  public MemberProfileService(
+      MemberRepository memberRepository,
+      MemberAgreementRepository memberAgreementRepository,
+      SignupService signupService,
+      RegionRepository regionRepository) {
+    this.memberRepository = memberRepository;
+    this.memberAgreementRepository = memberAgreementRepository;
+    this.signupService = signupService;
+    this.regionRepository = regionRepository;
+  }
+
+  /**
+   * 회원의 프로필 이미지 URL과 수정 시각을 변경합니다.
+   *
+   * @param memberId 변경할 회원 식별자
+   * @param profileImage 업로드가 완료된 이미지 URL
+   * @return 변경된 회원 프로필 이미지 정보
+   * @throws BusinessException 회원이 없거나 비활성 상태인 경우
+   */
+  @Transactional
+  public MemberProfileResult changeProfileImage(String memberId, String profileImage) {
+
+    Member member = findActiveMemberForUpdate(memberId);
+    LocalDateTime now = LocalDateTime.now();
+
+    memberRepository.updateProfileImage(memberId, profileImage, now);
+
+    return new MemberProfileResult(member.getId(), profileImage, now);
+  }
+
+  /**
+   * 회원의 닉네임, 선호 지역, 선호 테마를 수정합니다.
+   *
+   * <p>요청에서 생략한 필드는 유지하며, 닉네임 변경 정책, 선호 지역 및 약관 동의 여부를 확인한 후 변경합니다.
+   *
+   * @param memberId 변경할 회원 식별자
+   * @param command 회원 프로필 변경 정보
+   * @return 변경된 회원 프로필 정보
+   * @throws BusinessException 회원이 없거나 닉네임 변경 정책을 위반한 경우
+   * @throws InvalidRequestException 수정 항목이 없거나 입력값이 잘못된 경우
+   * @throws InvalidRegionPathException 선택할 수 없거나 존재하지 않는 지역인 경우
+   */
+  @Transactional
+  public MemberProfileDetailsResult updateProfile(String memberId, MemberProfileCommand command) {
+
+    Member member = findActiveMemberForUpdate(memberId);
+    LocalDateTime now = LocalDateTime.now();
+
+    // 1. 닉네임 검증
+    String normalizedNickname =
+        command.nickname() == null ? null : validateNicknameChange(member, command.nickname(), now);
+
+    // 2. 선호 지역 검증
+    List<PreferredRegionCode> regions = command.preferredRegions();
+
+    Region selectedRegion =
+        regions == null || regions.isEmpty() ? null : resolvePreferredRegion(regions.get(0));
+
+    // 3. 선호 테마
+    List<Theme> themes = command.preferredThemes();
+
+    // 4. 선호정보 약관 동의 확인
+    boolean settingPreference =
+        (regions != null && !regions.isEmpty()) || (themes != null && !themes.isEmpty());
+
+    if (settingPreference
+        && !memberAgreementRepository.existsAgreedActiveAgreement(
+            memberId, PREFERENCE_AGREEMENT_CODE)) {
+      throw new BusinessException(MemberErrorCode.PREFERENCE_CONSENT_REQUIRED);
+    }
+
+    // 변경 전 값 보관
+    Region currentRegion = member.getPreferredRegion();
+    List<Theme> currentThemes = member.getPreferredThemes();
+
+    boolean changed = false;
+
+    // 5. 닉네임 변경
+    if (normalizedNickname != null) {
+      try {
+        memberRepository.updateNickname(memberId, normalizedNickname, now);
+      } catch (DataIntegrityViolationException exception) {
+        Throwable cause = exception;
+
+        while (cause != null) {
+          if (cause instanceof ConstraintViolationException constraint
+              && "uk_member_nickname_normalized".equalsIgnoreCase(constraint.getConstraintName())) {
+            throw new BusinessException(MemberErrorCode.NICKNAME_ALREADY_EXISTS);
+          }
+
+          cause = cause.getCause();
+        }
+
+        throw exception;
+      }
+
+      changed = true;
+    }
+
+    // 6. 선호 지역 변경
+    if (regions != null) {
+      Integer currentId = currentRegion == null ? null : currentRegion.getRegionId();
+
+      Integer selectedId = selectedRegion == null ? null : selectedRegion.getRegionId();
+
+      if (!Objects.equals(currentId, selectedId)) {
+        memberRepository.updatePreferredRegion(memberId, selectedRegion, now);
+        changed = true;
+      }
+    }
+
+    // 7. 선호 테마 변경
+    if (themes != null && !currentThemes.equals(themes)) {
+      String themeCodes = String.join(",", themes.stream().map(Theme::name).toList());
+
+      memberRepository.updatePreferredThemes(memberId, themeCodes, now);
+      changed = true;
+    }
+
+    // 8. 응답 생성
+    // Repository 직접 UPDATE 이후 기존 Member 객체에는 이전 값이
+    // 남아 있을 수 있으므로 검증된 요청값으로 응답을 구성합니다.
+    List<PreferredRegionCode> resultRegions =
+        regions != null
+            ? regions
+            : currentRegion == null
+                ? List.of()
+                : List.of(
+                    new PreferredRegionCode(
+                        currentRegion.getSidoCode(), currentRegion.getSigunguCode()));
+
+    return new MemberProfileDetailsResult(
+        member.getId(),
+        member.getEmail(),
+        normalizedNickname == null ? member.getNickname() : normalizedNickname,
+        member.getRegisteredProfileImage(),
+        resultRegions,
+        themes == null ? currentThemes : themes,
+        changed ? now : member.getUpdatedAt());
+  }
+
+  /**
+   * 로그인한 회원 본인의 프로필 정보를 조회합니다.
+   *
+   * @param memberId 인증된 회원 식별자
+   * @return 회원 프로필 조회 결과
+   * @throws BusinessException 회원이 없거나 비활성 상태인 경우
+   */
+  @Transactional(readOnly = true)
+  public MemberProfileDetailsResult findProfile(String memberId) {
+    Member member = findActiveMember(memberId);
+    return toDetailsResult(member);
+  }
+
+  /**
+   * 프로필 이미지 등록을 위한 약관 동의 여부를 확인합니다.
+   *
+   * @param memberId 회원 식별자
+   * @throws BusinessException 약관에 동의하지 않은 경우
+   */
+  @Transactional(readOnly = true)
+  public void validateProfileImageConsent(String memberId) {
+    if (!memberAgreementRepository.existsAgreedActiveAgreement(
+        memberId, PROFILE_IMAGE_AGREEMENT_CODE)) {
+      throw new BusinessException(MemberErrorCode.PROFILE_IMAGE_CONSENT_REQUIRED);
+    }
+  }
+
+  /**
+   * 회원이 존재하고 활성 상태인지 확인합니다.
+   *
+   * @param memberId 회원 식별자
+   * @throws BusinessException 회원이 없거나 비활성 상태인 경우
+   */
+  @Transactional(readOnly = true)
+  public void validateActiveMember(String memberId) {
+    findActiveMember(memberId);
+  }
+
+  private Member findActiveMember(String memberId) {
+    return memberRepository
+        .findById(memberId)
+        .filter(Member::isActive)
+        .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+  }
+
+  private Member findActiveMemberForUpdate(String memberId) {
+    return memberRepository
+        .findByIdForUpdate(memberId)
+        .filter(Member::isActive)
+        .orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+  }
+
+  /**
+   * 선호 지역 코드에 해당하는 지역을 조회합니다.
+   *
+   * @param requested 요청된 선호 지역 코드
+   * @return 조회된 지역
+   * @throws InvalidRegionPathException 선택 불가능하거나 존재하지 않는 지역인 경우
+   */
+  private Region resolvePreferredRegion(PreferredRegionCode requested) {
+    if (!ALLOWED_PREFERRED_REGIONS.contains(requested)) {
+      throw new InvalidRegionPathException();
+    }
+
+    List<Integer> regionIds =
+        regionRepository.findIdsByCodes(requested.sidoCode(), requested.sigunguCode());
+
+    if (regionIds.size() != 1) {
+      throw new InvalidRegionPathException();
+    }
+
+    return regionRepository.findById(regionIds.get(0)).orElseThrow(InvalidRegionPathException::new);
+  }
+
+  private String validateNicknameChange(Member member, String nickname, LocalDateTime now) {
+
+    if (nickname.isBlank()) {
+      throw new InvalidRequestException("닉네임은 필수입니다.");
+    }
+
+    String normalizedNickname = nickname.strip();
+
+    // 동일한 닉네임이면 변경할 필요 없음
+    if (member.getNickname().equalsIgnoreCase(normalizedNickname)) {
+      return null;
+    }
+
+    LocalDateTime lastUpdatedAt = member.getNicknameUpdatedAt();
+
+    // 최초 변경은 허용, 이후 변경은 90일 제한
+    if (lastUpdatedAt != null && now.isBefore(lastUpdatedAt.plusDays(90))) {
+      throw new BusinessException(MemberErrorCode.NICKNAME_CHANGE_TOO_SOON);
+    }
+
+    // 기존 회원가입과 동일한 형식·금칙어·중복 검증
+    if (!signupService.isNicknameAvailable(normalizedNickname)) {
+      throw new BusinessException(MemberErrorCode.NICKNAME_ALREADY_EXISTS);
+    }
+
+    return normalizedNickname;
+  }
+
+  private MemberProfileDetailsResult toDetailsResult(Member member) {
+    Region region = member.getPreferredRegion();
+
+    List<PreferredRegionCode> regions =
+        region == null
+            ? List.of()
+            : List.of(new PreferredRegionCode(region.getSidoCode(), region.getSigunguCode()));
+
+    return new MemberProfileDetailsResult(
+        member.getId(),
+        member.getEmail(),
+        member.getNickname(),
+        member.getRegisteredProfileImage(),
+        regions,
+        member.getPreferredThemes(),
+        member.getUpdatedAt());
+  }
+
+  /**
+   * 회원의 프로필 이미지를 기본 이미지로 복원합니다.
+   *
+   * @param memberId 회원 식별자
+   * @return 초기화된 프로필 이미지 정보
+   * @throws BusinessException 회원이 없거나 비활성 상태인 경우
+   */
+  @Transactional
+  public MemberProfileResult resetProfileImage(String memberId) {
+    Member member = findActiveMemberForUpdate(memberId);
+    LocalDateTime updatedAt = member.getUpdatedAt();
+
+    if (member.getRegisteredProfileImage() != null) {
+      updatedAt = LocalDateTime.now();
+      memberRepository.resetProfileImage(memberId, updatedAt);
+    }
+
+    return new MemberProfileResult(member.getId(), null, updatedAt);
+  }
+}

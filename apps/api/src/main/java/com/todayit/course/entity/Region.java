@@ -69,4 +69,16 @@ public class Region {
    */
   public record RegionSnapshot(
       int regionId, String sidoCode, String sigunguCode, String sidoName, String sigunguName) {}
+
+  public int getRegionId() {
+    return regionId;
+  }
+
+  public String getSidoCode() {
+    return sidoCode;
+  }
+
+  public String getSigunguCode() {
+    return sigunguCode;
+  }
 }

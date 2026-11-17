@@ -1,0 +1,400 @@
+package com.todayit.member.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.todayit.common.exception.BusinessException;
+import com.todayit.course.entity.Region;
+import com.todayit.course.exception.InvalidRegionPathException;
+import com.todayit.course.repository.RegionRepository;
+import com.todayit.member.entity.Member;
+import com.todayit.member.entity.PreferredRegionCode;
+import com.todayit.member.exception.MemberErrorCode;
+import com.todayit.member.repository.MemberAgreementRepository;
+import com.todayit.member.repository.MemberRepository;
+import com.todayit.member.service.command.MemberProfileCommand;
+import com.todayit.member.service.model.MemberProfileDetailsResult;
+import com.todayit.member.service.model.MemberProfileResult;
+import com.todayit.theme.Theme;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import org.hibernate.exception.ConstraintViolationException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
+
+/** 회원 프로필 이미지 변경과 회원 상태 검증을 테스트합니다. */
+@ExtendWith(MockitoExtension.class)
+class MemberProfileServiceTest {
+
+  private static final String PROFILE_IMAGE_URL = "https://example.com/profile.png";
+
+  @Mock private MemberRepository memberRepository;
+  @Mock private MemberAgreementRepository memberAgreementRepository;
+  @Mock private SignupService signupService;
+  @Mock private RegionRepository regionRepository;
+
+  private MemberProfileService service;
+
+  @BeforeEach
+  void setUp() {
+    service =
+        new MemberProfileService(
+            memberRepository, memberAgreementRepository, signupService, regionRepository);
+  }
+
+  @Test
+  @DisplayName("활성 회원의 프로필 이미지와 수정 시각을 변경한다")
+  void changesProfileImageForActiveMember() {
+    // Given
+    Member member = Member.createLocal("test@example.com", "encoded-password", "테스트회원");
+    String memberId = member.getId();
+
+    when(memberRepository.findByIdForUpdate(memberId)).thenReturn(Optional.of(member));
+
+    LocalDateTime before = LocalDateTime.now();
+
+    // When
+    MemberProfileResult result = service.changeProfileImage(memberId, PROFILE_IMAGE_URL);
+
+    LocalDateTime after = LocalDateTime.now();
+
+    // Then
+    assertThat(result.memberId()).isEqualTo(memberId);
+    assertThat(result.profileImage()).isEqualTo(PROFILE_IMAGE_URL);
+    assertThat(result.updatedAt()).isBetween(before, after);
+
+    verify(memberRepository)
+        .updateProfileImage(eq(memberId), eq(PROFILE_IMAGE_URL), any(LocalDateTime.class));
+    verify(memberRepository).findByIdForUpdate(memberId);
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 회원의 프로필 이미지 변경을 거부한다")
+  void rejectsNonexistentMember() {
+    // Given
+    String memberId = "unknown-member";
+
+    when(memberRepository.findByIdForUpdate(memberId)).thenReturn(Optional.empty());
+
+    // When & Then
+    assertThatThrownBy(() -> service.changeProfileImage(memberId, PROFILE_IMAGE_URL))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("비활성 회원은 프로필 이미지를 변경할 수 없다")
+  void rejectsInactiveMember() {
+    // Given
+    Member member = org.mockito.Mockito.mock(Member.class);
+    String memberId = "inactive-member";
+
+    when(memberRepository.findByIdForUpdate(memberId)).thenReturn(Optional.of(member));
+    when(member.isActive()).thenReturn(false);
+
+    // When & Then
+    assertThatThrownBy(() -> service.changeProfileImage(memberId, PROFILE_IMAGE_URL))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND));
+
+    verify(memberRepository, never())
+        .updateProfileImage(anyString(), anyString(), any(LocalDateTime.class));
+  }
+
+  @Test
+  @DisplayName("프로필 이미지 약관에 동의한 회원은 검증을 통과한다")
+  void acceptsProfileImageConsent() {
+    // Given
+    String memberId = "member-123";
+
+    when(memberAgreementRepository.existsAgreedActiveAgreement(memberId, "PROFILE_IMAGE"))
+        .thenReturn(true);
+
+    // When & Then
+    assertThatCode(() -> service.validateProfileImageConsent(memberId)).doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("프로필 이미지 약관에 동의하지 않은 회원은 등록할 수 없다")
+  void rejectsMissingProfileImageConsent() {
+    // Given
+    String memberId = "member-123";
+
+    when(memberAgreementRepository.existsAgreedActiveAgreement(memberId, "PROFILE_IMAGE"))
+        .thenReturn(false);
+
+    // When & Then
+    assertThatThrownBy(() -> service.validateProfileImageConsent(memberId))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(MemberErrorCode.PROFILE_IMAGE_CONSENT_REQUIRED));
+  }
+
+  @Test
+  @DisplayName("닉네임 변경 후 90일이 지나지 않으면 변경을 거부한다")
+  void rejectsNicknameChangeBeforeNinetyDays() {
+    // Given
+    Member member = Member.createLocal("test@example.com", "encoded-password", "기존닉네임");
+
+    String memberId = member.getId();
+
+    LocalDateTime changedAt = LocalDateTime.now().minusDays(30);
+
+    ReflectionTestUtils.setField(member, "nicknameUpdatedAt", changedAt);
+
+    when(memberRepository.findByIdForUpdate(memberId)).thenReturn(Optional.of(member));
+
+    // When & Then
+    MemberProfileCommand command = new MemberProfileCommand("새닉네임", null, null);
+
+    assertThatThrownBy(() -> service.updateProfile(memberId, command))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(MemberErrorCode.NICKNAME_CHANGE_TOO_SOON));
+
+    assertThat(member.getNickname()).isEqualTo("기존닉네임");
+    assertThat(member.getNicknameUpdatedAt()).isEqualTo(changedAt);
+  }
+
+  @Test
+  @DisplayName("회원의 닉네임과 선호 지역 및 테마를 함께 수정한다")
+  void updatesMemberProfile() {
+    // Given
+    Member member = Member.createLocal("test@example.com", "encoded-password", "기존닉네임");
+
+    String memberId = member.getId();
+
+    when(memberRepository.findByIdForUpdate(memberId)).thenReturn(Optional.of(member));
+    when(signupService.isNicknameAvailable("새닉네임")).thenReturn(true);
+    when(memberAgreementRepository.existsAgreedActiveAgreement(memberId, "PREFERENCE"))
+        .thenReturn(true);
+
+    Region region = mock(Region.class);
+
+    when(region.getRegionId()).thenReturn(1);
+
+    when(regionRepository.findIdsByCodes("11", "110")).thenReturn(List.of(1));
+
+    when(regionRepository.findById(1)).thenReturn(Optional.of(region));
+
+    MemberProfileCommand command =
+        new MemberProfileCommand(
+            "새닉네임",
+            List.of(new PreferredRegionCode("11", "110")),
+            List.of(Theme.QUIET, Theme.ROMANTIC));
+
+    // When
+    MemberProfileDetailsResult result = service.updateProfile(memberId, command);
+
+    // Then
+    assertThat(result.memberId()).isEqualTo(memberId);
+    assertThat(result.nickname()).isEqualTo("새닉네임");
+    assertThat(result.preferredRegions()).containsExactly(new PreferredRegionCode("11", "110"));
+    assertThat(result.preferredThemes()).containsExactly(Theme.QUIET, Theme.ROMANTIC);
+    assertThat(result.updatedAt()).isNotNull();
+
+    verify(memberRepository).updateNickname(eq(memberId), eq("새닉네임"), any(LocalDateTime.class));
+
+    verify(memberRepository)
+        .updatePreferredRegion(eq(memberId), eq(region), any(LocalDateTime.class));
+
+    verify(memberRepository)
+        .updatePreferredThemes(eq(memberId), eq("QUIET,ROMANTIC"), any(LocalDateTime.class));
+
+    verify(regionRepository).findIdsByCodes("11", "110");
+    verify(regionRepository).findById(1);
+  }
+
+  @Test
+  @DisplayName("선호 지역과 테마 선택을 해제한다")
+  void clearsMemberPreferences() {
+    // Given
+    Member member = Member.createLocal("test@example.com", "encoded-password", "기존닉네임");
+
+    LocalDateTime now = LocalDateTime.now();
+
+    Region region = mock(Region.class);
+    when(region.getRegionId()).thenReturn(1);
+
+    ReflectionTestUtils.setField(member, "preferredRegion", region);
+    ReflectionTestUtils.setField(member, "preferredThemeCodes", new String[] {"QUIET"});
+
+    when(memberRepository.findByIdForUpdate(member.getId())).thenReturn(Optional.of(member));
+
+    MemberProfileCommand command = new MemberProfileCommand(null, List.of(), List.of());
+
+    // When
+    MemberProfileDetailsResult result = service.updateProfile(member.getId(), command);
+
+    // Then
+    assertThat(result.preferredRegions()).isEmpty();
+    assertThat(result.preferredThemes()).isEmpty();
+
+    verify(memberRepository)
+        .updatePreferredRegion(eq(member.getId()), eq(null), any(LocalDateTime.class));
+
+    verify(memberRepository)
+        .updatePreferredThemes(eq(member.getId()), eq(""), any(LocalDateTime.class));
+  }
+
+  @Test
+  @DisplayName("허용 목록에 없는 지역은 선호 지역으로 저장할 수 없다")
+  void rejectsNonSelectablePreferredRegion() {
+    Member member = Member.createLocal("test@example.com", "encoded-password", "기존닉네임");
+
+    String memberId = member.getId();
+
+    when(memberRepository.findByIdForUpdate(memberId)).thenReturn(Optional.of(member));
+
+    MemberProfileCommand command =
+        new MemberProfileCommand(null, List.of(new PreferredRegionCode("11", "350")), null);
+
+    assertThatThrownBy(() -> service.updateProfile(memberId, command))
+        .isInstanceOf(InvalidRegionPathException.class);
+
+    assertThat(member.getPreferredRegion()).isNull();
+
+    verify(regionRepository, never()).findIdsByCodes("11", "350");
+  }
+
+  @Test
+  @DisplayName("선호정보 약관에 동의하지 않으면 선호 테마 저장을 거부한다")
+  void rejectsPreferenceWithoutConsent() {
+    // Given
+    Member member = Member.createLocal("test@example.com", "encoded-password", "기존닉네임");
+
+    String memberId = member.getId();
+
+    when(memberRepository.findByIdForUpdate(memberId)).thenReturn(Optional.of(member));
+
+    MemberProfileCommand command = new MemberProfileCommand(null, null, List.of(Theme.QUIET));
+
+    // When & Then
+    assertThatThrownBy(() -> service.updateProfile(memberId, command))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(MemberErrorCode.PREFERENCE_CONSENT_REQUIRED));
+
+    assertThat(member.getPreferredThemes()).isEmpty();
+
+    verify(memberAgreementRepository).existsAgreedActiveAgreement(memberId, "PREFERENCE");
+  }
+
+  @Test
+  @DisplayName("닉네임만 변경하면 선호정보 약관 동의를 검사하지 않는다")
+  void changesNicknameWithoutPreferenceConsent() {
+    // Given
+    Member member = Member.createLocal("test@example.com", "encoded-password", "기존닉네임");
+
+    String memberId = member.getId();
+
+    when(memberRepository.findByIdForUpdate(memberId)).thenReturn(Optional.of(member));
+
+    when(signupService.isNicknameAvailable("새닉네임")).thenReturn(true);
+
+    MemberProfileCommand command = new MemberProfileCommand("새닉네임", null, null);
+
+    // When
+    MemberProfileDetailsResult result = service.updateProfile(memberId, command);
+
+    // Then
+    assertThat(result.nickname()).isEqualTo("새닉네임");
+
+    verify(memberRepository).updateNickname(eq(memberId), eq("새닉네임"), any(LocalDateTime.class));
+
+    verify(memberAgreementRepository, never()).existsAgreedActiveAgreement(memberId, "PREFERENCE");
+  }
+
+  @Test
+  @DisplayName("프로필 이미지를 삭제하면 기본 이미지로 복원한다")
+  void resetsProfileImage() {
+    // Given
+    Member member = Member.createLocal("test@example.com", "encoded-password", "테스트회원");
+
+    ReflectionTestUtils.setField(member, "profileImage", PROFILE_IMAGE_URL);
+
+    when(memberRepository.findByIdForUpdate(member.getId())).thenReturn(Optional.of(member));
+
+    // When
+    MemberProfileResult result = service.resetProfileImage(member.getId());
+
+    // Then
+    assertThat(result.profileImage()).isNull();
+    verify(memberRepository).resetProfileImage(eq(member.getId()), any(LocalDateTime.class));
+    assertThat(result.updatedAt()).isNotNull();
+  }
+
+  @Test
+  @DisplayName("이미 기본 이미지인 경우 수정 시각을 변경하지 않는다")
+  void keepsUpdatedAtWhenProfileImageAlreadyDefault() {
+    // Given
+    Member member = Member.createLocal("test@example.com", "encoded-password", "테스트회원");
+
+    when(memberRepository.findByIdForUpdate(member.getId())).thenReturn(Optional.of(member));
+
+    LocalDateTime previousUpdatedAt = member.getUpdatedAt();
+
+    // When
+    MemberProfileResult result = service.resetProfileImage(member.getId());
+
+    // Then
+    assertThat(result.profileImage()).isNull();
+    assertThat(result.updatedAt()).isEqualTo(previousUpdatedAt);
+
+    verify(memberRepository, never())
+        .resetProfileImage(eq(member.getId()), any(LocalDateTime.class));
+  }
+
+  @Test
+  @DisplayName("닉네임 저장 시 DB 중복 오류가 발생하면 409 오류 코드로 변환한다")
+  void convertsNicknameUniqueViolation() {
+    // Given
+    Member member = Member.createLocal("test@example.com", "encoded-password", "기존닉네임");
+
+    when(memberRepository.findByIdForUpdate(member.getId())).thenReturn(Optional.of(member));
+
+    when(signupService.isNicknameAvailable("새닉네임")).thenReturn(true);
+
+    ConstraintViolationException constraint = mock(ConstraintViolationException.class);
+
+    when(constraint.getConstraintName()).thenReturn("uk_member_nickname_normalized");
+
+    when(memberRepository.updateNickname(eq(member.getId()), eq("새닉네임"), any(LocalDateTime.class)))
+        .thenThrow(new DataIntegrityViolationException("닉네임 중복", constraint));
+
+    MemberProfileCommand command = new MemberProfileCommand("새닉네임", null, null);
+
+    // When & Then
+    assertThatThrownBy(() -> service.updateProfile(member.getId(), command))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(MemberErrorCode.NICKNAME_ALREADY_EXISTS));
+  }
+}

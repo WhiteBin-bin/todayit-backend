@@ -1,13 +1,22 @@
 package com.todayit.member.entity;
 
+import com.todayit.course.entity.Region;
+import com.todayit.theme.Theme;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /** 로그인에 필요한 회원 정보를 나타냅니다. */
 @Entity
@@ -27,6 +36,18 @@ public class Member {
   @Column(name = "nickname", nullable = false, length = 50)
   private String nickname;
 
+  @Column(name = "nickname_updated_at")
+  private LocalDateTime nicknameUpdatedAt;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "preferred_region")
+  private Region preferredRegion;
+
+  // PostgreSQL 문자열 배열에 선호 테마 코드 저장
+  @JdbcTypeCode(SqlTypes.ARRAY)
+  @Column(name = "preferred_theme", columnDefinition = "varchar(20)[]")
+  private String[] preferredThemeCodes;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "provider", nullable = false, length = 20)
   private MemberProvider provider;
@@ -40,6 +61,12 @@ public class Member {
 
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;
+
+  @Column(name = "profile_image", nullable = false, length = 2048)
+  private String profileImage = DEFAULT_PROFILE_IMAGE;
+
+  @Column(name = "updated_at")
+  private LocalDateTime updatedAt;
 
   protected Member() {}
 
@@ -66,6 +93,10 @@ public class Member {
     // Google 등 소셜 서비스에서 발급한 사용자 고유 식별자
     this.providerUserId = providerUserId;
   }
+
+  // 모든 회원이 공통으로 사용하는 기본 프로필 이미지
+  private static final String DEFAULT_PROFILE_IMAGE =
+      "https://res.cloudinary.com/xmb52jrp/image/upload/v1793191339/default_profile.png";
 
   /**
    * 이메일과 비밀번호를 사용하는 로컬 회원을 생성합니다.
@@ -147,6 +178,10 @@ public class Member {
     return nickname;
   }
 
+  public LocalDateTime getNicknameUpdatedAt() {
+    return nicknameUpdatedAt;
+  }
+
   public MemberProvider getProvider() {
     return provider;
   }
@@ -161,5 +196,39 @@ public class Member {
 
   public boolean isActive() {
     return active;
+  }
+
+  public String getProfileImage() {
+    return profileImage;
+  }
+
+  public LocalDateTime getUpdatedAt() {
+    return updatedAt;
+  }
+
+  public Region getPreferredRegion() {
+    return preferredRegion;
+  }
+
+  /**
+   * 회원이 선택한 선호 테마 목록을 반환합니다.
+   *
+   * @return 선호 테마 목록, 설정하지 않았으면 빈 목록
+   */
+  public List<Theme> getPreferredThemes() {
+    if (preferredThemeCodes == null) {
+      return List.of();
+    }
+
+    return Arrays.stream(preferredThemeCodes).map(Theme::valueOf).toList();
+  }
+
+  /**
+   * 회원이 등록한 프로필 이미지 URL을 반환합니다.
+   *
+   * @return 등록한 이미지 URL, 기본 이미지 상태라면 null
+   */
+  public String getRegisteredProfileImage() {
+    return DEFAULT_PROFILE_IMAGE.equals(profileImage) ? null : profileImage;
   }
 }

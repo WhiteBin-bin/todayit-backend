@@ -4,17 +4,32 @@ import com.todayit.common.pagination.PageResponse;
 import com.todayit.common.pagination.PaginationValidator;
 import com.todayit.common.response.CommonResponse;
 import com.todayit.member.controller.docs.MemberApiDocs;
+import com.todayit.member.dto.request.MemberProfileRequest;
+import com.todayit.member.dto.response.MemberProfileDetailResponse;
+import com.todayit.member.dto.response.MemberProfileImageResponse;
+import com.todayit.member.dto.response.MemberProfileResponse;
 import com.todayit.member.dto.response.NicknameAvailabilityResponse;
+import com.todayit.member.service.MemberProfileFacade;
+import com.todayit.member.service.MemberProfileService;
 import com.todayit.member.service.SignupService;
+import com.todayit.member.service.model.MemberProfileDetailsResult;
+import com.todayit.member.service.model.MemberProfileResult;
 import com.todayit.place.dto.response.PlaceResponse;
 import com.todayit.place.service.PlaceScrapQueryService;
 import com.todayit.place.service.model.PlaceScrapSort;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /** 회원 관련 API를 처리합니다. */
 @RestController
@@ -26,17 +41,26 @@ public class MemberController implements MemberApiDocs {
 
   private final PlaceScrapQueryService placeScrapQueryService;
   private final SignupService signupService;
+  private final MemberProfileFacade memberProfileFacade;
+  private final MemberProfileService memberProfileService;
 
   /**
    * 회원 관련 API에 필요한 서비스를 받습니다.
    *
    * @param signupService 회원가입 관련 서비스
-   * @param placeScrapQueryService 장소 스크랩 조회 Service 계약
+   * @param placeScrapQueryService 장소 스크랩 조회 서비스
+   * @param memberProfileFacade 프로필 이미지 등록 서비스
+   * @param memberProfileService 회원 프로필 변경 서비스
    */
   public MemberController(
-      SignupService signupService, PlaceScrapQueryService placeScrapQueryService) {
+      SignupService signupService,
+      PlaceScrapQueryService placeScrapQueryService,
+      MemberProfileFacade memberProfileFacade,
+      MemberProfileService memberProfileService) {
     this.signupService = signupService;
     this.placeScrapQueryService = placeScrapQueryService;
+    this.memberProfileFacade = memberProfileFacade;
+    this.memberProfileService = memberProfileService;
   }
 
   /**
@@ -74,5 +98,68 @@ public class MemberController implements MemberApiDocs {
                 placeScrapQueryService.findScrappedPlaces(
                     authentication.getName(), page, DEFAULT_SIZE, sort),
                 PlaceResponse::from)));
+  }
+
+  /**
+   * 인증된 회원의 프로필 이미지를 등록하거나 교체합니다.
+   *
+   * @param file 업로드할 프로필 이미지 파일
+   * @param authentication 인증된 회원 정보
+   * @return 변경된 회원 프로필 이미지 정보
+   */
+  @PostMapping(value = "/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<CommonResponse<MemberProfileImageResponse>> uploadProfileImage(
+      @RequestPart("file") MultipartFile file, Authentication authentication) {
+    String memberId = authentication.getName();
+
+    MemberProfileResult result = memberProfileFacade.uploadProfileImage(memberId, file);
+
+    return ResponseEntity.ok(CommonResponse.success(MemberProfileImageResponse.from(result)));
+  }
+
+  /**
+   * 로그인한 회원의 닉네임과 선호 정보를 수정합니다.
+   *
+   * @param request 회원 프로필 수정 요청
+   * @param authentication 인증된 회원 정보
+   * @return 변경된 회원 프로필 정보
+   */
+  @PatchMapping("/me")
+  public ResponseEntity<CommonResponse<MemberProfileResponse>> updateProfile(
+      @RequestBody MemberProfileRequest request, Authentication authentication) {
+    MemberProfileDetailsResult result =
+        memberProfileService.updateProfile(authentication.getName(), request.toCommand());
+
+    return ResponseEntity.ok(CommonResponse.success(MemberProfileResponse.from(result)));
+  }
+
+  /**
+   * 로그인한 회원 본인의 프로필 정보를 조회합니다.
+   *
+   * @param authentication 인증된 회원 정보
+   * @return 회원 프로필 조회 응답
+   */
+  @GetMapping("/me")
+  public ResponseEntity<CommonResponse<MemberProfileDetailResponse>> findProfile(
+      Authentication authentication) {
+
+    MemberProfileDetailsResult result = memberProfileService.findProfile(authentication.getName());
+
+    return ResponseEntity.ok(CommonResponse.success(MemberProfileDetailResponse.from(result)));
+  }
+
+  /**
+   * 로그인한 회원의 프로필 이미지를 삭제합니다.
+   *
+   * @param authentication 인증된 회원 정보
+   * @return 초기화된 프로필 이미지 정보
+   */
+  @DeleteMapping("/me/profile-image")
+  public ResponseEntity<CommonResponse<MemberProfileImageResponse>> deleteProfileImage(
+      Authentication authentication) {
+
+    MemberProfileResult result = memberProfileFacade.deleteProfileImage(authentication.getName());
+
+    return ResponseEntity.ok(CommonResponse.success(MemberProfileImageResponse.from(result)));
   }
 }
