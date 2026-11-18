@@ -1,7 +1,9 @@
 package com.todayit.place.service;
 
 import com.todayit.common.pagination.PageResult;
+import com.todayit.course.service.PlaceCourseQueryService;
 import com.todayit.course.service.RegionPlaceQueryService;
+import com.todayit.course.service.model.CoursePlaceItem;
 import com.todayit.course.service.model.RegionFilter;
 import com.todayit.place.entity.Category;
 import com.todayit.place.entity.Place;
@@ -17,6 +19,7 @@ import com.todayit.place.service.model.PlaceResult;
 import com.todayit.place.service.model.PlaceScrapSort;
 import com.todayit.place.service.model.PlaceSort;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,7 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** 장소 조회 업무를 처리하는 Query Service입니다. */
 @Service
-public class PlaceQueryService implements PlaceScrapQueryService {
+public class PlaceQueryService implements PlaceScrapQueryService, PlaceCourseQueryService {
 
   private static final Logger LOG = LoggerFactory.getLogger(PlaceQueryService.class);
 
@@ -225,6 +228,50 @@ public class PlaceQueryService implements PlaceScrapQueryService {
 
     LOG.info("장소 위치 조회: placeId={}", placeId);
     return PlaceLocationResult.from(place.getSnapshot());
+  }
+
+  /**
+   * 장소 식별자 목록에 해당하는 활성 장소 정보 맵을 조회합니다.
+   *
+   * @param placeIds 장소 식별자 목록
+   * @return 장소 식별자별 코스용 장소 정보 맵
+   */
+  @Override
+  @Transactional(readOnly = true)
+  public Map<Integer, CoursePlaceItem> findPlacesByIds(List<Integer> placeIds) {
+    if (placeIds == null || placeIds.isEmpty()) {
+      return Map.of();
+    }
+    List<Place> places = placeRepository.findByPlaceIdInAndIsActiveTrueAndIsDeletedFalse(placeIds);
+    Map<Integer, List<String>> imageUrlsByPlaceId = findImageUrlsByPlaceId(places);
+    return places.stream()
+        .collect(
+            Collectors.toMap(
+                Place::getPlaceId,
+                place -> {
+                  List<String> images =
+                      imageUrlsByPlaceId.getOrDefault(place.getPlaceId(), List.of());
+                  Place.PlaceSnapshot snapshot = place.getSnapshot(images);
+                  String imageUrl =
+                      snapshot.imageUrls().isEmpty() ? null : snapshot.imageUrls().get(0);
+                  return new CoursePlaceItem(
+                      snapshot.placeId(),
+                      snapshot.name(),
+                      snapshot.category().name(),
+                      snapshot.address(),
+                      snapshot.latitude(),
+                      snapshot.longitude(),
+                      imageUrl);
+                },
+                (first, second) -> first,
+                LinkedHashMap::new));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  @Transactional(readOnly = true)
+  public boolean existsActivePlace(int placeId) {
+    return placeRepository.existsByPlaceIdAndIsActiveTrueAndIsDeletedFalse(placeId);
   }
 
   /**

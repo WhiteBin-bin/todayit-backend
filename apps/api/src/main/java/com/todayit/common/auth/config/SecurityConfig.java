@@ -134,6 +134,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/regions")
                     .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/courses/*")
+                    .permitAll()
 
                     // 컨테이너 오케스트레이션에서 애플리케이션 생존 여부만 확인
                     .requestMatchers(HttpMethod.GET, "/actuator/health/liveness")

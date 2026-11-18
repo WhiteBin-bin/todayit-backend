@@ -53,6 +53,7 @@ public class RecommendationEngineService {
     double maxPopularityRawScore =
         candidates.stream()
             .filter(Objects::nonNull)
+            .filter(candidate -> candidate.isVisible() && !candidate.isDeleted())
             .mapToDouble(CourseCandidate::getPopularityRawScore)
             .max()
             .orElse(0.0);

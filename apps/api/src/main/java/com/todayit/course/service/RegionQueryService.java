@@ -4,9 +4,12 @@ import com.todayit.course.entity.Region;
 import com.todayit.course.entity.Region.RegionSnapshot;
 import com.todayit.course.exception.InvalidRegionPathException;
 import com.todayit.course.repository.RegionRepository;
+import com.todayit.course.service.model.CourseRegionResult;
 import com.todayit.course.service.model.RegionFilter;
 import com.todayit.course.service.model.RegionResult;
 import com.todayit.course.service.model.SigunguResult;
+import com.todayit.course.service.model.SubRegionResult;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -32,9 +35,9 @@ public class RegionQueryService implements RegionPlaceQueryService {
   }
 
   /**
-   * 전체 행정 지역을 시·도 및 하위 시·군·구 계층 구조로 조회합니다.
+   * 전체 행정 지역을 시·도, 시·군·구 및 하위 세부 지역 3단계 계층 구조로 조회합니다.
    *
-   * @return 시·도별 시·군·구 계층 구조 목록
+   * @return 시·도별 시·군·구 및 세부 지역 계층 구조 목록
    */
   @Transactional(readOnly = true)
   public List<RegionResult> findAllRegions() {
@@ -53,23 +56,66 @@ public class RegionQueryService implements RegionPlaceQueryService {
         .map(
             regionList -> {
               RegionSnapshot first = regionList.get(0);
+              Map<String, String> parentCodes = new LinkedHashMap<>();
+              Map<String, List<SubRegionResult>> subRegionsMap = new LinkedHashMap<>();
+
+              for (RegionSnapshot r : regionList) {
+                String[] parts = r.sigunguName().split(" ", 2);
+                String parentName = parts[0];
+
+                parentCodes.putIfAbsent(parentName, null);
+                subRegionsMap.putIfAbsent(parentName, new ArrayList<>());
+
+                if (parts.length == 1) {
+                  parentCodes.put(parentName, r.sigunguCode());
+                } else {
+                  subRegionsMap.get(parentName).add(new SubRegionResult(r.sigunguCode(), parts[1]));
+                }
+              }
+
               List<SigunguResult> sigungus =
-                  regionList.stream()
-                      .map(r -> new SigunguResult(r.sigunguCode(), r.sigunguName()))
+                  parentCodes.entrySet().stream()
+                      .map(
+                          entry ->
+                              new SigunguResult(
+                                  entry.getValue(),
+                                  entry.getKey(),
+                                  subRegionsMap.get(entry.getKey())))
                       .toList();
+
               return new RegionResult(first.sidoCode(), first.sidoName(), sigungus);
             })
         .toList();
   }
 
   /**
-   * 전달한 지역 코드가 모두 일치하는 지역 식별자를 조회합니다.
+   * 지역 식별자 목록을 바탕으로 코스 지역 요약 정보를 조회합니다.
    *
-   * @param sidoCode 시·도 코드 2자리, 생략 가능
-   * @param sigunguCode 시·군·구 코드 3자리, 생략 가능
-   * @return 조건에 해당하는 지역 식별자 목록
-   * @throws InvalidRegionPathException 코드 형식이 잘못되었거나 해당 지역이 없을 때
+   * @param regionIds 지역 식별자 목록
+   * @return 코스 지역 요약 정보, 지역 정보가 없으면 null
    */
+  @Transactional(readOnly = true)
+  public CourseRegionResult getCourseRegionSummary(List<Integer> regionIds) {
+    if (regionIds == null || regionIds.isEmpty()) {
+      return null;
+    }
+    List<Region> regions = regionRepository.findAllById(regionIds);
+    if (regions.isEmpty()) {
+      return null;
+    }
+    String sidoCode = regions.get(0).getSnapshot().sidoCode();
+    String sidoName = regions.get(0).getSnapshot().sidoName();
+    Set<String> sigungus =
+        regions.stream().map(r -> r.getSnapshot().sigunguCode()).collect(Collectors.toSet());
+    String sigunguCode = null;
+    String sigunguName = null;
+    if (sigungus.size() == 1) {
+      sigunguCode = regions.get(0).getSnapshot().sigunguCode();
+      sigunguName = regions.get(0).getSnapshot().sigunguName();
+    }
+    return new CourseRegionResult(sidoCode, sidoName, sigunguCode, sigunguName);
+  }
+
   @Transactional(readOnly = true)
   @Override
   public List<Integer> findRegionIds(String sidoCode, String sigunguCode) {
@@ -85,7 +131,7 @@ public class RegionQueryService implements RegionPlaceQueryService {
   }
 
   /**
-   * 전달한 지역 필터 조건에 해당하는 지역 식별자 목록을 조회합니다.
+   * 전달한 지역 필터 조건에 해당하는 지역 식별자 목록을 조회합니다. 상위 지역을 선택하면 하위 세부 지역도 포함합니다.
    *
    * @param filters 지역 필터 목록
    * @return 조건에 해당하는 지역 식별자 목록
@@ -132,6 +178,12 @@ public class RegionQueryService implements RegionPlaceQueryService {
         }
 
         matchedRegions.forEach(r -> allRegionIds.add(r.getSnapshot().regionId()));
+        for (Region region : matchedRegions) {
+          String name = region.getSnapshot().sigunguName();
+          if (!name.contains(" ")) {
+            allRegionIds.addAll(regionRepository.findSubRegionIds(sidoCode, name));
+          }
+        }
       }
     }
 

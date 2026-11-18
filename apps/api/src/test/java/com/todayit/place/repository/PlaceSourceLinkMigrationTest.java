@@ -20,7 +20,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
-/** 기존 장소를 변경하지 않고 원천 연결 테이블을 추가하는 V14와 식별자/FK 제약을 검증합니다. */
+/** 기존 장소를 변경하지 않고 원천 연결 테이블을 추가하는 V15와 식별자/FK 제약을 검증합니다. */
 @Testcontainers
 class PlaceSourceLinkMigrationTest {
 
@@ -39,7 +39,7 @@ class PlaceSourceLinkMigrationTest {
     Flyway.configure()
         .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
         .locations("classpath:db/migration")
-        .target("13")
+        .target("14")
         .load()
         .migrate();
     try (Connection connection = open();

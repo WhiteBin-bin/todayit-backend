@@ -56,6 +56,22 @@ public interface PlaceRepository extends JpaRepository<Place, Integer> {
   Optional<Place> findByPlaceIdAndIsActiveTrueAndIsDeletedFalse(int placeId);
 
   /**
+   * 활성화되고 삭제되지 않은 장소가 존재하는지 확인합니다.
+   *
+   * @param placeId 장소 식별자
+   * @return 활성 장소 존재 여부
+   */
+  boolean existsByPlaceIdAndIsActiveTrueAndIsDeletedFalse(int placeId);
+
+  /**
+   * 활성화되고 삭제되지 않은 장소들을 식별자 목록으로 조회합니다.
+   *
+   * @param placeIds 장소 식별자 목록
+   * @return 조건에 맞는 장소 목록
+   */
+  List<Place> findByPlaceIdInAndIsActiveTrueAndIsDeletedFalse(List<Integer> placeIds);
+
+  /**
    * 이름에 검색어 글자가 하나 이상 포함된 활성 장소를 조회합니다. 공백을 제거한 이름의 완전 일치를 우선하고, 글자별 등장 횟수 중 작은 값을 합산한 점수 내림차순으로
    * 정렬합니다.
    *
@@ -75,11 +91,9 @@ public interface PlaceRepository extends JpaRepository<Place, Integer> {
           )
           select p.* from place p
           cross join search s
-          cross join lateral (
-            select regexp_replace(lower(p.name), '[[:space:]]+', '', 'g') as name
+          cross join lateral (\n            select regexp_replace(lower(p.name), '[[:space:]]+', '', 'g') as name
           ) normalized
-          cross join lateral (
-            select coalesce(sum(least(c.occurrences,
+          cross join lateral (\n            select coalesce(sum(least(c.occurrences,
               char_length(normalized.name) - char_length(replace(normalized.name, c.ch, '')))), 0) as score
             from characters c
           ) matched

@@ -19,13 +19,13 @@ import org.springframework.http.ResponseEntity;
 public interface RegionApiDocs {
 
   /**
-   * 전체 시·도 및 시·군·구 목록을 계층 구조로 조회합니다.
+   * 전체 시·도, 시·군·구 및 세부 지역 목록을 3단계 계층 구조로 조회합니다.
    *
-   * @return 시·도 및 하위 시·군·구 목록
+   * @return 시·도, 시·군·구 및 하위 세부 지역 목록
    */
   @Operation(
       summary = "전체 지역 목록 조회",
-      description = "전국 시·도 및 하위 시·군·구 목록을 계층(트리) 구조로 일괄 조회합니다. 필터 렌더링에 사용됩니다.")
+      description = "전국 시·도, 시·군·구 및 하위 세부 지역 목록을 3단계 계층(트리) 구조로 일괄 조회합니다. 필터 렌더링에 사용됩니다.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -48,25 +48,69 @@ public interface RegionApiDocs {
                                   "sigungus": [
                                     {
                                       "sigunguCode": "110",
-                                      "sigunguName": "종로구"
+                                      "sigunguName": "종로구",
+                                      "subRegions": []
                                     },
                                     {
                                       "sigunguCode": "140",
-                                      "sigunguName": "중구"
+                                      "sigunguName": "중구",
+                                      "subRegions": []
                                     },
                                     {
                                       "sigunguCode": "680",
-                                      "sigunguName": "강남구"
+                                      "sigunguName": "강남구",
+                                      "subRegions": []
                                     }
                                   ]
                                 },
                                 {
-                                  "sidoCode": "26",
-                                  "sidoName": "부산광역시",
+                                  "sidoCode": "41",
+                                  "sidoName": "경기도",
                                   "sigungus": [
                                     {
                                       "sigunguCode": "110",
-                                      "sigunguName": "중구"
+                                      "sigunguName": "수원시",
+                                      "subRegions": [
+                                        {
+                                          "sigunguCode": "111",
+                                          "sigunguName": "장안구"
+                                        },
+                                        {
+                                          "sigunguCode": "113",
+                                          "sigunguName": "권선구"
+                                        },
+                                        {
+                                          "sigunguCode": "115",
+                                          "sigunguName": "팔달구"
+                                        },
+                                        {
+                                          "sigunguCode": "117",
+                                          "sigunguName": "영통구"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "sigunguCode": "130",
+                                      "sigunguName": "성남시",
+                                      "subRegions": [
+                                        {
+                                          "sigunguCode": "131",
+                                          "sigunguName": "수정구"
+                                        },
+                                        {
+                                          "sigunguCode": "133",
+                                          "sigunguName": "중원구"
+                                        },
+                                        {
+                                          "sigunguCode": "135",
+                                          "sigunguName": "분당구"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "sigunguCode": "150",
+                                      "sigunguName": "의정부시",
+                                      "subRegions": []
                                     }
                                   ]
                                 }

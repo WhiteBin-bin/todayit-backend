@@ -1,6 +1,7 @@
 package com.todayit.course.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -8,12 +9,15 @@ import static org.mockito.Mockito.when;
 
 import com.todayit.common.pagination.PageResult;
 import com.todayit.course.entity.Course;
+import com.todayit.course.entity.CourseStatus;
 import com.todayit.course.entity.CourseTransport;
+import com.todayit.course.exception.CourseNotFoundException;
 import com.todayit.course.repository.CourseRepository;
 import com.todayit.course.service.model.CourseResult;
 import com.todayit.course.service.model.CourseSort;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -103,5 +107,44 @@ class CourseQueryServiceTest {
     // Then
     assertThat(result.content()).isEmpty();
     assertThat(result.totalElements()).isZero();
+  }
+
+  @Test
+  @DisplayName("존재하는 활성 코스를 정상 조회한다")
+  void getsCourseSuccessfully() {
+    // given
+    when(course.getStatus()).thenReturn(CourseStatus.ACTIVE);
+    when(course.getDeletedAt()).thenReturn(null);
+    when(courseRepository.findById(1)).thenReturn(Optional.of(course));
+    CourseQueryService service = new CourseQueryService(courseRepository);
+
+    // when
+    Course result = service.getCourse(1);
+
+    // then
+    assertThat(result).isSameAs(course);
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 코스는 예외를 던진다")
+  void throwsNotFoundWhenCourseDoesNotExist() {
+    // given
+    when(courseRepository.findById(99)).thenReturn(Optional.empty());
+    CourseQueryService service = new CourseQueryService(courseRepository);
+
+    // when & then
+    assertThrows(CourseNotFoundException.class, () -> service.getCourse(99));
+  }
+
+  @Test
+  @DisplayName("삭제된 코스는 조회 시 예외를 던진다")
+  void throwsNotFoundWhenCourseIsDeleted() {
+    // given
+    when(course.getStatus()).thenReturn(CourseStatus.DELETED);
+    when(courseRepository.findById(1)).thenReturn(Optional.of(course));
+    CourseQueryService service = new CourseQueryService(courseRepository);
+
+    // when & then
+    assertThrows(CourseNotFoundException.class, () -> service.getCourse(1));
   }
 }

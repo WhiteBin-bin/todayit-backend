@@ -164,7 +164,7 @@ public interface PlaceApiDocs {
   @Operation(
       summary = "장소 필터 조회",
       description =
-          "지역·카테고리로 활성 장소를 페이지 단위로 조회합니다. regions는 시도 및 시군구 목록을 담은 JSON 배열 문자열이며 시도당 시군구는 최대 3개까지 지정 가능합니다. 생략 시 전체 지역을 조회합니다. 인증은 선택사항이며, 비회원의 liked는 false입니다.",
+          "지역·카테고리로 활성 장소를 페이지 단위로 조회합니다. regions는 시도 및 시군구 목록을 담은 JSON 배열 문자열이며 끝자리가 0인 시군구 코드만 시도당 최대 3개까지 지정 가능하며, 나머지 코드는 개수 제한에서 제외합니다. 생략 시 전체 지역을 조회합니다. 인증은 선택사항이며, 비회원의 liked는 false입니다.",
       security = {@SecurityRequirement(), @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)})
   @ApiResponses({
     @ApiResponse(
@@ -196,7 +196,7 @@ public interface PlaceApiDocs {
                   @ExampleObject(
                       name = "시군구 제한 초과",
                       value =
-                          "{\"success\":false,\"code\":\"EXCEEDED_SIGUNGU_LIMIT\",\"message\":\"시군구 필터는 시도당 최대 3개까지 선택할 수 있습니다.\"}"),
+                          "{\"success\":false,\"code\":\"EXCEEDED_SIGUNGU_LIMIT\",\"message\":\"끝자리가 0인 시군구 코드는 시도당 최대 3개까지 선택할 수 있습니다.\"}"),
                   @ExampleObject(
                       name = "잘못된 페이지",
                       value =
@@ -217,7 +217,7 @@ public interface PlaceApiDocs {
   ResponseEntity<CommonResponse<PageResponse<PlaceFilterResponse>>> findPlaces(
       @Parameter(
               description =
-                  "지역 필터 JSON 배열 문자열입니다. 시도당 시군구 코드는 최대 3개까지 지정할 수 있으며, 빈 배열이거나 생략하면 해당 시도 전체를 조회합니다.",
+                  "지역 필터 JSON 배열 문자열입니다. 끝자리가 0인 시군구 코드만 시도당 최대 3개로 제한하며 나머지 코드는 개수 제한에서 제외합니다. 빈 배열이거나 생략하면 해당 시도 전체를 조회합니다. 상위 시를 선택하면 하위 구도 포함하며, 특정 구를 선택하면 해당 구만 조회합니다.",
               example =
                   "[{\"sidoCode\":\"11\",\"sigunguCodes\":[\"680\",\"650\"]},{\"sidoCode\":\"41\",\"sigunguCodes\":[]}]")
           String regions,

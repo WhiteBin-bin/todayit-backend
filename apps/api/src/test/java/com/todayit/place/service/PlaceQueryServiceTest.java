@@ -2,14 +2,18 @@ package com.todayit.place.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.todayit.common.pagination.PageResult;
 import com.todayit.course.service.RegionPlaceQueryService;
+import com.todayit.course.service.model.CoursePlaceItem;
 import com.todayit.course.service.model.RegionFilter;
 import com.todayit.place.entity.Category;
 import com.todayit.place.entity.Place;
+import com.todayit.place.entity.PlaceImage;
 import com.todayit.place.repository.PlaceImageRepository;
 import com.todayit.place.repository.PlaceMemberLikeRepository;
 import com.todayit.place.repository.PlaceRepository;
@@ -20,6 +24,7 @@ import com.todayit.place.service.model.PlaceScrapSort;
 import com.todayit.place.service.model.PlaceSort;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.assertj.core.api.AbstractThrowableAssert;
 import org.junit.jupiter.api.AfterEach;
@@ -391,5 +396,103 @@ class PlaceQueryServiceTest {
     // Then
     assertThat(result.content()).hasSize(1);
     assertThat(result.content().get(0).name()).isEqualTo("오늘의 식당");
+  }
+
+  @Test
+  @DisplayName("장소 식별자 목록으로 활성 장소 정보를 맵으로 조회한다")
+  void findsPlacesByIdsSuccessfully() {
+    // given
+    Place place = mock(Place.class);
+    when(place.getPlaceId()).thenReturn(10);
+    when(place.getSnapshot(any()))
+        .thenReturn(
+            new Place.PlaceSnapshot(
+                10,
+                "오늘의 카페",
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                "주소",
+                Category.CAFE_DESSERT,
+                0,
+                List.of("https://example.com/image.jpg")));
+    when(placeRepository.findByPlaceIdInAndIsActiveTrueAndIsDeletedFalse(List.of(10)))
+        .thenReturn(List.of(place));
+    PlaceImage image = mock(PlaceImage.class);
+    when(image.getPlaceId()).thenReturn(10);
+    when(image.getImageUrl()).thenReturn("https://example.com/image.jpg");
+    when(placeImageRepository.findByPlacePlaceIdInOrderByPlacePlaceIdAscCreatedAtAsc(List.of(10)))
+        .thenReturn(List.of(image));
+
+    PlaceQueryService service =
+        new PlaceQueryService(
+            placeMemberLikeRepository,
+            placeRepository,
+            placeImageRepository,
+            placeScrapRepository,
+            regionPlaceQueryService);
+
+    // when
+    Map<Integer, CoursePlaceItem> result = service.findPlacesByIds(List.of(10));
+
+    // then
+    assertThat(result).hasSize(1);
+    assertThat(result.get(10).name()).isEqualTo("오늘의 카페");
+  }
+
+  @Test
+  @DisplayName("식별자 목록이 비어 있거나 없으면 빈 맵을 반환한다")
+  void returnsEmptyMapWhenPlaceIdsEmpty() {
+    // given
+    PlaceQueryService service =
+        new PlaceQueryService(
+            placeMemberLikeRepository,
+            placeRepository,
+            placeImageRepository,
+            placeScrapRepository,
+            regionPlaceQueryService);
+
+    // when & then
+    assertThat(service.findPlacesByIds(null)).isEmpty();
+    assertThat(service.findPlacesByIds(List.of())).isEmpty();
+  }
+
+  @Test
+  @DisplayName("활성화된 장소가 존재하면 true를 반환한다")
+  void returnsTrueWhenActivePlaceExists() {
+    // given
+    when(placeRepository.existsByPlaceIdAndIsActiveTrueAndIsDeletedFalse(10)).thenReturn(true);
+    PlaceQueryService service =
+        new PlaceQueryService(
+            placeMemberLikeRepository,
+            placeRepository,
+            placeImageRepository,
+            placeScrapRepository,
+            regionPlaceQueryService);
+
+    // when
+    boolean exists = service.existsActivePlace(10);
+
+    // then
+    assertThat(exists).isTrue();
+  }
+
+  @Test
+  @DisplayName("활성화된 장소가 존재하지 않으면 false를 반환한다")
+  void returnsFalseWhenPlaceNotFound() {
+    // given
+    when(placeRepository.existsByPlaceIdAndIsActiveTrueAndIsDeletedFalse(999)).thenReturn(false);
+    PlaceQueryService service =
+        new PlaceQueryService(
+            placeMemberLikeRepository,
+            placeRepository,
+            placeImageRepository,
+            placeScrapRepository,
+            regionPlaceQueryService);
+
+    // when
+    boolean exists = service.existsActivePlace(999);
+
+    // then
+    assertThat(exists).isFalse();
   }
 }

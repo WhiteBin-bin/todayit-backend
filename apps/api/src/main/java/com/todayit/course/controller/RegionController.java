@@ -27,9 +27,9 @@ public class RegionController implements RegionApiDocs {
   }
 
   /**
-   * 전체 행정 지역 목록을 시·도 및 시·군·구 계층 구조로 조회합니다.
+   * 전체 행정 지역 목록을 시·도, 시·군·구 및 세부 지역 3단계 계층 구조로 조회합니다.
    *
-   * @return 시·도 및 하위 시·군·구 목록
+   * @return 시·도, 시·군·구 및 하위 세부 지역 목록
    */
   @GetMapping
   @Override

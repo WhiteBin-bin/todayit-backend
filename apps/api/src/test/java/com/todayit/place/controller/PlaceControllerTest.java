@@ -202,8 +202,54 @@ class PlaceControllerTest {
     verify(placeQueryService).findPlaces(filters, null, 0, 20, PlaceSort.LATEST, null);
   }
 
+  @ParameterizedTest
+  @CsvSource({"111:113:115:117", "110:130:170:111:113:115:117", "110:110:130:170:111:113:115:117"})
+  @DisplayName("끝자리가 0이 아닌 코드는 제한에서 제외하고 중복 코드는 한 번만 센다")
+  void excludesSubRegionCodesFromLimit(String codes) throws Exception {
+    List<String> requestedCodes = List.of(codes.split(":"));
+    List<RegionFilter> filters =
+        List.of(new RegionFilter("41", requestedCodes.stream().distinct().toList()));
+    when(placeQueryService.findPlaces(filters, null, 0, 20, PlaceSort.LATEST, null))
+        .thenReturn(new PageResult<>(List.of(), 0, 20, 0));
+
+    mockMvc
+        .perform(
+            get("/api/v1/places")
+                .param(
+                    "regions",
+                    "[{\"sidoCode\":\"41\",\"sigunguCodes\":[\""
+                        + String.join("\",\"", requestedCodes)
+                        + "\"]}]"))
+        .andExpect(status().isOk());
+
+    verify(placeQueryService).findPlaces(filters, null, 0, 20, PlaceSort.LATEST, null);
+  }
+
   @Test
-  @DisplayName("시도당 시군구 코드가 3개를 초과하면 400 오류를 반환한다")
+  @DisplayName("끝자리가 0인 코드의 3개 제한은 시도별로 각각 적용한다")
+  void appliesZeroEndingCodeLimitPerSido() throws Exception {
+    List<String> codes = List.of("110", "140", "170");
+    List<RegionFilter> filters =
+        List.of(new RegionFilter("11", codes), new RegionFilter("41", codes));
+    when(placeQueryService.findPlaces(filters, null, 0, 20, PlaceSort.LATEST, null))
+        .thenReturn(new PageResult<>(List.of(), 0, 20, 0));
+
+    mockMvc
+        .perform(
+            get("/api/v1/places")
+                .param(
+                    "regions",
+                    """
+                    [{"sidoCode":"11","sigunguCodes":["110","140","170"]},
+                     {"sidoCode":"41","sigunguCodes":["110","140","170"]}]
+                    """))
+        .andExpect(status().isOk());
+
+    verify(placeQueryService).findPlaces(filters, null, 0, 20, PlaceSort.LATEST, null);
+  }
+
+  @Test
+  @DisplayName("시도당 끝자리가 0인 시군구 코드가 3개를 초과하면 400 오류를 반환한다")
   void rejectsExceededSigunguLimit() throws Exception {
     // When & Then
     mockMvc
@@ -214,7 +260,7 @@ class PlaceControllerTest {
                     "[{\"sidoCode\":\"11\",\"sigunguCodes\":[\"110\",\"120\",\"130\",\"140\"]}]"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("EXCEEDED_SIGUNGU_LIMIT"))
-        .andExpect(jsonPath("$.message").value("시군구 필터는 시도당 최대 3개까지 선택할 수 있습니다."));
+        .andExpect(jsonPath("$.message").value("끝자리가 0인 시군구 코드는 시도당 최대 3개까지 선택할 수 있습니다."));
     verifyNoInteractions(placeQueryService);
   }
 

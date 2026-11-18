@@ -78,6 +78,31 @@ class PlaceRepositoryTest {
   }
 
   @Test
+  @DisplayName("하위 지역은 같은 시도의 상위 지역명과 공백 경계로 조회한다")
+  @Transactional
+  void findsSubRegionsWithinSameSidoAndNameBoundary() {
+    jdbcTemplate.update(
+        "INSERT INTO region (sido_code, sigungu_code, sido_name, sigungu_name) VALUES "
+            + "('41', '190', '경기도', '부천시'), "
+            + "('41', '192', '경기도', '부천시 원미구'), "
+            + "('41', '194', '경기도', '부천시 소사구'), "
+            + "('41', '196', '경기도', '부천시 오정구'), "
+            + "('41', '999', '경기도', '부천시외 구'), "
+            + "('30', '192', '대전광역시', '부천시 원미구')");
+
+    List<Integer> result = regionRepository.findSubRegionIds("41", "부천시");
+
+    assertThat(result)
+        .containsExactlyInAnyOrderElementsOf(
+            regionRepository
+                .findBySidoCodeAndSigunguCodeIn("41", List.of("192", "194", "196"))
+                .stream()
+                .map(region -> region.getSnapshot().regionId())
+                .toList());
+    assertThat(result).hasSize(3);
+  }
+
+  @Test
   @DisplayName("시군구 코드만으로 조회한다")
   @Transactional
   void findsRegionsBySigunguOnly() {

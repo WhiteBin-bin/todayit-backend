@@ -9,6 +9,7 @@ import com.todayit.common.exception.GlobalExceptionHandler;
 import com.todayit.course.service.RegionQueryService;
 import com.todayit.course.service.model.RegionResult;
 import com.todayit.course.service.model.SigunguResult;
+import com.todayit.course.service.model.SubRegionResult;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,7 +37,7 @@ class RegionControllerTest {
   }
 
   @Test
-  @DisplayName("전체 지역 목록을 계층 구조로 조회한다")
+  @DisplayName("전체 지역 목록을 3단계 계층 구조로 조회한다")
   void getsAllRegionsHierarchically() throws Exception {
     // Given
     List<RegionResult> results =
@@ -44,8 +45,19 @@ class RegionControllerTest {
             new RegionResult(
                 "11",
                 "서울특별시",
-                List.of(new SigunguResult("110", "종로구"), new SigunguResult("680", "강남구"))),
-            new RegionResult("26", "부산광역시", List.of(new SigunguResult("110", "중구"))));
+                List.of(
+                    new SigunguResult("110", "종로구", List.of()),
+                    new SigunguResult("680", "강남구", List.of()))),
+            new RegionResult(
+                "41",
+                "경기도",
+                List.of(
+                    new SigunguResult(
+                        "130",
+                        "성남시",
+                        List.of(
+                            new SubRegionResult("131", "수정구"),
+                            new SubRegionResult("135", "분당구"))))));
     when(regionQueryService.findAllRegions()).thenReturn(results);
 
     // When & Then
@@ -57,12 +69,18 @@ class RegionControllerTest {
         .andExpect(jsonPath("$.data[0].sidoName").value("서울특별시"))
         .andExpect(jsonPath("$.data[0].sigungus[0].sigunguCode").value("110"))
         .andExpect(jsonPath("$.data[0].sigungus[0].sigunguName").value("종로구"))
+        .andExpect(jsonPath("$.data[0].sigungus[0].subRegions").isArray())
+        .andExpect(jsonPath("$.data[0].sigungus[0].subRegions").isEmpty())
         .andExpect(jsonPath("$.data[0].sigungus[1].sigunguCode").value("680"))
         .andExpect(jsonPath("$.data[0].sigungus[1].sigunguName").value("강남구"))
-        .andExpect(jsonPath("$.data[1].sidoCode").value("26"))
-        .andExpect(jsonPath("$.data[1].sidoName").value("부산광역시"))
-        .andExpect(jsonPath("$.data[1].sigungus[0].sigunguCode").value("110"))
-        .andExpect(jsonPath("$.data[1].sigungus[0].sigunguName").value("중구"));
+        .andExpect(jsonPath("$.data[1].sidoCode").value("41"))
+        .andExpect(jsonPath("$.data[1].sidoName").value("경기도"))
+        .andExpect(jsonPath("$.data[1].sigungus[0].sigunguCode").value("130"))
+        .andExpect(jsonPath("$.data[1].sigungus[0].sigunguName").value("성남시"))
+        .andExpect(jsonPath("$.data[1].sigungus[0].subRegions[0].sigunguCode").value("131"))
+        .andExpect(jsonPath("$.data[1].sigungus[0].subRegions[0].sigunguName").value("수정구"))
+        .andExpect(jsonPath("$.data[1].sigungus[0].subRegions[1].sigunguCode").value("135"))
+        .andExpect(jsonPath("$.data[1].sigungus[0].subRegions[1].sigunguName").value("분당구"));
   }
 
   @Test

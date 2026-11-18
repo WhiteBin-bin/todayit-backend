@@ -17,6 +17,8 @@ import com.todayit.common.auth.handler.RestAuthenticationEntryPoint;
 import com.todayit.common.auth.jwt.JwtTokenProvider;
 import com.todayit.common.auth.token.RefreshTokenService;
 import com.todayit.common.pagination.PageResult;
+import com.todayit.course.exception.CourseNotFoundException;
+import com.todayit.course.service.CourseFacade;
 import com.todayit.course.service.CoursePlaceQueryService;
 import com.todayit.member.service.GoogleLoginService;
 import com.todayit.member.service.KakaoLoginService;
@@ -84,6 +86,7 @@ public class SecurityConfigTest {
   @MockitoBean private GoogleLoginService googleLoginService;
 
   @MockitoBean private KakaoLoginService kakaoLoginService;
+  @MockitoBean private CourseFacade courseFacade;
 
   @Autowired
   SecurityConfigTest(MockMvc mockMvc) {
@@ -104,6 +107,19 @@ public class SecurityConfigTest {
     // Then
     result.andExpect(status().isNotFound());
     verify(placeDetailFacade).getPlaceDetail(1, null);
+  }
+
+  @Test
+  @DisplayName("코스 상세는 인증 없이 조회할 수 있다")
+  void allowsAnonymousCourseDetailLookup() throws Exception {
+    // Given
+    doThrow(new CourseNotFoundException()).when(courseFacade).getCourseDetail(1, null);
+    // When
+    ResultActions result = mockMvc.perform(get("/api/v1/courses/1"));
+
+    // Then
+    result.andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("COURSE_NOT_FOUND"));
+    verify(courseFacade).getCourseDetail(1, null);
   }
 
   @Test

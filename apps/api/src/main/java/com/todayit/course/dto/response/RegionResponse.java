@@ -18,6 +18,17 @@ public record RegionResponse(
     @Schema(description = "하위 시·군·구 목록") List<SigunguResponse> sigungus) {
 
   /**
+   * 시·군·구 목록을 방어적으로 복사하여 초기화합니다.
+   *
+   * @param sidoCode 시·도 코드
+   * @param sidoName 시·도 명칭
+   * @param sigungus 하위 시·군·구 목록
+   */
+  public RegionResponse {
+    sigungus = sigungus != null ? List.copyOf(sigungus) : List.of();
+  }
+
+  /**
    * 서비스 계층의 지역 모델로부터 응답 DTO를 생성합니다.
    *
    * @param result 지역 조회 결과 모델
@@ -25,9 +36,7 @@ public record RegionResponse(
    */
   public static RegionResponse from(RegionResult result) {
     List<SigunguResponse> sigunguResponses =
-        result.sigungus().stream()
-            .map(s -> new SigunguResponse(s.sigunguCode(), s.sigunguName()))
-            .toList();
+        result.sigungus().stream().map(SigunguResponse::from).toList();
     return new RegionResponse(result.sidoCode(), result.sidoName(), sigunguResponses);
   }
 }

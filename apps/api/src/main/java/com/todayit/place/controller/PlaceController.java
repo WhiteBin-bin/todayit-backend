@@ -162,7 +162,7 @@ public class PlaceController implements PlaceApiDocs {
    * @param regionsJson 지역 필터 JSON 문자열
    * @return 변환한 지역 필터 목록, 생략 시 {@code null}
    * @throws InvalidRegionPathException 형식이 잘못되었거나 코드가 올바르지 않을 때
-   * @throws ExceededSigunguLimitException 시도당 시군구 코드가 3개를 초과할 때
+   * @throws ExceededSigunguLimitException 시도당 끝자리가 0인 서로 다른 시군구 코드가 3개를 초과할 때
    */
   private List<RegionFilter> parseRegions(String regionsJson) {
     if (regionsJson == null) {
@@ -205,7 +205,8 @@ public class PlaceController implements PlaceApiDocs {
           }
           set.add(sigunguCode);
         }
-        if (set.size() > MAX_SIGUNGU_COUNT_PER_SIDO) {
+        long limitedCodeCount = set.stream().filter(code -> code.endsWith("0")).count();
+        if (limitedCodeCount > MAX_SIGUNGU_COUNT_PER_SIDO) {
           throw new ExceededSigunguLimitException();
         }
       }

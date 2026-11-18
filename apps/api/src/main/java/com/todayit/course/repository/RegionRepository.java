@@ -42,6 +42,20 @@ public interface RegionRepository extends JpaRepository<Region, Integer> {
   List<Region> findBySidoCodeAndSigunguCodeIn(String sidoCode, List<String> sigunguCodes);
 
   /**
+   * 같은 시·도에서 상위 지역명 아래의 세부 지역 식별자를 조회합니다.
+   *
+   * @param sidoCode 시·도 코드
+   * @param parentName 상위 지역명
+   * @return 하위 세부 지역 식별자 목록
+   */
+  @Query(
+      "select region.regionId from Region region "
+          + "where region.sidoCode = :sidoCode "
+          + "and region.sigunguName like concat(:parentName, ' %')")
+  List<Integer> findSubRegionIds(
+      @Param("sidoCode") String sidoCode, @Param("parentName") String parentName);
+
+  /**
    * 전체 행정 지역 목록을 시·도 코드 및 시·군·구 코드 오름차순으로 조회합니다.
    *
    * @return 정렬된 전체 행정 지역 엔티티 목록
