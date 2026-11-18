@@ -131,7 +131,7 @@ public class RegionQueryService implements RegionPlaceQueryService {
   }
 
   /**
-   * 전달한 지역 필터 조건에 해당하는 지역 식별자 목록을 조회합니다. 상위 지역을 선택하면 하위 세부 지역도 포함합니다.
+   * 전달한 코드와 일치하는 지역 식별자만 조회합니다. 시군구 코드를 생략하면 해당 시도의 전체 지역을 조회합니다.
    *
    * @param filters 지역 필터 목록
    * @return 조건에 해당하는 지역 식별자 목록
@@ -178,12 +178,6 @@ public class RegionQueryService implements RegionPlaceQueryService {
         }
 
         matchedRegions.forEach(r -> allRegionIds.add(r.getSnapshot().regionId()));
-        for (Region region : matchedRegions) {
-          String name = region.getSnapshot().sigunguName();
-          if (!name.contains(" ")) {
-            allRegionIds.addAll(regionRepository.findSubRegionIds(sidoCode, name));
-          }
-        }
       }
     }
 

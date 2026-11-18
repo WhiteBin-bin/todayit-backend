@@ -2,10 +2,9 @@ package com.todayit.course.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.todayit.course.entity.Region;
@@ -248,20 +247,31 @@ class RegionQueryServiceTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"190", "190:192"})
-  @DisplayName("부천시 선택 시 하위 구를 포함하고 중복 선택한 구는 한 번만 반환한다")
-  void includesSubRegionsWhenCitySelected(String codes) {
+  @CsvSource({"190", "190:192", "192:194:196"})
+  @DisplayName("시와 하위 구를 자동 확장하지 않고 전달한 코드의 지역만 반환한다")
+  void returnsOnlyRegionsForExplicitCodes(String codes) {
     List<String> selectedCodes = List.of(codes.split(":"));
-    Region city = new Region(10, "41", "190", "경기도", "부천시");
-    Region wonmi = new Region(11, "41", "192", "경기도", "부천시 원미구");
+    List<Region> regions =
+        List.of(
+            new Region(10, "41", "190", "경기도", "부천시"),
+            new Region(11, "41", "192", "경기도", "부천시 원미구"),
+            new Region(12, "41", "194", "경기도", "부천시 소사구"),
+            new Region(13, "41", "196", "경기도", "부천시 오정구"));
+    List<Region> selectedRegions =
+        regions.stream()
+            .filter(r -> selectedCodes.contains(r.getSnapshot().sigunguCode()))
+            .toList();
     when(regionRepository.findBySidoCodeAndSigunguCodeIn("41", selectedCodes))
-        .thenReturn(selectedCodes.size() == 1 ? List.of(city) : List.of(city, wonmi));
-    when(regionRepository.findSubRegionIds("41", "부천시")).thenReturn(List.of(11, 12, 13));
+        .thenReturn(selectedRegions);
     RegionQueryService service = new RegionQueryService(regionRepository);
 
     List<Integer> result = service.findRegionIds(List.of(new RegionFilter("41", selectedCodes)));
 
-    assertThat(result).containsExactly(10, 11, 12, 13);
+    assertThat(result)
+        .containsExactlyElementsOf(
+            selectedRegions.stream().map(r -> r.getSnapshot().regionId()).toList());
+    verify(regionRepository).findBySidoCodeAndSigunguCodeIn("41", selectedCodes);
+    verifyNoMoreInteractions(regionRepository);
   }
 
   @Test
@@ -274,7 +284,8 @@ class RegionQueryServiceTest {
     List<Integer> result = service.findRegionIds(List.of(new RegionFilter("41", List.of("192"))));
 
     assertThat(result).containsExactly(11);
-    verify(regionRepository, never()).findSubRegionIds(anyString(), anyString());
+    verify(regionRepository).findBySidoCodeAndSigunguCodeIn("41", List.of("192"));
+    verifyNoMoreInteractions(regionRepository);
   }
 
   @Test

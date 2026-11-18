@@ -164,7 +164,7 @@ public interface PlaceApiDocs {
   @Operation(
       summary = "장소 필터 조회",
       description =
-          "지역·카테고리로 활성 장소를 페이지 단위로 조회합니다. regions는 시도 및 시군구 목록을 담은 JSON 배열 문자열이며 끝자리가 0인 시군구 코드만 시도당 최대 3개까지 지정 가능하며, 나머지 코드는 개수 제한에서 제외합니다. 생략 시 전체 지역을 조회합니다. 인증은 선택사항이며, 비회원의 liked는 false입니다.",
+          "지역·카테고리로 활성 장소를 페이지 단위로 조회합니다. regions는 시도 및 시군구 목록을 담은 JSON 배열 문자열입니다. regions를 생략하면 지역 필터를 적용하지 않으며, 빈 배열([])이나 빈 문자열 또는 공백 문자열은 400 INVALID_REGION_PATH를 반환합니다. 각 시도 항목의 sigunguCodes를 생략하거나 빈 배열로 전달하면 해당 시도 전체를 조회합니다. 끝자리가 0인 시군구 코드만 시도당 최대 3개로 제한하며, 나머지 코드는 개수 제한에서 제외합니다. 인증은 선택사항이며, 비회원의 liked는 false입니다.",
       security = {@SecurityRequirement(), @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)})
   @ApiResponses({
     @ApiResponse(
@@ -217,7 +217,7 @@ public interface PlaceApiDocs {
   ResponseEntity<CommonResponse<PageResponse<PlaceFilterResponse>>> findPlaces(
       @Parameter(
               description =
-                  "지역 필터 JSON 배열 문자열입니다. 끝자리가 0인 시군구 코드만 시도당 최대 3개로 제한하며 나머지 코드는 개수 제한에서 제외합니다. 빈 배열이거나 생략하면 해당 시도 전체를 조회합니다. 상위 시를 선택하면 하위 구도 포함하며, 특정 구를 선택하면 해당 구만 조회합니다.",
+                  "지역 필터 JSON 배열 문자열입니다. regions를 생략하면 지역 필터를 적용하지 않습니다. regions에 빈 배열([])이나 빈 문자열 또는 공백 문자열을 전달하면 400 INVALID_REGION_PATH를 반환합니다. 각 시도 항목의 sigunguCodes를 생략하거나 빈 배열로 전달하면 해당 시도 전체를 조회합니다. 끝자리가 0인 시군구 코드만 시도당 최대 3개로 제한하며 나머지 코드는 개수 제한에서 제외합니다. 시군구 코드를 전달하면 해당 코드의 지역만 조회하며 하위 구 코드는 자동으로 추가하지 않습니다.",
               example =
                   "[{\"sidoCode\":\"11\",\"sigunguCodes\":[\"680\",\"650\"]},{\"sidoCode\":\"41\",\"sigunguCodes\":[]}]")
           String regions,
