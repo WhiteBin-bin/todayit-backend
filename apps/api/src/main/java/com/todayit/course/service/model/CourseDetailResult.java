@@ -27,6 +27,9 @@ import java.util.List;
  * @param places 포함된 장소 목록
  * @param createdAt 생성 일시
  * @param updatedAt 수정 일시, 없으면 null
+ * @param liked 요청 회원의 좋아요 여부
+ * @param scrapped 요청 회원의 스크랩 여부
+ * @param beforeVisit AI 방문 전 유의사항 목록
  */
 public record CourseDetailResult(
     int courseId,
@@ -46,7 +49,10 @@ public record CourseDetailResult(
     boolean isWriter,
     List<CoursePlaceDetailResult> places,
     LocalDateTime createdAt,
-    LocalDateTime updatedAt) {
+    LocalDateTime updatedAt,
+    boolean liked,
+    boolean scrapped,
+    List<String> beforeVisit) {
 
   /**
    * 컬렉션을 방어적으로 복사합니다.
@@ -69,9 +75,13 @@ public record CourseDetailResult(
    * @param places 장소 목록
    * @param createdAt 생성 일시
    * @param updatedAt 수정 일시
+   * @param liked 좋아요 여부
+   * @param scrapped 스크랩 여부
+   * @param beforeVisit 방문 전 유의사항 목록
    */
   public CourseDetailResult {
     themes = themes == null ? List.of() : List.copyOf(themes);
     places = places == null ? List.of() : List.copyOf(places);
+    beforeVisit = beforeVisit == null ? List.of() : List.copyOf(beforeVisit);
   }
 }

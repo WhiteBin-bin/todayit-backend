@@ -1,14 +1,18 @@
 package com.todayit.course.repository;
 
 import com.todayit.course.entity.Course;
+import com.todayit.course.entity.CourseStatus;
+import com.todayit.course.entity.CourseVisibility;
 import com.todayit.course.entity.Theme;
 import jakarta.persistence.LockModeType;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -27,6 +31,18 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
           + "where course.courseId = :courseId and course.memberId = :memberId")
   Optional<Course> findByIdAndMemberIdForUpdate(
       @Param("courseId") int courseId, @Param("memberId") String memberId);
+
+  /**
+   * 원본 코스와 포함된 장소 목록을 한 번에 즉시 적재하여 상태 확인과 장소 조회가 동일한 스냅샷을 사용하도록 조회합니다.
+   *
+   * @param courseId 코스 식별자
+   * @return 장소가 함께 적재된 코스, 존재하지 않으면 빈 Optional
+   */
+  @Query(
+      "select distinct course from Course course "
+          + "left join fetch course.coursePlaces "
+          + "where course.courseId = :courseId")
+  Optional<Course> findByIdWithPlaces(@Param("courseId") int courseId);
 
   /**
    * 선택한 콘셉트를 조회합니다.
@@ -70,4 +86,61 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
               + "and course.status = com.todayit.course.entity.CourseStatus.ACTIVE "
               + "and course.visibility = com.todayit.course.entity.CourseVisibility.PUBLIC")
   Page<Course> findPublicActiveByPlaceId(@Param("placeId") int placeId, Pageable pageable);
+
+  /**
+   * 코스의 공개 범위를 변경합니다.
+   *
+   * @param courseId 코스 식별자
+   * @param visibility 변경할 공개 범위
+   * @param updatedAt 수정 시각
+   * @return 변경된 행 수
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update Course c
+      set c.visibility = :visibility,
+          c.updatedAt = :updatedAt
+      where c.courseId = :courseId
+      """)
+  int updateVisibility(
+      @Param("courseId") int courseId,
+      @Param("visibility") CourseVisibility visibility,
+      @Param("updatedAt") LocalDateTime updatedAt);
+
+  /**
+   * 코스의 상태를 변경합니다.
+   *
+   * @param courseId 코스 식별자
+   * @param status 변경할 상태
+   * @param updatedAt 수정 시각
+   * @return 변경된 행 수
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update Course c
+      set c.status = :status,
+          c.updatedAt = :updatedAt
+      where c.courseId = :courseId
+      """)
+  int updateStatus(
+      @Param("courseId") int courseId,
+      @Param("status") CourseStatus status,
+      @Param("updatedAt") LocalDateTime updatedAt);
+
+  /**
+   * 코스 조회수를 1 증가시킵니다.
+   *
+   * @param courseId 코스 식별자
+   * @return 변경된 행 수
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update Course c
+      set c.viewCount = c.viewCount + 1
+      where c.courseId = :courseId
+      """)
+  int increaseViewCount(@Param("courseId") int courseId);
 }

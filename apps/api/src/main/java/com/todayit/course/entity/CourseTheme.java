@@ -30,9 +30,26 @@ public class CourseTheme {
 
   protected CourseTheme() {}
 
-  CourseTheme(Course course, Theme theme) {
+  /**
+   * 코스와 테마 관계를 생성합니다.
+   *
+   * @param course 코스 엔티티
+   * @param theme 테마 엔티티
+   */
+  private CourseTheme(Course course, Theme theme) {
     this.course = course;
     this.theme = theme;
+  }
+
+  /**
+   * 코스와 테마 관계를 생성합니다.
+   *
+   * @param course 코스 엔티티
+   * @param theme 테마 엔티티
+   * @return 생성된 CourseTheme 엔티티
+   */
+  public static CourseTheme create(Course course, Theme theme) {
+    return new CourseTheme(course, theme);
   }
 
   /**

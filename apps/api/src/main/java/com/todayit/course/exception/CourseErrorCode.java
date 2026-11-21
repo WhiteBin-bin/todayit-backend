@@ -32,6 +32,9 @@ public enum CourseErrorCode implements ErrorCode {
   /** 코스에 추가하려는 장소를 찾을 수 없거나 삭제된 경우입니다. */
   PLACE_NOT_FOUND("PLACE_NOT_FOUND", "장소를 찾을 수 없습니다.", ErrorStatus.NOT_FOUND),
 
+  /** 코스 내 장소를 찾을 수 없는 경우입니다. */
+  COURSE_PLACE_NOT_FOUND("COURSE_PLACE_NOT_FOUND", "코스 내 장소를 찾을 수 없습니다.", ErrorStatus.NOT_FOUND),
+
   /** 장소 식별자가 누락되었거나 유효하지 않은 경우입니다. */
   INVALID_PLACE_ID("INVALID_PLACE_ID", "장소 식별자는 1 이상이어야 합니다."),
 
@@ -43,7 +46,10 @@ public enum CourseErrorCode implements ErrorCode {
 
   /** 동일한 장소를 허용 횟수(최대 2회)를 초과하여 추가하려는 경우입니다. */
   MAX_PLACE_DUPLICATION_EXCEEDED(
-      "MAX_PLACE_DUPLICATION_EXCEEDED", "동일한 장소는 코스에 최대 2회까지만 추가할 수 있습니다.");
+      "MAX_PLACE_DUPLICATION_EXCEEDED", "동일한 장소는 코스에 최대 2회까지만 추가할 수 있습니다."),
+
+  /** 임시저장(DRAFT) 상태의 코스는 복사할 수 없는 경우입니다. */
+  CANNOT_COPY_DRAFT("CANNOT_COPY_DRAFT", "임시저장 코스는 복사할 수 없습니다.");
 
   private final String code;
   private final String message;

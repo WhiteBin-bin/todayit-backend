@@ -7,7 +7,7 @@ import com.todayit.course.exception.CourseNotFoundException;
 import com.todayit.course.exception.MaxPlaceDuplicationExceededException;
 import com.todayit.course.service.command.AddCoursePlaceCommand;
 import com.todayit.course.service.command.UpdateCoursePlaceOrdersCommand;
-import com.todayit.course.service.model.AddCoursePlaceResult;
+import com.todayit.course.service.model.AddCoursePlaceEntities;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.util.ArrayList;
@@ -100,7 +100,7 @@ class CoursePlaceConcurrencyTest {
         lock.setInt(1, courseId);
         lock.executeQuery().close();
       }
-      Future<AddCoursePlaceResult> first =
+      Future<AddCoursePlaceEntities> first =
           executor.submit(
               () -> {
                 ready.countDown();
@@ -108,7 +108,7 @@ class CoursePlaceConcurrencyTest {
                 return service.addPlace(
                     memberId, new AddCoursePlaceCommand(courseId, firstPlaceId, null, 30));
               });
-      Future<AddCoursePlaceResult> second =
+      Future<AddCoursePlaceEntities> second =
           executor.submit(
               () -> {
                 ready.countDown();
@@ -121,11 +121,11 @@ class CoursePlaceConcurrencyTest {
       // when
       awaitBlockedRequests();
       blocker.commit();
-      AddCoursePlaceResult firstResult = first.get(30, TimeUnit.SECONDS);
-      AddCoursePlaceResult secondResult = second.get(30, TimeUnit.SECONDS);
+      AddCoursePlaceEntities firstResult = first.get(30, TimeUnit.SECONDS);
+      AddCoursePlaceEntities secondResult = second.get(30, TimeUnit.SECONDS);
 
       // then
-      assertThat(List.of(firstResult.order(), secondResult.order()))
+      assertThat(List.of(firstResult.addedPlace().getOrder(), secondResult.addedPlace().getOrder()))
           .containsExactlyInAnyOrder(1, 2);
       assertThat(
               jdbc.queryForList(
@@ -147,7 +147,7 @@ class CoursePlaceConcurrencyTest {
     service.addPlace(memberId, new AddCoursePlaceCommand(courseId, firstPlaceId, null, 30));
     CountDownLatch ready = new CountDownLatch(2);
     CountDownLatch start = new CountDownLatch(1);
-    List<Future<AddCoursePlaceResult>> attempts = new ArrayList<>();
+    List<Future<AddCoursePlaceEntities>> attempts = new ArrayList<>();
     try (ExecutorService executor = Executors.newFixedThreadPool(2);
         Connection blocker = dataSource.getConnection()) {
       blocker.setAutoCommit(false);
@@ -171,9 +171,9 @@ class CoursePlaceConcurrencyTest {
       // when
       awaitBlockedRequests();
       blocker.commit();
-      List<AddCoursePlaceResult> successes = new ArrayList<>();
+      List<AddCoursePlaceEntities> successes = new ArrayList<>();
       List<Throwable> failures = new ArrayList<>();
-      for (Future<AddCoursePlaceResult> attempt : attempts) {
+      for (Future<AddCoursePlaceEntities> attempt : attempts) {
         try {
           successes.add(attempt.get(30, TimeUnit.SECONDS));
         } catch (ExecutionException exception) {
@@ -183,7 +183,7 @@ class CoursePlaceConcurrencyTest {
 
       // then
       assertThat(successes).hasSize(1);
-      assertThat(successes.get(0).order()).isEqualTo(2);
+      assertThat(successes.get(0).addedPlace().getOrder()).isEqualTo(2);
       assertThat(failures).hasSize(1);
       assertThat(failures.get(0)).isInstanceOf(MaxPlaceDuplicationExceededException.class);
       assertThat(
@@ -215,7 +215,7 @@ class CoursePlaceConcurrencyTest {
             executor.submit(
                 () -> {
                   if (reorder) {
-                    service.reorderPlaces(
+                    service.updatePlaceOrders(
                         "other-member", new UpdateCoursePlaceOrdersCommand(courseId, List.of(1)));
                   } else {
                     service.addPlace(

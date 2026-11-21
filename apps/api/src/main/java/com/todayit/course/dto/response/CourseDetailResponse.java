@@ -12,10 +12,10 @@ import java.util.List;
  * 코스 상세 조회 API 응답입니다.
  *
  * @param courseId 코스 식별자
- * @param title 코스 이름
+ * @param title 코스 이름, 없으면 null
  * @param courseSummary 코스 요약 설명, 없으면 null
- * @param transport 이동 수단
- * @param startAt 코스 시작 일시
+ * @param transport 이동 수단, 없으면 null
+ * @param startAt 코스 시작 일시, 없으면 null
  * @param endAt 코스 종료 일시, 없으면 null
  * @param status 코스 상태
  * @param visibility 코스 공개 여부
@@ -26,6 +26,9 @@ import java.util.List;
  * @param sigunguName 시·군·구 명칭, 없으면 null
  * @param themes 코스 콘셉트 목록
  * @param isWriter 현재 요청 회원이 코스 작성자인지 여부
+ * @param liked 현재 요청 회원의 코스 좋아요 여부
+ * @param scrapped 현재 요청 회원의 코스 스크랩 여부
+ * @param beforeVisit AI 방문 전 유의사항 목록
  * @param places 코스에 포함된 장소 목록 (순서 오름차순)
  * @param createdAt 코스 생성 일시
  * @param updatedAt 코스 수정 일시, 없으면 null
@@ -35,9 +38,9 @@ public record CourseDetailResponse(
     @Schema(description = "코스 식별자입니다.", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
         int courseId,
     @Schema(
-            description = "코스 이름입니다.",
+            description = "코스 이름입니다. 임시저장 코스는 미설정 시 null입니다.",
             example = "서울 도심 산책 코스",
-            requiredMode = Schema.RequiredMode.REQUIRED)
+            nullable = true)
         String title,
     @Schema(
             description = "코스 요약 설명입니다. 등록된 설명이 없으면 null을 반환합니다.",
@@ -45,14 +48,14 @@ public record CourseDetailResponse(
             nullable = true)
         String courseSummary,
     @Schema(
-            description = "코스의 이동 수단입니다.",
+            description = "코스의 이동 수단입니다. 임시저장 코스는 미설정 시 null입니다.",
             example = "WALKING",
-            requiredMode = Schema.RequiredMode.REQUIRED)
+            nullable = true)
         CourseTransport transport,
     @Schema(
-            description = "코스 시작 일시입니다.",
+            description = "코스 시작 일시입니다. 임시저장 코스는 미설정 시 null입니다.",
             example = "2026-12-01T10:00:00",
-            requiredMode = Schema.RequiredMode.REQUIRED)
+            nullable = true)
         LocalDateTime startAt,
     @Schema(
             description = "코스 종료 일시입니다. 미설정 시 null을 반환합니다.",
@@ -94,6 +97,21 @@ public record CourseDetailResponse(
             requiredMode = Schema.RequiredMode.REQUIRED)
         boolean isWriter,
     @Schema(
+            description = "현재 요청 회원의 코스 좋아요 여부입니다. 비회원인 경우 false입니다.",
+            example = "false",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        boolean liked,
+    @Schema(
+            description = "현재 요청 회원의 코스 스크랩 여부입니다. 비회원인 경우 false입니다.",
+            example = "false",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        boolean scrapped,
+    @Schema(
+            description = "AI 방문 전 유의사항 목록입니다. 없으면 빈 목록을 반환합니다.",
+            example = "[\"웨이팅이 길 수 있으니 사전 예약을 권장합니다.\"]",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        List<String> beforeVisit,
+    @Schema(
             description = "코스에 포함된 장소 목록입니다. 방문 순서(order) 기준 오름차순으로 정렬됩니다.",
             requiredMode = Schema.RequiredMode.REQUIRED)
         List<CoursePlaceResponse> places,
@@ -126,6 +144,9 @@ public record CourseDetailResponse(
    * @param sigunguName 시·군·구 명칭
    * @param themes 코스 콘셉트 목록
    * @param isWriter 작성자 여부
+   * @param liked 좋아요 여부
+   * @param scrapped 스크랩 여부
+   * @param beforeVisit 방문 전 유의사항 목록
    * @param places 장소 목록
    * @param createdAt 생성 일시
    * @param updatedAt 수정 일시
@@ -133,6 +154,7 @@ public record CourseDetailResponse(
   public CourseDetailResponse {
     themes = themes == null ? List.of() : List.copyOf(themes);
     places = places == null ? List.of() : List.copyOf(places);
+    beforeVisit = beforeVisit == null ? List.of() : List.copyOf(beforeVisit);
   }
 
   /**
@@ -158,6 +180,9 @@ public record CourseDetailResponse(
         result.sigunguName(),
         result.themes(),
         result.isWriter(),
+        result.liked(),
+        result.scrapped(),
+        result.beforeVisit(),
         result.places().stream().map(CoursePlaceResponse::from).toList(),
         result.createdAt(),
         result.updatedAt());

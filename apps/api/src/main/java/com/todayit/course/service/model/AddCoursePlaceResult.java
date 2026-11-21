@@ -1,28 +1,23 @@
 package com.todayit.course.service.model;
 
-import com.todayit.course.entity.CoursePlace;
+import java.util.List;
 
 /**
  * 코스 장소 추가 결과 모델입니다.
  *
- * @param coursePlaceId 코스 장소 식별자
- * @param placeId 장소 식별자
- * @param order 방문 순서
- * @param stayMinute 체류 시간(분)
+ * @param addedPlace 추가된 코스 장소 상세 정보
+ * @param places 장소 추가 후 최신 정렬된 전체 코스 장소 목록
  */
-public record AddCoursePlaceResult(int coursePlaceId, int placeId, int order, int stayMinute) {
+public record AddCoursePlaceResult(
+    CoursePlaceDetailResult addedPlace, List<CoursePlaceDetailResult> places) {
 
   /**
-   * CoursePlace 엔티티로부터 결과 모델을 생성합니다.
+   * 장소 목록을 방어적으로 복사합니다.
    *
-   * @param coursePlace 코스 장소 엔티티
-   * @return 코스 장소 추가 결과 모델
+   * @param addedPlace 추가된 코스 장소 상세 정보
+   * @param places 전체 코스 장소 목록
    */
-  public static AddCoursePlaceResult from(CoursePlace coursePlace) {
-    return new AddCoursePlaceResult(
-        coursePlace.getCoursePlaceId(),
-        coursePlace.getPlaceId(),
-        coursePlace.getOrder(),
-        coursePlace.getStayMinute());
+  public AddCoursePlaceResult {
+    places = places == null ? List.of() : List.copyOf(places);
   }
 }

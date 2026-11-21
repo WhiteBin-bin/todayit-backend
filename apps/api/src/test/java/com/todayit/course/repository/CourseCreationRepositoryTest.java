@@ -7,7 +7,6 @@ import com.todayit.course.entity.Course;
 import com.todayit.course.entity.CoursePlace;
 import com.todayit.course.entity.CourseTransport;
 import com.todayit.course.entity.Theme;
-import com.todayit.course.exception.MaxPlaceDuplicationExceededException;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -52,8 +51,8 @@ class CourseCreationRepositoryTest {
     Course course =
         Course.createDraft(
             "member-1", "종로 데이트", CourseTransport.WALKING, start, end, themes, start.minusDays(1));
-    course.addRegion(7);
-    course.addRegion(8);
+    course.getRegions().add(com.todayit.course.entity.RegionCourse.create(course, 7));
+    course.getRegions().add(com.todayit.course.entity.RegionCourse.create(course, 8));
 
     // when
     int id = courses.saveAndFlush(course).getSnapshot().courseId();
@@ -91,8 +90,8 @@ class CourseCreationRepositoryTest {
     Course course =
         Course.createDraft(
             "member-1", "종로 데이트", CourseTransport.WALKING, start, null, themes, start.minusDays(1));
-    course.addRegion(7);
-    course.addRegion(8);
+    course.getRegions().add(com.todayit.course.entity.RegionCourse.create(course, 7));
+    course.getRegions().add(com.todayit.course.entity.RegionCourse.create(course, 8));
 
     // when
     int id = courses.saveAndFlush(course).getSnapshot().courseId();
@@ -145,7 +144,7 @@ class CourseCreationRepositoryTest {
     course = courses.saveAndFlush(course);
 
     // when
-    course.addPlace(10, null, 60);
+    addPlace(course, 10, null, 60);
     Course savedCourse = courses.saveAndFlush(course);
     CoursePlace savedPlace =
         savedCourse.getCoursePlaces().stream()
@@ -176,8 +175,8 @@ class CourseCreationRepositoryTest {
     course = courses.saveAndFlush(course);
 
     // when
-    course.addPlace(10, null, 60);
-    course.addPlace(10, null, 30);
+    addPlace(course, 10, null, 60);
+    addPlace(course, 10, null, 30);
     Course savedCourse = courses.saveAndFlush(course);
 
     // then
@@ -194,28 +193,6 @@ class CourseCreationRepositoryTest {
   }
 
   @Test
-  @DisplayName("동일한 장소를 3회 추가하려 하면 MaxPlaceDuplicationExceededException이 발생한다")
-  void rejectsAddingSamePlaceThirdTime() {
-    // given
-    Course course =
-        Course.createDraft(
-            "member-1",
-            "종로 데이트",
-            CourseTransport.WALKING,
-            LocalDateTime.now(),
-            null,
-            List.of(),
-            LocalDateTime.now());
-    Course savedCourse = courses.saveAndFlush(course);
-    savedCourse.addPlace(10, null, 60);
-    savedCourse.addPlace(10, null, 30);
-
-    // when & then
-    assertThrows(
-        MaxPlaceDuplicationExceededException.class, () -> savedCourse.addPlace(10, null, 45));
-  }
-
-  @Test
   @DisplayName("코스 장소의 방문 순서를 변경하고 저장하면 DB 순서가 갱신된다")
   void reordersCoursePlacesAndPersists() {
     // given
@@ -228,9 +205,9 @@ class CourseCreationRepositoryTest {
             null,
             List.of(),
             LocalDateTime.now());
-    course.addPlace(10, null, 60);
-    course.addPlace(20, null, 30);
-    course.addPlace(30, null, 45);
+    addPlace(course, 10, null, 60);
+    addPlace(course, 20, null, 30);
+    addPlace(course, 30, null, 45);
     course = courses.saveAndFlush(course);
 
     int id1 = course.getCoursePlaces().get(0).getCoursePlaceId();
@@ -238,9 +215,13 @@ class CourseCreationRepositoryTest {
     int id3 = course.getCoursePlaces().get(2).getCoursePlaceId();
 
     // when: [id3, id1, id2] 순서로 변경
-    course.reorderPlaces(List.of(id3, id1, id2));
+    course.getCoursePlaces().get(2).setOrder(-1);
+    course.getCoursePlaces().get(0).setOrder(-2);
+    course.getCoursePlaces().get(1).setOrder(-3);
     courses.flush();
-    course.applyNewOrders(List.of(id3, id1, id2));
+    course.getCoursePlaces().get(2).setOrder(1);
+    course.getCoursePlaces().get(0).setOrder(2);
+    course.getCoursePlaces().get(1).setOrder(3);
     Course savedCourse = courses.saveAndFlush(course);
 
     // then
@@ -252,5 +233,16 @@ class CourseCreationRepositoryTest {
     assertThat(orderMap.get(id3)).isEqualTo(1);
     assertThat(orderMap.get(id1)).isEqualTo(2);
     assertThat(orderMap.get(id2)).isEqualTo(3);
+  }
+
+  private CoursePlace addPlace(
+      Course course, int placeId, Integer targetOrder, Integer stayMinute) {
+    int maxOrder =
+        course.getCoursePlaces().stream().mapToInt(CoursePlace::getOrder).max().orElse(0);
+    int assignedOrder =
+        (targetOrder == null || targetOrder > maxOrder) ? maxOrder + 1 : Math.max(1, targetOrder);
+    CoursePlace cp = CoursePlace.create(course, placeId, assignedOrder, stayMinute);
+    course.getCoursePlaces().add(cp);
+    return cp;
   }
 }

@@ -29,9 +29,26 @@ public class RegionCourse {
 
   protected RegionCourse() {}
 
-  RegionCourse(Course course, int regionId) {
+  /**
+   * 지역과 코스 관계를 생성합니다.
+   *
+   * @param course 코스 엔티티
+   * @param regionId 지역 식별자
+   */
+  private RegionCourse(Course course, int regionId) {
     this.course = course;
     this.regionId = regionId;
+  }
+
+  /**
+   * 지역과 코스 관계를 생성합니다.
+   *
+   * @param course 코스 엔티티
+   * @param regionId 지역 식별자
+   * @return 생성된 RegionCourse 엔티티
+   */
+  public static RegionCourse create(Course course, int regionId) {
+    return new RegionCourse(course, regionId);
   }
 
   /**

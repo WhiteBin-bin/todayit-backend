@@ -6,6 +6,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -19,6 +20,7 @@ import com.todayit.course.entity.CourseVisibility;
 import com.todayit.course.exception.CourseErrorCode;
 import com.todayit.course.exception.CourseException;
 import com.todayit.course.exception.CourseNotFoundException;
+import com.todayit.course.exception.CoursePlaceNotFoundException;
 import com.todayit.course.exception.InvalidCoursePlaceOrderException;
 import com.todayit.course.exception.MaxPlaceDuplicationExceededException;
 import com.todayit.course.exception.PlaceNotFoundException;
@@ -27,9 +29,12 @@ import com.todayit.course.service.command.AddCoursePlaceCommand;
 import com.todayit.course.service.command.CreateCourseCommand;
 import com.todayit.course.service.command.UpdateCoursePlaceOrdersCommand;
 import com.todayit.course.service.model.AddCoursePlaceResult;
+import com.todayit.course.service.model.CopyCourseResult;
 import com.todayit.course.service.model.CourseDetailResult;
 import com.todayit.course.service.model.CoursePlaceDetailResult;
 import com.todayit.course.service.model.CreateCourseResult;
+import com.todayit.course.service.model.RemoveCoursePlaceResult;
+import com.todayit.course.service.model.UpdateCoursePlaceOrdersResult;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -74,410 +79,7 @@ class CourseControllerTest {
             "여유로움"
           ],
           "startAt": "2026-12-01T10:00:00",
-          "endAt": "2026-12-01T14:00:00",
-          "transport": "WALKING"
-        }
-        """;
-
-    // when
-    ResultActions result =
-        mvc.perform(
-            post("/api/v1/courses")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request));
-
-    // then
-    result
-        .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.courseId").value(12))
-        .andExpect(jsonPath("$.data.title").doesNotExist())
-        .andExpect(jsonPath("$.data.places").doesNotExist());
-    verify(courseFacade)
-        .createCourse(
-            "member-1",
-            new CreateCourseCommand(
-                "종로 데이트",
-                List.of("감성적", "여유로움"),
-                LocalDateTime.of(2026, 12, 1, 10, 0),
-                LocalDateTime.of(2026, 12, 1, 14, 0),
-                CourseTransport.WALKING));
-  }
-
-  @Test
-  @DisplayName("코스명이 없으면 400을 반환한다")
-  void rejectsMissingTitle() throws Exception {
-    // given
-    String request =
-        """
-        {
-          "title": null,
-          "themes": [
-            "감성적",
-            "여유로움"
-          ],
-          "startAt": "2026-12-01T10:00:00",
-          "endAt": "2026-12-01T14:00:00",
-          "transport": "WALKING"
-        }
-        """;
-
-    // when
-    ResultActions result =
-        mvc.perform(
-            post("/api/v1/courses")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request));
-
-    // then
-    result
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_COURSE_TITLE"));
-    verifyNoInteractions(courseFacade);
-  }
-
-  @Test
-  @DisplayName("코스명이 공백이면 400을 반환한다")
-  void rejectsBlankTitle() throws Exception {
-    // given
-    String request =
-        """
-        {
-          "title": " ",
-          "themes": [
-            "감성적",
-            "여유로움"
-          ],
-          "startAt": "2026-12-01T10:00:00",
-          "endAt": "2026-12-01T14:00:00",
-          "transport": "WALKING"
-        }
-        """;
-
-    // when
-    ResultActions result =
-        mvc.perform(
-            post("/api/v1/courses")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request));
-
-    // then
-    result
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_COURSE_TITLE"));
-    verifyNoInteractions(courseFacade);
-  }
-
-  @Test
-  @DisplayName("콘셉트가 없으면 400을 반환한다")
-  void rejectsMissingThemes() throws Exception {
-    // given
-    String request =
-        """
-        {
-          "title": "  종로 데이트  ",
-          "themes": null,
-          "startAt": "2026-12-01T10:00:00",
-          "endAt": "2026-12-01T14:00:00",
-          "transport": "WALKING"
-        }
-        """;
-
-    // when
-    ResultActions result =
-        mvc.perform(
-            post("/api/v1/courses")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request));
-
-    // then
-    result
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_COURSE_THEMES"));
-    verifyNoInteractions(courseFacade);
-  }
-
-  @Test
-  @DisplayName("콘셉트 목록이 비어 있으면 400을 반환한다")
-  void rejectsEmptyThemes() throws Exception {
-    // given
-    String request =
-        """
-        {
-          "title": "  종로 데이트  ",
-          "themes": [],
-          "startAt": "2026-12-01T10:00:00",
-          "endAt": "2026-12-01T14:00:00",
-          "transport": "WALKING"
-        }
-        """;
-
-    // when
-    ResultActions result =
-        mvc.perform(
-            post("/api/v1/courses")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request));
-
-    // then
-    result
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_COURSE_THEMES"));
-    verifyNoInteractions(courseFacade);
-  }
-
-  @Test
-  @DisplayName("콘셉트가 2개를 초과하면 400을 반환한다")
-  void rejectsTooManyThemes() throws Exception {
-    // given
-    String request =
-        """
-        {
-          "title": "  종로 데이트  ",
-          "themes": [
-            "감성적",
-            "여유로움",
-            "아늑함"
-          ],
-          "startAt": "2026-12-01T10:00:00",
-          "endAt": "2026-12-01T14:00:00",
-          "transport": "WALKING"
-        }
-        """;
-
-    // when
-    ResultActions result =
-        mvc.perform(
-            post("/api/v1/courses")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request));
-
-    // then
-    result
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_COURSE_THEMES"));
-    verifyNoInteractions(courseFacade);
-  }
-
-  @Test
-  @DisplayName("같은 콘셉트를 중복 입력하면 400을 반환한다")
-  void rejectsDuplicateThemes() throws Exception {
-    // given
-    String request =
-        """
-        {
-          "title": "  종로 데이트  ",
-          "themes": [
-            "감성적",
-            "감성적"
-          ],
-          "startAt": "2026-12-01T10:00:00",
-          "endAt": "2026-12-01T14:00:00",
-          "transport": "WALKING"
-        }
-        """;
-
-    // when
-    ResultActions result =
-        mvc.perform(
-            post("/api/v1/courses")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request));
-
-    // then
-    result
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_COURSE_THEMES"));
-    verifyNoInteractions(courseFacade);
-  }
-
-  @Test
-  @DisplayName("콘셉트 목록에 null이 있으면 400을 반환한다")
-  void rejectsNullTheme() throws Exception {
-    // given
-    String request =
-        """
-        {
-          "title": "  종로 데이트  ",
-          "themes": [
-            null
-          ],
-          "startAt": "2026-12-01T10:00:00",
-          "endAt": "2026-12-01T14:00:00",
-          "transport": "WALKING"
-        }
-        """;
-
-    // when
-    ResultActions result =
-        mvc.perform(
-            post("/api/v1/courses")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request));
-
-    // then
-    result
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_COURSE_THEMES"));
-    verifyNoInteractions(courseFacade);
-  }
-
-  @Test
-  @DisplayName("시작 시각이 없으면 400을 반환한다")
-  void rejectsMissingStartTime() throws Exception {
-    // given
-    String request =
-        """
-        {
-          "title": "  종로 데이트  ",
-          "themes": [
-            "감성적",
-            "여유로움"
-          ],
-          "startAt": null,
-          "endAt": "2026-12-01T14:00:00",
-          "transport": "WALKING"
-        }
-        """;
-
-    // when
-    ResultActions result =
-        mvc.perform(
-            post("/api/v1/courses")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request));
-
-    // then
-    result
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("COURSE_START_AT_REQUIRED"));
-    verifyNoInteractions(courseFacade);
-  }
-
-  @Test
-  @DisplayName("시작 시각 형식이 올바르지 않으면 400을 반환한다")
-  void rejectsMalformedStartTime() throws Exception {
-    // given
-    String request =
-        """
-        {
-          "title": "  종로 데이트  ",
-          "themes": [
-            "감성적",
-            "여유로움"
-          ],
-          "startAt": "wrong",
-          "endAt": "2026-12-01T14:00:00",
-          "transport": "WALKING"
-        }
-        """;
-
-    // when
-    ResultActions result =
-        mvc.perform(
-            post("/api/v1/courses")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request));
-
-    // then
-    result
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
-    verifyNoInteractions(courseFacade);
-  }
-
-  @Test
-  @DisplayName("이동수단이 없으면 400을 반환한다")
-  void rejectsMissingTransport() throws Exception {
-    // given
-    String request =
-        """
-        {
-          "title": "  종로 데이트  ",
-          "themes": [
-            "감성적",
-            "여유로움"
-          ],
-          "startAt": "2026-12-01T10:00:00",
-          "endAt": "2026-12-01T14:00:00",
-          "transport": null
-        }
-        """;
-
-    // when
-    ResultActions result =
-        mvc.perform(
-            post("/api/v1/courses")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request));
-
-    // then
-    result
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("COURSE_TRANSPORT_REQUIRED"));
-    verifyNoInteractions(courseFacade);
-  }
-
-  @Test
-  @DisplayName("지원하지 않는 이동수단이면 400을 반환한다")
-  void rejectsUnknownTransport() throws Exception {
-    // given
-    String request =
-        """
-        {
-          "title": "  종로 데이트  ",
-          "themes": [
-            "감성적",
-            "여유로움"
-          ],
-          "startAt": "2026-12-01T10:00:00",
-          "endAt": "2026-12-01T14:00:00",
-          "transport": "PLANE"
-        }
-        """;
-
-    // when
-    ResultActions result =
-        mvc.perform(
-            post("/api/v1/courses")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request));
-
-    // then
-    result
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
-    verifyNoInteractions(courseFacade);
-  }
-
-  @Test
-  @DisplayName("종료 시각이 없어도 DRAFT를 정상 생성한다")
-  void createsDraftWithoutEndTime() throws Exception {
-    // given
-    LocalDateTime createdAt = LocalDateTime.of(2026, 11, 17, 12, 0);
-    when(courseFacade.createCourse(eq("member-1"), any())).thenReturn(new CreateCourseResult(12));
-    String request =
-        """
-        {
-          "title": "  종로 데이트  ",
-          "themes": [
-            "감성적",
-            "여유로움"
-          ],
-          "startAt": "2026-12-01T10:00:00",
-          "endAt": null,
+          "endAt": "2026-12-01T18:00:00",
           "transport": "WALKING"
         }
         """;
@@ -495,99 +97,31 @@ class CourseControllerTest {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.courseId").value(12));
-    verify(courseFacade)
-        .createCourse(
-            "member-1",
-            new CreateCourseCommand(
-                "종로 데이트",
-                List.of("감성적", "여유로움"),
-                LocalDateTime.of(2026, 12, 1, 10, 0),
-                null,
-                CourseTransport.WALKING));
+
+    CreateCourseCommand expected =
+        new CreateCourseCommand(
+            "종로 데이트",
+            List.of("감성적", "여유로움"),
+            LocalDateTime.of(2026, 12, 1, 10, 0),
+            LocalDateTime.of(2026, 12, 1, 18, 0),
+            CourseTransport.WALKING);
+    verify(courseFacade).createCourse("member-1", expected);
   }
 
   @Test
-  @DisplayName("종료 시각이 시작 시각과 같으면 400을 반환한다")
-  void rejectsEqualEndTime() throws Exception {
+  @DisplayName("코스명이 비어 있으면 400과 INVALID_COURSE_TITLE을 반환한다")
+  void rejectsEmptyTitle() throws Exception {
     // given
     String request =
         """
         {
-          "title": "  종로 데이트  ",
-          "themes": [
-            "감성적",
-            "여유로움"
-          ],
-          "startAt": "2026-12-01T10:00:00",
-          "transport": "WALKING",
-          "endAt": "2026-12-01T10:00:00"
-        }
-        """;
-
-    // when
-    ResultActions result =
-        mvc.perform(
-            post("/api/v1/courses")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request));
-
-    // then
-    result
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_COURSE_END_AT"));
-    verifyNoInteractions(courseFacade);
-  }
-
-  @Test
-  @DisplayName("종료 시각이 시작 시각보다 이르면 400을 반환한다")
-  void rejectsEarlierEndTime() throws Exception {
-    // given
-    String request =
-        """
-        {
-          "title": "  종로 데이트  ",
-          "themes": [
-            "감성적",
-            "여유로움"
-          ],
-          "startAt": "2026-12-01T10:00:00",
-          "transport": "WALKING",
-          "endAt": "2026-11-30T10:00:00"
-        }
-        """;
-
-    // when
-    ResultActions result =
-        mvc.perform(
-            post("/api/v1/courses")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request));
-
-    // then
-    result
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_COURSE_END_AT"));
-    verifyNoInteractions(courseFacade);
-  }
-
-  @Test
-  @DisplayName("등록되지 않은 콘셉트이면 코스 전용 오류 코드를 반환한다")
-  void returnsUnsupportedThemeCode() throws Exception {
-    // given
-    String request =
-        """
-        {
-          "title": "종로 데이트",
+          "title": "   ",
           "themes": ["감성적"],
           "startAt": "2026-12-01T10:00:00",
-          "endAt": "2026-12-01T14:00:00",
+          "endAt": "2026-12-01T18:00:00",
           "transport": "WALKING"
         }
         """;
-    when(courseFacade.createCourse(eq("member-1"), any()))
-        .thenThrow(new CourseException(CourseErrorCode.UNSUPPORTED_THEME));
 
     // when
     ResultActions result =
@@ -600,16 +134,289 @@ class CourseControllerTest {
     // then
     result
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("UNSUPPORTED_COURSE_THEME"))
-        .andExpect(jsonPath("$.message").value("지원하지 않는 콘셉트가 포함되어 있습니다."));
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("INVALID_COURSE_TITLE"));
+    verifyNoInteractions(courseFacade);
   }
 
   @Test
-  @DisplayName("회원 인증 상태로 코스 상세 정보를 정상 조회한다")
-  void getsCourseDetailSuccessfully() throws Exception {
+  @DisplayName("코스명이 100자를 초과하면 400과 INVALID_COURSE_TITLE을 반환한다")
+  void rejectsTooLongTitle() throws Exception {
     // given
-    LocalDateTime startAt = LocalDateTime.of(2026, 12, 1, 10, 0);
-    LocalDateTime endAt = LocalDateTime.of(2026, 12, 1, 14, 0);
+    String request =
+        """
+        {
+          "title": "%s",
+          "themes": ["감성적"],
+          "startAt": "2026-12-01T10:00:00",
+          "endAt": "2026-12-01T18:00:00",
+          "transport": "WALKING"
+        }
+        """
+            .formatted("a".repeat(101));
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+
+    // then
+    result
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("INVALID_COURSE_TITLE"));
+    verifyNoInteractions(courseFacade);
+  }
+
+  @Test
+  @DisplayName("콘셉트가 비어 있으면 400과 INVALID_COURSE_THEMES를 반환한다")
+  void rejectsEmptyThemes() throws Exception {
+    // given
+    String request =
+        """
+        {
+          "title": "코스명",
+          "themes": [],
+          "startAt": "2026-12-01T10:00:00",
+          "endAt": "2026-12-01T18:00:00",
+          "transport": "WALKING"
+        }
+        """;
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+
+    // then
+    result
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("INVALID_COURSE_THEMES"));
+    verifyNoInteractions(courseFacade);
+  }
+
+  @Test
+  @DisplayName("콘셉트가 2개를 초과하면 400과 INVALID_COURSE_THEMES를 반환한다")
+  void rejectsTooManyThemes() throws Exception {
+    // given
+    String request =
+        """
+        {
+          "title": "코스명",
+          "themes": ["감성적", "여유로움", "자연친화적"],
+          "startAt": "2026-12-01T10:00:00",
+          "endAt": "2026-12-01T18:00:00",
+          "transport": "WALKING"
+        }
+        """;
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+
+    // then
+    result
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("INVALID_COURSE_THEMES"));
+    verifyNoInteractions(courseFacade);
+  }
+
+  @Test
+  @DisplayName("콘셉트에 중복된 값이 있으면 400과 INVALID_COURSE_THEMES를 반환한다")
+  void rejectsDuplicateThemes() throws Exception {
+    // given
+    String request =
+        """
+        {
+          "title": "코스명",
+          "themes": ["감성적", "감성적"],
+          "startAt": "2026-12-01T10:00:00",
+          "endAt": "2026-12-01T18:00:00",
+          "transport": "WALKING"
+        }
+        """;
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+
+    // then
+    result
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("INVALID_COURSE_THEMES"));
+    verifyNoInteractions(courseFacade);
+  }
+
+  @Test
+  @DisplayName("시작 시각이 누락되면 400과 COURSE_START_AT_REQUIRED를 반환한다")
+  void rejectsMissingStartAt() throws Exception {
+    // given
+    String request =
+        """
+        {
+          "title": "코스명",
+          "themes": ["감성적"],
+          "endAt": "2026-12-01T18:00:00",
+          "transport": "WALKING"
+        }
+        """;
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+
+    // then
+    result
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("COURSE_START_AT_REQUIRED"));
+    verifyNoInteractions(courseFacade);
+  }
+
+  @Test
+  @DisplayName("종료 시각이 시작 시각 이전이거나 같으면 400과 INVALID_COURSE_END_AT을 반환한다")
+  void rejectsEndAtNotAfterStartAt() throws Exception {
+    // given
+    String request =
+        """
+        {
+          "title": "코스명",
+          "themes": ["감성적"],
+          "startAt": "2026-12-01T10:00:00",
+          "endAt": "2026-12-01T10:00:00",
+          "transport": "WALKING"
+        }
+        """;
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+
+    // then
+    result
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("INVALID_COURSE_END_AT"));
+    verifyNoInteractions(courseFacade);
+  }
+
+  @Test
+  @DisplayName("종료 시각은 null이어도 허용된다")
+  void allowsNullEndAt() throws Exception {
+    // given
+    when(courseFacade.createCourse(eq("member-1"), any())).thenReturn(new CreateCourseResult(1));
+    String request =
+        """
+        {
+          "title": "코스명",
+          "themes": ["감성적"],
+          "startAt": "2026-12-01T10:00:00",
+          "transport": "WALKING"
+        }
+        """;
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+
+    // then
+    result.andExpect(status().isCreated()).andExpect(jsonPath("$.success").value(true));
+  }
+
+  @Test
+  @DisplayName("이동수단이 누락되면 400과 COURSE_TRANSPORT_REQUIRED를 반환한다")
+  void rejectsMissingTransport() throws Exception {
+    // given
+    String request =
+        """
+        {
+          "title": "코스명",
+          "themes": ["감성적"],
+          "startAt": "2026-12-01T10:00:00"
+        }
+        """;
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+
+    // then
+    result
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("COURSE_TRANSPORT_REQUIRED"));
+    verifyNoInteractions(courseFacade);
+  }
+
+  @Test
+  @DisplayName("지원하지 않는 콘셉트는 400과 UNSUPPORTED_COURSE_THEME을 반환한다")
+  void returnsBadRequestWhenUnsupportedTheme() throws Exception {
+    // given
+    when(courseFacade.createCourse(eq("member-1"), any()))
+        .thenThrow(new CourseException(CourseErrorCode.UNSUPPORTED_THEME));
+    String request =
+        """
+        {
+          "title": "코스명",
+          "themes": ["우주여행"],
+          "startAt": "2026-12-01T10:00:00",
+          "transport": "WALKING"
+        }
+        """;
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+
+    // then
+    result
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("UNSUPPORTED_COURSE_THEME"));
+  }
+
+  @Test
+  @DisplayName("코스 상세 조회 시 작성자 본인이면 isWriter가 true이고 전체 정보가 반환된다")
+  void getsCourseDetailAsWriter() throws Exception {
+    // given
+    LocalDateTime now = LocalDateTime.of(2026, 11, 17, 12, 0);
     CoursePlaceDetailResult place =
         new CoursePlaceDetailResult(
             1,
@@ -625,23 +432,26 @@ class CourseControllerTest {
     CourseDetailResult detail =
         new CourseDetailResult(
             1,
-            "종로 데이트",
-            "삼청동 카페 투어",
+            "종로 데이트 코스",
+            "종로 감성 카페 투어",
             CourseTransport.WALKING,
-            startAt,
-            endAt,
+            LocalDateTime.of(2026, 12, 1, 10, 0),
+            LocalDateTime.of(2026, 12, 1, 18, 0),
             CourseStatus.DRAFT,
             CourseVisibility.PRIVATE,
-            5,
+            0,
             "11",
             "서울특별시",
             "110",
             "종로구",
-            List.of("감성적"),
+            List.of("감성적", "여유로움"),
             true,
             List.of(place),
-            startAt.minusDays(1),
-            null);
+            now,
+            now,
+            false,
+            false,
+            List.of("웨이팅이 있을 수 있습니다."));
     when(courseFacade.getCourseDetail(1, "member-1")).thenReturn(detail);
 
     // when
@@ -655,47 +465,57 @@ class CourseControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.courseId").value(1))
-        .andExpect(jsonPath("$.data.title").value("종로 데이트"))
-        .andExpect(jsonPath("$.data.courseSummary").value("삼청동 카페 투어"))
+        .andExpect(jsonPath("$.data.title").value("종로 데이트 코스"))
+        .andExpect(jsonPath("$.data.courseSummary").value("종로 감성 카페 투어"))
         .andExpect(jsonPath("$.data.transport").value("WALKING"))
         .andExpect(jsonPath("$.data.status").value("DRAFT"))
         .andExpect(jsonPath("$.data.visibility").value("PRIVATE"))
+        .andExpect(jsonPath("$.data.isWriter").value(true))
+        .andExpect(jsonPath("$.data.liked").value(false))
+        .andExpect(jsonPath("$.data.scrapped").value(false))
+        .andExpect(jsonPath("$.data.beforeVisit[0]").value("웨이팅이 있을 수 있습니다."))
         .andExpect(jsonPath("$.data.sidoCode").value("11"))
         .andExpect(jsonPath("$.data.sidoName").value("서울특별시"))
         .andExpect(jsonPath("$.data.sigunguCode").value("110"))
         .andExpect(jsonPath("$.data.sigunguName").value("종로구"))
         .andExpect(jsonPath("$.data.themes[0]").value("감성적"))
-        .andExpect(jsonPath("$.data.isWriter").value(true))
+        .andExpect(jsonPath("$.data.themes[1]").value("여유로움"))
         .andExpect(jsonPath("$.data.places[0].coursePlaceId").value(1))
+        .andExpect(jsonPath("$.data.places[0].placeId").value(10))
         .andExpect(jsonPath("$.data.places[0].name").value("블루보틀 삼청"))
+        .andExpect(jsonPath("$.data.places[0].category").value("CAFE_DESSERT"))
+        .andExpect(jsonPath("$.data.places[0].order").value(1))
         .andExpect(jsonPath("$.data.places[0].stayMinute").value(60));
   }
 
   @Test
-  @DisplayName("비회원으로 공개 코스 상세 정보를 정상 조회하면 isWriter는 false이다")
-  void getsPublicCourseDetailAsAnonymous() throws Exception {
+  @DisplayName("비회원 코스 상세 조회 시 authentication이 null이어도 정상 조회된다")
+  void getsCourseDetailAsAnonymous() throws Exception {
     // given
-    LocalDateTime startAt = LocalDateTime.of(2026, 12, 1, 10, 0);
+    LocalDateTime now = LocalDateTime.of(2026, 11, 17, 12, 0);
     CourseDetailResult detail =
         new CourseDetailResult(
             1,
-            "종로 데이트",
+            "종로 공개 코스",
             null,
             CourseTransport.WALKING,
-            startAt,
+            LocalDateTime.of(2026, 12, 1, 10, 0),
             null,
             CourseStatus.ACTIVE,
             CourseVisibility.PUBLIC,
-            12,
-            "11",
-            "서울특별시",
+            5,
             null,
             null,
-            List.of("감성적"),
+            null,
+            null,
+            List.of(),
             false,
             List.of(),
-            startAt.minusDays(1),
-            null);
+            now,
+            now,
+            false,
+            false,
+            List.of());
     when(courseFacade.getCourseDetail(1, null)).thenReturn(detail);
 
     // when
@@ -707,6 +527,9 @@ class CourseControllerTest {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.courseId").value(1))
         .andExpect(jsonPath("$.data.isWriter").value(false))
+        .andExpect(jsonPath("$.data.liked").value(false))
+        .andExpect(jsonPath("$.data.scrapped").value(false))
+        .andExpect(jsonPath("$.data.beforeVisit").isEmpty())
         .andExpect(jsonPath("$.data.places").isEmpty());
   }
 
@@ -734,8 +557,20 @@ class CourseControllerTest {
   @DisplayName("코스에 장소를 정상 추가하고 201과 코스 장소 정보를 반환한다")
   void addsPlaceToCourseSuccessfully() throws Exception {
     // given
+    CoursePlaceDetailResult placeDetail =
+        new CoursePlaceDetailResult(
+            1,
+            10,
+            "블루보틀 삼청",
+            "CAFE_DESSERT",
+            "서울특별시 종로구 북촌로 5길",
+            new BigDecimal("37.58123400"),
+            new BigDecimal("126.98123400"),
+            "https://example.com/place.jpg",
+            1,
+            60);
     when(courseFacade.addPlaceToCourse(eq("member-1"), any(AddCoursePlaceCommand.class)))
-        .thenReturn(new AddCoursePlaceResult(1, 10, 1, 60));
+        .thenReturn(new AddCoursePlaceResult(placeDetail, List.of(placeDetail)));
     String request =
         """
         {
@@ -757,10 +592,11 @@ class CourseControllerTest {
     result
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.coursePlaceId").value(1))
-        .andExpect(jsonPath("$.data.placeId").value(10))
-        .andExpect(jsonPath("$.data.order").value(1))
-        .andExpect(jsonPath("$.data.stayMinute").value(60));
+        .andExpect(jsonPath("$.data.addedPlace.coursePlaceId").value(1))
+        .andExpect(jsonPath("$.data.addedPlace.placeId").value(10))
+        .andExpect(jsonPath("$.data.addedPlace.order").value(1))
+        .andExpect(jsonPath("$.data.addedPlace.stayMinute").value(60))
+        .andExpect(jsonPath("$.data.places").isArray());
     verify(courseFacade).addPlaceToCourse("member-1", new AddCoursePlaceCommand(1, 10, 1, 60));
   }
 
@@ -823,15 +659,15 @@ class CourseControllerTest {
   }
 
   @Test
-  @DisplayName("체류 시간이 음수이거나 1440분 초과이면 400과 INVALID_STAY_MINUTE를 반환한다")
-  void rejectsInvalidStayMinute() throws Exception {
+  @DisplayName("체류 시간이 0 미만이면 400과 INVALID_STAY_MINUTE을 반환한다")
+  void rejectsNegativeStayMinute() throws Exception {
     // given
     String request =
         """
         {
           "placeId": 10,
           "order": 1,
-          "stayMinute": -1
+          "stayMinute": -10
         }
         """;
 
@@ -852,79 +688,15 @@ class CourseControllerTest {
   }
 
   @Test
-  @DisplayName("코스가 존재하지 않거나 작성자가 아니면 404와 COURSE_NOT_FOUND를 반환한다")
-  void returnsNotFoundWhenCourseDoesNotExistOrNotWriter() throws Exception {
+  @DisplayName("체류 시간이 1440분을 초과하면 400과 INVALID_STAY_MINUTE을 반환한다")
+  void rejectsExcessiveStayMinute() throws Exception {
     // given
-    when(courseFacade.addPlaceToCourse(eq("member-1"), any(AddCoursePlaceCommand.class)))
-        .thenThrow(new CourseNotFoundException());
     String request =
         """
         {
           "placeId": 10,
           "order": 1,
-          "stayMinute": 60
-        }
-        """;
-
-    // when
-    ResultActions result =
-        mvc.perform(
-            post("/api/v1/courses/99/places")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request));
-
-    // then
-    result
-        .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.success").value(false))
-        .andExpect(jsonPath("$.code").value("COURSE_NOT_FOUND"))
-        .andExpect(jsonPath("$.message").value("코스를 찾을 수 없습니다."));
-  }
-
-  @Test
-  @DisplayName("추가하려는 장소가 존재하지 않거나 삭제되었으면 404와 PLACE_NOT_FOUND를 반환한다")
-  void returnsNotFoundWhenPlaceDoesNotExist() throws Exception {
-    // given
-    when(courseFacade.addPlaceToCourse(eq("member-1"), any(AddCoursePlaceCommand.class)))
-        .thenThrow(new PlaceNotFoundException());
-    String request =
-        """
-        {
-          "placeId": 999,
-          "order": 1,
-          "stayMinute": 60
-        }
-        """;
-
-    // when
-    ResultActions result =
-        mvc.perform(
-            post("/api/v1/courses/1/places")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(request));
-
-    // then
-    result
-        .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.success").value(false))
-        .andExpect(jsonPath("$.code").value("PLACE_NOT_FOUND"))
-        .andExpect(jsonPath("$.message").value("장소를 찾을 수 없습니다."));
-  }
-
-  @Test
-  @DisplayName("동일한 장소를 3회 이상 추가하려 하면 400과 MAX_PLACE_DUPLICATION_EXCEEDED를 반환한다")
-  void rejectsWhenPlaceDuplicationExceeded() throws Exception {
-    // given
-    when(courseFacade.addPlaceToCourse(eq("member-1"), any(AddCoursePlaceCommand.class)))
-        .thenThrow(new MaxPlaceDuplicationExceededException());
-    String request =
-        """
-        {
-          "placeId": 10,
-          "order": 3,
-          "stayMinute": 60
+          "stayMinute": 1441
         }
         """;
 
@@ -940,14 +712,147 @@ class CourseControllerTest {
     result
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false))
-        .andExpect(jsonPath("$.code").value("MAX_PLACE_DUPLICATION_EXCEEDED"))
-        .andExpect(jsonPath("$.message").value("동일한 장소는 코스에 최대 2회까지만 추가할 수 있습니다."));
+        .andExpect(jsonPath("$.code").value("INVALID_STAY_MINUTE"));
+    verifyNoInteractions(courseFacade);
   }
 
   @Test
-  @DisplayName("코스 장소 순서 변경에 성공하면 200과 null data를 반환한다")
+  @DisplayName("방문 순서와 체류 시간을 생략하면 기본값으로 추가된다")
+  void allowsOmittingOrderAndStayMinute() throws Exception {
+    // given
+    CoursePlaceDetailResult placeDetail =
+        new CoursePlaceDetailResult(
+            1,
+            10,
+            "블루보틀 삼청",
+            "CAFE_DESSERT",
+            "서울특별시 종로구 북촌로 5길",
+            new BigDecimal("37.58123400"),
+            new BigDecimal("126.98123400"),
+            "https://example.com/place.jpg",
+            1,
+            0);
+    when(courseFacade.addPlaceToCourse(eq("member-1"), any(AddCoursePlaceCommand.class)))
+        .thenReturn(new AddCoursePlaceResult(placeDetail, List.of(placeDetail)));
+    String request =
+        """
+        {
+          "placeId": 10
+        }
+        """;
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses/1/places")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+
+    // then
+    result
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.addedPlace.order").value(1))
+        .andExpect(jsonPath("$.data.addedPlace.stayMinute").value(0))
+        .andExpect(jsonPath("$.data.places").isArray());
+    verify(courseFacade).addPlaceToCourse("member-1", new AddCoursePlaceCommand(1, 10, null, 0));
+  }
+
+  @Test
+  @DisplayName("코스를 찾을 수 없으면 404와 COURSE_NOT_FOUND를 반환한다")
+  void returnsNotFoundWhenCourseNotFoundOnAddPlace() throws Exception {
+    // given
+    doThrow(new CourseNotFoundException())
+        .when(courseFacade)
+        .addPlaceToCourse(eq("member-1"), any(AddCoursePlaceCommand.class));
+    String request =
+        """
+        {
+          "placeId": 10
+        }
+        """;
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses/999/places")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+
+    // then
+    result
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("COURSE_NOT_FOUND"));
+  }
+
+  @Test
+  @DisplayName("장소를 찾을 수 없거나 삭제된 장소이면 404와 PLACE_NOT_FOUND를 반환한다")
+  void returnsNotFoundWhenPlaceNotFoundOnAddPlace() throws Exception {
+    // given
+    doThrow(new PlaceNotFoundException())
+        .when(courseFacade)
+        .addPlaceToCourse(eq("member-1"), any(AddCoursePlaceCommand.class));
+    String request =
+        """
+        {
+          "placeId": 999
+        }
+        """;
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses/1/places")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+
+    // then
+    result
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("PLACE_NOT_FOUND"));
+  }
+
+  @Test
+  @DisplayName("동일 장소 중복 추가 횟수(2회)를 초과하면 400과 MAX_PLACE_DUPLICATION_EXCEEDED를 반환한다")
+  void returnsBadRequestWhenMaxDuplicationExceeded() throws Exception {
+    // given
+    doThrow(new MaxPlaceDuplicationExceededException())
+        .when(courseFacade)
+        .addPlaceToCourse(eq("member-1"), any(AddCoursePlaceCommand.class));
+    String request =
+        """
+        {
+          "placeId": 10
+        }
+        """;
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses/1/places")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+
+    // then
+    result
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("MAX_PLACE_DUPLICATION_EXCEEDED"));
+  }
+
+  @Test
+  @DisplayName("코스 장소의 방문 순서를 일괄 변경하고 200과 성공 결과를 반환한다")
   void updatesCoursePlaceOrdersSuccessfully() throws Exception {
     // given
+    when(courseFacade.updateCoursePlaceOrders(
+            eq("member-1"), any(UpdateCoursePlaceOrdersCommand.class)))
+        .thenReturn(new UpdateCoursePlaceOrdersResult(List.of()));
     String request =
         """
         {
@@ -967,7 +872,7 @@ class CourseControllerTest {
     result
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data").doesNotExist());
+        .andExpect(jsonPath("$.data.places").isArray());
     verify(courseFacade)
         .updateCoursePlaceOrders(
             "member-1", new UpdateCoursePlaceOrdersCommand(1, List.of(3, 1, 2)));
@@ -1083,5 +988,169 @@ class CourseControllerTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.code").value("INVALID_COURSE_PLACE_ORDER"));
+  }
+
+  @Test
+  @DisplayName("코스 장소를 정상적으로 삭제하고 200과 삭제 결과를 반환한다")
+  void deletesCoursePlaceSuccessfully() throws Exception {
+    // given
+    when(courseFacade.removePlaceFromCourse("member-1", 1, 10))
+        .thenReturn(new RemoveCoursePlaceResult(10, List.of()));
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            delete("/api/v1/courses/1/places/10")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
+
+    // then
+    result
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.deletedCoursePlaceId").value(10))
+        .andExpect(jsonPath("$.data.places").isArray());
+    verify(courseFacade).removePlaceFromCourse("member-1", 1, 10);
+  }
+
+  @Test
+  @DisplayName("장소 삭제 시 코스를 찾을 수 없거나 작성자가 아니면 404를 반환한다")
+  void returnsNotFoundWhenCourseNotFoundOnDeletePlace() throws Exception {
+    // given
+    doThrow(new CourseNotFoundException())
+        .when(courseFacade)
+        .removePlaceFromCourse("member-1", 999, 10);
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            delete("/api/v1/courses/999/places/10")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
+
+    // then
+    result
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("COURSE_NOT_FOUND"));
+  }
+
+  @Test
+  @DisplayName("장소 삭제 시 코스 내 장소를 찾을 수 없으면 404를 반환한다")
+  void returnsNotFoundWhenCoursePlaceNotFoundOnDeletePlace() throws Exception {
+    // given
+    doThrow(new CoursePlaceNotFoundException())
+        .when(courseFacade)
+        .removePlaceFromCourse("member-1", 1, 999);
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            delete("/api/v1/courses/1/places/999")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
+
+    // then
+    result
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("COURSE_PLACE_NOT_FOUND"));
+  }
+
+  @Test
+  @DisplayName("코스를 정상적으로 영구 삭제하고 204를 반환한다")
+  void deletesCourseSuccessfully() throws Exception {
+    // when
+    ResultActions result =
+        mvc.perform(
+            delete("/api/v1/courses/1")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
+
+    // then
+    result.andExpect(status().isNoContent());
+    verify(courseFacade).deleteCourse("member-1", 1);
+  }
+
+  @Test
+  @DisplayName("코스 삭제 시 코스를 찾을 수 없거나 작성자가 아니면 404를 반환한다")
+  void returnsNotFoundWhenCourseNotFoundOnDeleteCourse() throws Exception {
+    // given
+    doThrow(new CourseNotFoundException()).when(courseFacade).deleteCourse("member-1", 999);
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            delete("/api/v1/courses/999")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
+
+    // then
+    result
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("COURSE_NOT_FOUND"));
+  }
+
+  @Test
+  @DisplayName("확정된 코스를 정상적으로 복사하고 201과 복사된 코스 정보를 반환한다")
+  void copiesCourseSuccessfully() throws Exception {
+    // given
+    LocalDateTime now = LocalDateTime.of(2026, 11, 19, 12, 0);
+    when(courseFacade.copyCourse("member-1", 1))
+        .thenReturn(new CopyCourseResult(2, 1, null, CourseStatus.DRAFT, List.of(), now));
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses/1/copy")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
+
+    // then
+    result
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.courseId").value(2))
+        .andExpect(jsonPath("$.data.originalCourseId").value(1))
+        .andExpect(jsonPath("$.data.title").doesNotExist())
+        .andExpect(jsonPath("$.data.status").value("DRAFT"))
+        .andExpect(jsonPath("$.data.places").isArray())
+        .andExpect(jsonPath("$.data.createdAt").exists());
+    verify(courseFacade).copyCourse("member-1", 1);
+  }
+
+  @Test
+  @DisplayName("코스 복사 시 코스를 찾을 수 없거나 타인의 비공개 코스이면 404를 반환한다")
+  void returnsNotFoundWhenCourseNotFoundOnCopyCourse() throws Exception {
+    // given
+    doThrow(new CourseNotFoundException()).when(courseFacade).copyCourse("member-1", 999);
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses/999/copy")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
+
+    // then
+    result
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("COURSE_NOT_FOUND"));
+  }
+
+  @Test
+  @DisplayName("코스 복사 시 DRAFT 상태의 코스이면 400과 CANNOT_COPY_DRAFT를 반환한다")
+  void returnsBadRequestWhenCopyCourseIsDraft() throws Exception {
+    // given
+    doThrow(new CourseException(CourseErrorCode.CANNOT_COPY_DRAFT))
+        .when(courseFacade)
+        .copyCourse("member-1", 1);
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses/1/copy")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
+
+    // then
+    result
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("CANNOT_COPY_DRAFT"));
   }
 }
