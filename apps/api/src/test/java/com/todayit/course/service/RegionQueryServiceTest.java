@@ -356,4 +356,30 @@ class RegionQueryServiceTest {
     assertThatThrownBy(() -> service.findRegionIds(filters))
         .isInstanceOf(InvalidRegionPathException.class);
   }
+
+  @Test
+  @DisplayName("지역 목록이 둘 이상의 시·도에 걸쳐 있으면 true를 반환한다")
+  void returnsTrueWhenRegionIdsSpanMultipleSidos() {
+    // Given
+    Region r1 = new Region(1, "11", "110", "서울특별시", "종로구");
+    Region r2 = new Region(2, "41", "110", "경기도", "수원시");
+    when(regionRepository.findAllById(List.of(1, 2))).thenReturn(List.of(r1, r2));
+    RegionQueryService service = new RegionQueryService(regionRepository);
+
+    // When & Then
+    assertThat(service.hasMultipleSidos(List.of(1, 2))).isTrue();
+  }
+
+  @Test
+  @DisplayName("지역 목록이 동일한 시·도에 속하면 false를 반환한다")
+  void returnsFalseWhenRegionIdsBelongToSameSido() {
+    // Given
+    Region r1 = new Region(1, "11", "110", "서울특별시", "종로구");
+    Region r2 = new Region(2, "11", "140", "서울특별시", "중구");
+    when(regionRepository.findAllById(List.of(1, 2))).thenReturn(List.of(r1, r2));
+    RegionQueryService service = new RegionQueryService(regionRepository);
+
+    // When & Then
+    assertThat(service.hasMultipleSidos(List.of(1, 2))).isFalse();
+  }
 }

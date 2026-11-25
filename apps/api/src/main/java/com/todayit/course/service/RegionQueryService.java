@@ -116,6 +116,22 @@ public class RegionQueryService implements RegionPlaceQueryService {
     return new CourseRegionResult(sidoCode, sidoName, sigunguCode, sigunguName);
   }
 
+  /**
+   * 지역 식별자 목록이 둘 이상의 시·도에 걸쳐 있는지 확인합니다.
+   *
+   * @param regionIds 지역 식별자 목록
+   * @return 둘 이상의 시·도에 걸쳐 있으면 true
+   */
+  @Transactional(readOnly = true)
+  public boolean hasMultipleSidos(List<Integer> regionIds) {
+    if (regionIds == null || regionIds.size() <= 1) {
+      return false;
+    }
+    List<Region> regions = regionRepository.findAllById(regionIds);
+    long distinctSidos = regions.stream().map(r -> r.getSnapshot().sidoCode()).distinct().count();
+    return distinctSidos > 1;
+  }
+
   @Transactional(readOnly = true)
   @Override
   public List<Integer> findRegionIds(String sidoCode, String sigunguCode) {

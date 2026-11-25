@@ -3,9 +3,11 @@ package com.todayit.course.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.todayit.course.entity.Course;
@@ -16,32 +18,39 @@ import com.todayit.course.entity.CourseVisibility;
 import com.todayit.course.entity.Theme;
 import com.todayit.course.exception.CourseErrorCode;
 import com.todayit.course.exception.CourseException;
-import com.todayit.course.exception.CourseNotFoundException;
-import com.todayit.course.exception.CoursePlaceNotFoundException;
-import com.todayit.course.exception.InvalidCoursePlaceOrderException;
-import com.todayit.course.exception.MaxPlaceDuplicationExceededException;
+import com.todayit.course.exception.InvalidRegionPathException;
+import com.todayit.course.repository.CourseMemberLikeRepository;
 import com.todayit.course.repository.CourseRepository;
 import com.todayit.course.service.command.AddCoursePlaceCommand;
 import com.todayit.course.service.command.CreateCourseCommand;
+import com.todayit.course.service.command.UpdateCourseConditionsCommand;
 import com.todayit.course.service.command.UpdateCoursePlaceOrdersCommand;
 import com.todayit.course.service.model.AddCoursePlaceEntities;
+import com.todayit.course.service.model.CourseLikeResult;
 import com.todayit.course.service.model.CreateCourseResult;
+import com.todayit.course.service.model.UpdateCourseTransportResult;
+import com.todayit.course.service.model.UpdateCourseVisibilityResult;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("코스 생성 및 장소 추가 서비스")
 class CourseCommandServiceTest {
   @Mock private CourseRepository courses;
+  @Mock private CourseMemberLikeRepository courseMemberLikeRepository;
+  @Mock private RegionQueryService regionQueryService;
   @InjectMocks private CourseCommandService service;
 
   @Test
@@ -61,14 +70,14 @@ class CourseCommandServiceTest {
   @Test
   @DisplayName("지원하지 않는 콘셉트는 저장 전에 거부한다")
   void rejectsUnknownTheme() {
-    // given
+    // Given
     when(courses.findThemesByNames(List.of("감성적"))).thenReturn(List.of());
 
-    // when
+    // When
     CourseException exception =
         assertThrows(CourseException.class, () -> service.createCourse("member-1", command()));
 
-    // then
+    // Then
     assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.UNSUPPORTED_THEME);
     verify(courses, never()).save(any());
   }
@@ -133,7 +142,7 @@ class CourseCommandServiceTest {
   @Test
   @DisplayName("동일한 장소를 3회 추가하려고 하면 예외가 발생한다")
   void rejectsAddingSamePlaceMoreThanTwice() {
-    // given
+    // Given
     Course course =
         Course.createDraft(
             "member-1",
@@ -147,34 +156,45 @@ class CourseCommandServiceTest {
     addPlace(course, 10, null, 45);
     when(courses.findByIdAndMemberIdForUpdate(1, "member-1")).thenReturn(Optional.of(course));
 
-    // when & then
+    // When
     AddCoursePlaceCommand command = new AddCoursePlaceCommand(1, 10, null, 30);
-    assertThrows(
-        MaxPlaceDuplicationExceededException.class, () -> service.addPlace("member-1", command));
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.addPlace("member-1", command));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.MAX_PLACE_DUPLICATION_EXCEEDED);
     verify(courses, never()).saveAndFlush(any());
   }
 
   @Test
   @DisplayName("코스가 존재하지 않으면 장소 추가 시 404 예외를 던진다")
   void rejectsAddingPlaceWhenCourseNotFound() {
-    // given
+    // Given
     when(courses.findByIdAndMemberIdForUpdate(999, "member-1")).thenReturn(Optional.empty());
 
-    // when & then
+    // When
     AddCoursePlaceCommand command = new AddCoursePlaceCommand(999, 10, null, 60);
-    assertThrows(CourseNotFoundException.class, () -> service.addPlace("member-1", command));
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.addPlace("member-1", command));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
     verify(courses, never()).saveAndFlush(any());
   }
 
   @Test
   @DisplayName("작성자가 아니면 장소 추가 시 404 예외를 던진다")
   void rejectsAddingPlaceWhenNotWriter() {
-    // given
+    // Given
     when(courses.findByIdAndMemberIdForUpdate(1, "member-2")).thenReturn(Optional.empty());
 
-    // when & then
+    // When
     AddCoursePlaceCommand command = new AddCoursePlaceCommand(1, 10, null, 60);
-    assertThrows(CourseNotFoundException.class, () -> service.addPlace("member-2", command));
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.addPlace("member-2", command));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
     verify(courses, never()).saveAndFlush(any());
   }
 
@@ -247,7 +267,7 @@ class CourseCommandServiceTest {
   @Test
   @DisplayName("순서 변경 요청에 코스 장소가 누락되거나 다른 장소가 포함되면 예외를 던진다")
   void rejectsUpdatePlaceOrdersWhenIdsMismatch() {
-    // given
+    // Given
     Course course =
         Course.createDraft(
             "member-1",
@@ -262,12 +282,14 @@ class CourseCommandServiceTest {
 
     when(courses.findByIdAndMemberIdForUpdate(1, "member-1")).thenReturn(Optional.of(course));
 
-    // when & then
+    // When
     UpdateCoursePlaceOrdersCommand command =
         new UpdateCoursePlaceOrdersCommand(1, List.of(101, 999));
-    assertThrows(
-        InvalidCoursePlaceOrderException.class,
-        () -> service.updatePlaceOrders("member-1", command));
+    assertThat(
+            assertThrows(
+                    CourseException.class, () -> service.updatePlaceOrders("member-1", command))
+                .getErrorCode())
+        .isEqualTo(CourseErrorCode.INVALID_ORDER);
     verify(courses, never()).saveAndFlush(any());
   }
 
@@ -368,29 +390,37 @@ class CourseCommandServiceTest {
   @Test
   @DisplayName("장소 삭제 시 코스가 존재하지 않으면 404 예외를 던진다")
   void rejectsRemovePlaceWhenCourseNotFound() {
-    // given
+    // Given
     when(courses.findByIdAndMemberIdForUpdate(999, "member-1")).thenReturn(Optional.empty());
 
-    // when & then
-    assertThrows(CourseNotFoundException.class, () -> service.removePlace("member-1", 999, 101));
+    // When
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.removePlace("member-1", 999, 101));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
     verify(courses, never()).saveAndFlush(any());
   }
 
   @Test
   @DisplayName("장소 삭제 시 작성자가 아니면 404 예외를 던진다")
   void rejectsRemovePlaceWhenNotWriter() {
-    // given
+    // Given
     when(courses.findByIdAndMemberIdForUpdate(1, "member-2")).thenReturn(Optional.empty());
 
-    // when & then
-    assertThrows(CourseNotFoundException.class, () -> service.removePlace("member-2", 1, 101));
+    // When
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.removePlace("member-2", 1, 101));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
     verify(courses, never()).saveAndFlush(any());
   }
 
   @Test
   @DisplayName("코스 내에 존재하지 않는 장소 식별자 삭제 요청 시 404 예외를 던진다")
   void rejectsRemovePlaceWhenPlaceNotFoundInCourse() {
-    // given
+    // Given
     Course course =
         Course.createDraft(
             "member-1",
@@ -405,8 +435,12 @@ class CourseCommandServiceTest {
 
     when(courses.findByIdAndMemberIdForUpdate(1, "member-1")).thenReturn(Optional.of(course));
 
-    // when & then
-    assertThrows(CoursePlaceNotFoundException.class, () -> service.removePlace("member-1", 1, 999));
+    // When
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.removePlace("member-1", 1, 999));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.COURSE_PLACE_NOT_FOUND);
     verify(courses, never()).saveAndFlush(any());
   }
 
@@ -436,29 +470,37 @@ class CourseCommandServiceTest {
   @Test
   @DisplayName("코스 삭제 시 코스가 존재하지 않으면 404 예외를 던진다")
   void rejectsDeleteCourseWhenNotFound() {
-    // given
+    // Given
     when(courses.findByIdAndMemberIdForUpdate(999, "member-1")).thenReturn(Optional.empty());
 
-    // when & then
-    assertThrows(CourseNotFoundException.class, () -> service.deleteCourse("member-1", 999));
+    // When
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.deleteCourse("member-1", 999));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
     verify(courses, never()).delete(any());
   }
 
   @Test
   @DisplayName("코스 삭제 시 작성자가 아니면 404 예외를 던진다")
   void rejectsDeleteCourseWhenNotWriter() {
-    // given
+    // Given
     when(courses.findByIdAndMemberIdForUpdate(1, "member-2")).thenReturn(Optional.empty());
 
-    // when & then
-    assertThrows(CourseNotFoundException.class, () -> service.deleteCourse("member-2", 1));
+    // When
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.deleteCourse("member-2", 1));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
     verify(courses, never()).delete(any());
   }
 
   @Test
   @DisplayName("코스 삭제 시 이미 탈퇴/제재로 삭제된 코스이면 404 예외를 던진다")
   void rejectsDeleteCourseWhenAlreadyDeleted() {
-    // given
+    // Given
     Course course =
         Course.createDraft(
             "member-1",
@@ -471,8 +513,12 @@ class CourseCommandServiceTest {
     ReflectionTestUtils.setField(course, "status", CourseStatus.DELETED);
     when(courses.findByIdAndMemberIdForUpdate(1, "member-1")).thenReturn(Optional.of(course));
 
-    // when & then
-    assertThrows(CourseNotFoundException.class, () -> service.deleteCourse("member-1", 1));
+    // When
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.deleteCourse("member-1", 1));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
     verify(courses, never()).delete(any());
   }
 
@@ -570,7 +616,7 @@ class CourseCommandServiceTest {
   @Test
   @DisplayName("타인의 비공개 코스는 복사 시도 시 404 예외를 던진다")
   void rejectsCopyingAnotherUsersPrivateCourse() {
-    // given
+    // Given
     Course sourceCourse =
         Course.createDraft(
             "member-1",
@@ -586,15 +632,19 @@ class CourseCommandServiceTest {
 
     when(courses.findByIdWithPlaces(1)).thenReturn(Optional.of(sourceCourse));
 
-    // when & then
-    assertThrows(CourseNotFoundException.class, () -> service.copyCourse("member-2", 1));
+    // When
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.copyCourse("member-2", 1));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
     verify(courses, never()).save(any());
   }
 
   @Test
   @DisplayName("DRAFT 상태의 코스는 복사 시도 시 CANNOT_COPY_DRAFT 예외를 던진다")
   void rejectsCopyingDraftCourse() {
-    // given
+    // Given
     Course sourceCourse =
         Course.createDraft(
             "member-1",
@@ -610,7 +660,7 @@ class CourseCommandServiceTest {
 
     when(courses.findByIdWithPlaces(1)).thenReturn(Optional.of(sourceCourse));
 
-    // when & then
+    // When
     CourseException exception =
         assertThrows(CourseException.class, () -> service.copyCourse("member-1", 1));
     assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.CANNOT_COPY_DRAFT);
@@ -620,11 +670,15 @@ class CourseCommandServiceTest {
   @Test
   @DisplayName("존재하지 않거나 삭제된 코스를 복사 시도 시 404 예외를 던진다")
   void rejectsCopyingNonExistentOrDeletedCourse() {
-    // given
+    // Given
     when(courses.findByIdWithPlaces(999)).thenReturn(Optional.empty());
 
-    // when & then
-    assertThrows(CourseNotFoundException.class, () -> service.copyCourse("member-1", 999));
+    // When
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.copyCourse("member-1", 999));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
     verify(courses, never()).save(any());
   }
 
@@ -643,5 +697,710 @@ class CourseCommandServiceTest {
     CoursePlace cp = CoursePlace.create(course, placeId, assignedOrder, stayMinute);
     course.getCoursePlaces().add(cp);
     return cp;
+  }
+
+  @Test
+  @DisplayName("공개 확정 코스에 좋아요를 정상적으로 등록하고 최신 좋아요 수를 반환한다")
+  void likesCourseSuccessfully() {
+    // given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "공개 코스",
+            CourseTransport.CAR,
+            LocalDateTime.now(),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PUBLIC);
+
+    when(courses.findById(1)).thenReturn(Optional.of(course));
+    when(courseMemberLikeRepository.insertIfAbsent("liker-member", 1)).thenReturn(1);
+    when(courseMemberLikeRepository.countByCourseId(1)).thenReturn(5L);
+
+    // when
+    CourseLikeResult result = service.likeCourse(1, "liker-member");
+
+    // then
+    assertThat(result.courseId()).isEqualTo(1);
+    assertThat(result.liked()).isTrue();
+    assertThat(result.likeCount()).isEqualTo(5L);
+    verify(courseMemberLikeRepository).insertIfAbsent("liker-member", 1);
+  }
+
+  @Test
+  @DisplayName("이미 좋아요를 누른 코스에 다시 좋아요를 요청하면 409 예외를 던진다")
+  void rejectsDuplicateLike() {
+    // Given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "공개 코스",
+            CourseTransport.CAR,
+            LocalDateTime.now(),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PUBLIC);
+
+    when(courses.findById(1)).thenReturn(Optional.of(course));
+    when(courseMemberLikeRepository.insertIfAbsent("liker-member", 1)).thenReturn(0);
+
+    // When
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.likeCourse(1, "liker-member"));
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.ALREADY_LIKED);
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 코스에 좋아요를 요청하면 404 예외를 던진다")
+  void rejectsLikingNonExistentCourse() {
+    // Given
+    when(courses.findById(999)).thenReturn(Optional.empty());
+
+    // When
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.likeCourse(999, "liker-member"));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("삭제된 코스에 좋아요를 요청하면 404 예외를 던진다")
+  void rejectsLikingDeletedCourse() {
+    // Given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "삭제된 코스",
+            CourseTransport.CAR,
+            LocalDateTime.now(),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.DELETED);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PUBLIC);
+
+    when(courses.findById(1)).thenReturn(Optional.of(course));
+
+    // When
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.likeCourse(1, "liker-member"));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("DRAFT 상태의 미확정 코스에 좋아요를 요청하면 404 예외를 던진다")
+  void rejectsLikingDraftCourse() {
+    // Given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "임시저장 코스",
+            CourseTransport.CAR,
+            LocalDateTime.now(),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.DRAFT);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PUBLIC);
+
+    when(courses.findById(1)).thenReturn(Optional.of(course));
+
+    // When
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.likeCourse(1, "liker-member"));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("타인의 비공개 코스에 좋아요를 요청하면 존재 여부를 숨기기 위해 404 예외를 던진다")
+  void rejectsLikingOthersPrivateCourse() {
+    // Given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "비공개 코스",
+            CourseTransport.CAR,
+            LocalDateTime.now(),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PRIVATE);
+
+    when(courses.findById(1)).thenReturn(Optional.of(course));
+
+    // When
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.likeCourse(1, "other-member"));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("본인의 비공개 활성 코스에는 좋아요를 등록할 수 있다")
+  void likesOwnPrivateActiveCourseSuccessfully() {
+    // given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "내 비공개 코스",
+            CourseTransport.CAR,
+            LocalDateTime.now(),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PRIVATE);
+
+    when(courses.findById(1)).thenReturn(Optional.of(course));
+    when(courseMemberLikeRepository.insertIfAbsent("owner-member", 1)).thenReturn(1);
+    when(courseMemberLikeRepository.countByCourseId(1)).thenReturn(1L);
+
+    // when
+    CourseLikeResult result = service.likeCourse(1, "owner-member");
+
+    // then
+    assertThat(result.courseId()).isEqualTo(1);
+    assertThat(result.liked()).isTrue();
+    assertThat(result.likeCount()).isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("좋아요 등록 시 코스가 동시 삭제되어 외래키 위반이 발생하면 404 예외를 던진다")
+  void throwsCourseNotFoundWhenCourseDeletedConcurrentlyDuringLike() {
+    // Given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "내 코스",
+            CourseTransport.CAR,
+            LocalDateTime.of(2026, 12, 1, 10, 0),
+            LocalDateTime.of(2026, 12, 1, 14, 0),
+            List.of(),
+            LocalDateTime.of(2026, 11, 24, 9, 0));
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PUBLIC);
+
+    when(courses.findById(1)).thenReturn(Optional.of(course));
+    when(courseMemberLikeRepository.insertIfAbsent("liker-member", 1))
+        .thenThrow(
+            new DataIntegrityViolationException(
+                "violates foreign key constraint fk_course_member_like_course"));
+
+    // When
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.likeCourse(1, "liker-member"));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"some other data integrity violation", "fk_course_member_like_member"})
+  @DisplayName("좋아요 등록 시 코스 외래키 외의 다른 무결성 위반은 예외를 그대로 전파한다")
+  void propagatesOtherDataIntegrityViolationsDuringLike(String causeMessage) {
+    // Given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "내 코스",
+            CourseTransport.CAR,
+            LocalDateTime.of(2026, 12, 1, 10, 0),
+            LocalDateTime.of(2026, 12, 1, 14, 0),
+            List.of(),
+            LocalDateTime.of(2026, 11, 24, 9, 0));
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PUBLIC);
+
+    when(courses.findById(1)).thenReturn(Optional.of(course));
+    DataIntegrityViolationException failure =
+        new DataIntegrityViolationException(
+            "could not execute statement [insert into course_member_like (member_id, course_id)"
+                + " values (?, ?)]",
+            new RuntimeException(causeMessage));
+    when(courseMemberLikeRepository.insertIfAbsent("liker-member", 1)).thenThrow(failure);
+
+    // When
+    DataIntegrityViolationException exception =
+        assertThrows(
+            DataIntegrityViolationException.class, () -> service.likeCourse(1, "liker-member"));
+    assertThat(exception).isSameAs(failure);
+  }
+
+  @Test
+  @DisplayName("확정된 코스의 공개 범위를 성공적으로 변경한다")
+  void updatesCourseVisibilitySuccessfully() {
+    // given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "내 코스",
+            CourseTransport.CAR,
+            LocalDateTime.now(),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PUBLIC);
+
+    when(courses.findByIdAndMemberIdForUpdate(1, "owner-member")).thenReturn(Optional.of(course));
+
+    // when
+    UpdateCourseVisibilityResult result =
+        service.updateCourseVisibility("owner-member", 1, CourseVisibility.PRIVATE);
+
+    // then
+    assertThat(result.courseId()).isEqualTo(1);
+    assertThat(result.visibility()).isEqualTo(CourseVisibility.PRIVATE);
+    assertThat(result.updatedAt()).isNotNull();
+    verify(courses).updateVisibility(eq(1), eq(CourseVisibility.PRIVATE), any(LocalDateTime.class));
+  }
+
+  @Test
+  @DisplayName("코스가 존재하지 않거나 타인의 코스 또는 삭제된 코스이면 404 예외를 던진다")
+  void rejectsUpdatingVisibilityWhenCourseNotFoundOrDeleted() {
+    // Given
+    when(courses.findByIdAndMemberIdForUpdate(999, "owner-member")).thenReturn(Optional.empty());
+
+    // When
+    assertThat(
+            assertThrows(
+                    CourseException.class,
+                    () ->
+                        service.updateCourseVisibility(
+                            "owner-member", 999, CourseVisibility.PUBLIC))
+                .getErrorCode())
+        .isEqualTo(CourseErrorCode.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("임시저장(DRAFT) 상태의 코스는 공개 범위를 변경할 수 없다")
+  void rejectsUpdatingVisibilityForDraftCourse() {
+    // Given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "임시저장 코스",
+            CourseTransport.CAR,
+            LocalDateTime.now(),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.DRAFT);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PUBLIC);
+
+    when(courses.findByIdAndMemberIdForUpdate(1, "owner-member")).thenReturn(Optional.of(course));
+
+    // When
+    assertThat(
+            assertThrows(
+                    CourseException.class,
+                    () ->
+                        service.updateCourseVisibility("owner-member", 1, CourseVisibility.PRIVATE))
+                .getErrorCode())
+        .isEqualTo(CourseErrorCode.CANNOT_CHANGE_DRAFT_VISIBILITY);
+  }
+
+  @Test
+  @DisplayName("코스가 존재하지 않거나 타인의 코스 또는 삭제된 코스이면 조건 수정 시 404 예외를 던진다")
+  void rejectsUpdatingConditionsWhenCourseNotFoundOrDeleted() {
+    // Given
+    UpdateCourseConditionsCommand command =
+        new UpdateCourseConditionsCommand(999, null, null, null, null, null);
+    when(courses.findByIdAndMemberIdForUpdate(999, "owner-member")).thenReturn(Optional.empty());
+
+    // When
+    assertThat(
+            assertThrows(
+                    CourseException.class,
+                    () -> service.updateCourseConditions("owner-member", command))
+                .getErrorCode())
+        .isEqualTo(CourseErrorCode.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("확정(ACTIVE) 상태의 코스는 생성 조건을 수정할 수 없다")
+  void rejectsUpdatingConditionsForActiveCourse() {
+    // Given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "확정 코스",
+            CourseTransport.CAR,
+            LocalDateTime.now(),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+
+    when(courses.findByIdAndMemberIdForUpdate(1, "owner-member")).thenReturn(Optional.of(course));
+
+    UpdateCourseConditionsCommand command =
+        new UpdateCourseConditionsCommand(1, null, null, null, null, CourseTransport.WALKING);
+
+    // When
+    assertThat(
+            assertThrows(
+                    CourseException.class,
+                    () -> service.updateCourseConditions("owner-member", command))
+                .getErrorCode())
+        .isEqualTo(CourseErrorCode.CANNOT_EDIT_ACTIVE_COURSE);
+  }
+
+  @Test
+  @DisplayName("유효하지 않은 지역 코드이거나 존재하지 않는 지역인 경우 예외를 던진다")
+  void rejectsUpdatingConditionsWhenInvalidRegionCode() {
+    // Given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "임시 코스",
+            CourseTransport.CAR,
+            LocalDateTime.now(),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+
+    when(courses.findByIdAndMemberIdForUpdate(1, "owner-member")).thenReturn(Optional.of(course));
+    when(regionQueryService.findRegionIds("99", null)).thenThrow(new InvalidRegionPathException());
+
+    UpdateCourseConditionsCommand command =
+        new UpdateCourseConditionsCommand(1, "99", null, null, null, null);
+
+    // When
+    CourseException exception =
+        assertThrows(
+            CourseException.class, () -> service.updateCourseConditions("owner-member", command));
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.INVALID_REGION);
+  }
+
+  @Test
+  @DisplayName("durationMinutes가 제공되고 endAt이 없는 경우 endAt이 자동 계산되어 리포지토리를 통해 갱신된다")
+  void updatesConditionsSuccessfullyWithDurationMinutes() {
+    // Given
+    LocalDateTime initialStart = LocalDateTime.of(2026, 12, 1, 10, 0);
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "임시 코스",
+            CourseTransport.CAR,
+            initialStart,
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+
+    Course updatedCourse =
+        Course.createDraft(
+            "owner-member",
+            "임시 코스",
+            CourseTransport.WALKING,
+            initialStart,
+            initialStart.plusMinutes(120),
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(updatedCourse, "courseId", 1);
+
+    when(courses.findByIdAndMemberIdForUpdate(1, "owner-member"))
+        .thenReturn(Optional.of(course), Optional.of(updatedCourse));
+
+    UpdateCourseConditionsCommand command =
+        new UpdateCourseConditionsCommand(1, null, null, null, 120, CourseTransport.WALKING);
+
+    // When
+    Course updated = service.updateCourseConditions("owner-member", command);
+
+    // Then
+    assertThat(updated.getStartAt()).isEqualTo(initialStart);
+    assertThat(updated.getEndAt()).isEqualTo(initialStart.plusMinutes(120));
+    assertThat(updated.getTransport()).isEqualTo(CourseTransport.WALKING);
+    verify(courses)
+        .updateConditions(
+            eq(1),
+            eq(initialStart),
+            eq(initialStart.plusMinutes(120)),
+            eq(CourseTransport.WALKING),
+            any(LocalDateTime.class));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  @DisplayName("시작 시각 없이 소요 시간을 요청하면 지역과 일정을 저장하기 전에 거부한다")
+  void rejectsDurationWithoutStartAtBeforeSaving(boolean providesRegion) {
+    // Given
+    LocalDateTime now = LocalDateTime.of(2026, 12, 1, 9, 0);
+    Course source =
+        Course.createDraft(
+            "owner-member", "원본 코스", CourseTransport.CAR, now, now.plusHours(4), List.of(), now);
+    Course course = Course.createCopyDraft("owner-member", source, now);
+    when(courses.findByIdAndMemberIdForUpdate(1, "owner-member")).thenReturn(Optional.of(course));
+    UpdateCourseConditionsCommand command =
+        new UpdateCourseConditionsCommand(1, providesRegion ? "11" : null, null, null, 120, null);
+
+    // When
+    CourseException exception =
+        assertThrows(
+            CourseException.class, () -> service.updateCourseConditions("owner-member", command));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.START_AT_REQUIRED);
+    verifyNoInteractions(regionQueryService);
+    verify(courses, never()).saveAndFlush(any());
+    verify(courses, never()).updateConditions(eq(1), any(), any(), any(), any());
+    assertThat(course.getStartAt()).isNull();
+    assertThat(course.getEndAt()).isNull();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  @DisplayName("종료 시각과 소요 시간을 함께 보내면 유효한 시작 시각에 소요 시간을 더해 저장한다")
+  void prioritizesDurationOverExplicitEndAt(boolean providesStartAt) {
+    // Given
+    LocalDateTime initialStart = LocalDateTime.of(2026, 12, 1, 9, 0);
+    LocalDateTime requestedStart = LocalDateTime.of(2026, 12, 1, 10, 0);
+    LocalDateTime explicitEnd = LocalDateTime.of(2026, 12, 1, 14, 0);
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "임시 코스",
+            CourseTransport.CAR,
+            initialStart,
+            explicitEnd,
+            List.of(),
+            initialStart);
+    when(courses.findByIdAndMemberIdForUpdate(1, "owner-member")).thenReturn(Optional.of(course));
+    UpdateCourseConditionsCommand command =
+        new UpdateCourseConditionsCommand(
+            1, null, providesStartAt ? requestedStart : null, explicitEnd, 60, null);
+
+    // When
+    service.updateCourseConditions("owner-member", command);
+
+    // Then
+    LocalDateTime effectiveStart = providesStartAt ? requestedStart : initialStart;
+    verify(courses)
+        .updateConditions(
+            eq(1),
+            eq(effectiveStart),
+            eq(effectiveStart.plusMinutes(60)),
+            eq(CourseTransport.CAR),
+            any(LocalDateTime.class));
+  }
+
+  @Test
+  @DisplayName("지역 코드(시도)와 일시, 이동수단을 지정하여 정상적으로 조건을 수정한다")
+  void updatesConditionsSuccessfullyWithExplicitEndAtAndRegion() {
+    // given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "임시 코스",
+            CourseTransport.CAR,
+            LocalDateTime.of(2026, 12, 1, 10, 0),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+
+    LocalDateTime newStartAt = LocalDateTime.of(2026, 12, 2, 9, 0);
+    LocalDateTime newEndAt = LocalDateTime.of(2026, 12, 2, 18, 0);
+
+    Course updatedCourse =
+        Course.createDraft(
+            "owner-member",
+            "임시 코스",
+            CourseTransport.PUBLIC_TRANSPORT,
+            newStartAt,
+            newEndAt,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(updatedCourse, "courseId", 1);
+
+    when(courses.findByIdAndMemberIdForUpdate(1, "owner-member"))
+        .thenReturn(Optional.of(course), Optional.of(updatedCourse));
+    when(regionQueryService.findRegionIds("11", null)).thenReturn(List.of(10, 11));
+
+    UpdateCourseConditionsCommand command =
+        new UpdateCourseConditionsCommand(
+            1, "11", newStartAt, newEndAt, null, CourseTransport.PUBLIC_TRANSPORT);
+
+    // when
+    Course updated = service.updateCourseConditions("owner-member", command);
+
+    // then
+    assertThat(updated.getStartAt()).isEqualTo(newStartAt);
+    assertThat(updated.getEndAt()).isEqualTo(newEndAt);
+    assertThat(updated.getTransport()).isEqualTo(CourseTransport.PUBLIC_TRANSPORT);
+    verify(courses)
+        .updateConditions(
+            eq(1),
+            eq(newStartAt),
+            eq(newEndAt),
+            eq(CourseTransport.PUBLIC_TRANSPORT),
+            any(LocalDateTime.class));
+  }
+
+  @Test
+  @DisplayName("임시저장(DRAFT) 코스의 이동수단을 정상 변경한다")
+  void updatesTransportSuccessfully() {
+    // given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "임시 코스",
+            CourseTransport.CAR,
+            LocalDateTime.now(),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    when(courses.findByIdAndMemberIdForUpdate(1, "owner-member")).thenReturn(Optional.of(course));
+
+    // when
+    UpdateCourseTransportResult result =
+        service.updateCourseTransport("owner-member", 1, CourseTransport.WALKING);
+
+    // then
+    assertThat(result.courseId()).isEqualTo(1);
+    assertThat(result.transport()).isEqualTo(CourseTransport.WALKING);
+    verify(courses).updateTransport(eq(1), eq(CourseTransport.WALKING), any(LocalDateTime.class));
+  }
+
+  @Test
+  @DisplayName("확정(ACTIVE) 상태의 코스는 이동수단을 변경할 수 없다")
+  void rejectsUpdatingTransportForActiveCourse() {
+    // Given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "확정 코스",
+            CourseTransport.CAR,
+            LocalDateTime.now(),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+    when(courses.findByIdAndMemberIdForUpdate(1, "owner-member")).thenReturn(Optional.of(course));
+
+    // When
+    assertThat(
+            assertThrows(
+                    CourseException.class,
+                    () -> service.updateCourseTransport("owner-member", 1, CourseTransport.WALKING))
+                .getErrorCode())
+        .isEqualTo(CourseErrorCode.CANNOT_EDIT_ACTIVE_COURSE);
+    verify(courses, never())
+        .updateTransport(any(Integer.class), any(CourseTransport.class), any(LocalDateTime.class));
+  }
+
+  @Test
+  @DisplayName("코스가 존재하지 않거나 타인의 코스 또는 삭제된 코스이면 이동수단 변경 시 404 예외를 던진다")
+  void rejectsUpdatingTransportWhenCourseNotFoundOrDeleted() {
+    // Given
+    when(courses.findByIdAndMemberIdForUpdate(999, "owner-member")).thenReturn(Optional.empty());
+
+    // When
+    assertThat(
+            assertThrows(
+                    CourseException.class,
+                    () ->
+                        service.updateCourseTransport("owner-member", 999, CourseTransport.WALKING))
+                .getErrorCode())
+        .isEqualTo(CourseErrorCode.NOT_FOUND);
+    verify(courses, never())
+        .updateTransport(any(Integer.class), any(CourseTransport.class), any(LocalDateTime.class));
+  }
+
+  @Test
+  @DisplayName("3자리 시군구 코드가 둘 이상의 시·도에 걸쳐 중복되면 유일하지 않으므로 예외를 던진다")
+  void throwsInvalidRegionWhenSigunguCodeSpansMultipleSidos() {
+    // Given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "임시 코스",
+            CourseTransport.CAR,
+            LocalDateTime.of(2026, 12, 1, 10, 0),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+
+    when(courses.findByIdAndMemberIdForUpdate(1, "owner-member")).thenReturn(Optional.of(course));
+    when(regionQueryService.findRegionIds(null, "110")).thenReturn(List.of(1, 2));
+    when(regionQueryService.hasMultipleSidos(List.of(1, 2))).thenReturn(true);
+
+    UpdateCourseConditionsCommand command =
+        new UpdateCourseConditionsCommand(1, "110", null, null, null, null);
+
+    // When
+    CourseException exception =
+        assertThrows(
+            CourseException.class, () -> service.updateCourseConditions("owner-member", command));
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.INVALID_REGION);
+  }
+
+  @Test
+  @DisplayName("5자리 시도+시군구 코드로 명확하게 단일 시군구를 지정하여 조건을 수정한다")
+  void updatesConditionsSuccessfullyWithFiveDigitRegionCode() {
+    // given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "임시 코스",
+            CourseTransport.CAR,
+            LocalDateTime.of(2026, 12, 1, 10, 0),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+
+    Course updatedCourse =
+        Course.createDraft(
+            "owner-member",
+            "임시 코스",
+            CourseTransport.CAR,
+            LocalDateTime.of(2026, 12, 1, 10, 0),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(updatedCourse, "courseId", 1);
+
+    when(courses.findByIdAndMemberIdForUpdate(1, "owner-member"))
+        .thenReturn(Optional.of(course), Optional.of(updatedCourse));
+    when(regionQueryService.findRegionIds("11", "110")).thenReturn(List.of(1));
+
+    UpdateCourseConditionsCommand command =
+        new UpdateCourseConditionsCommand(1, "11110", null, null, null, null);
+
+    // when
+    Course updated = service.updateCourseConditions("owner-member", command);
+
+    // then
+    assertThat(updated).isNotNull();
+    verify(regionQueryService).findRegionIds("11", "110");
   }
 }

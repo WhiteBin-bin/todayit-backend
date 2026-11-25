@@ -2,31 +2,42 @@ package com.todayit.course.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.todayit.common.pagination.PageResult;
 import com.todayit.course.entity.Course;
 import com.todayit.course.entity.CoursePlace;
 import com.todayit.course.entity.CourseStatus;
 import com.todayit.course.entity.CourseTransport;
-import com.todayit.course.exception.CourseNotFoundException;
-import com.todayit.course.exception.PlaceNotFoundException;
+import com.todayit.course.entity.CourseVisibility;
+import com.todayit.course.exception.CourseErrorCode;
+import com.todayit.course.exception.CourseException;
 import com.todayit.course.repository.CourseMemberLikeRepository;
 import com.todayit.course.repository.CourseScrapRepository;
 import com.todayit.course.service.command.AddCoursePlaceCommand;
 import com.todayit.course.service.command.CreateCourseCommand;
+import com.todayit.course.service.command.UpdateCourseConditionsCommand;
 import com.todayit.course.service.command.UpdateCoursePlaceOrdersCommand;
 import com.todayit.course.service.model.AddCoursePlaceEntities;
 import com.todayit.course.service.model.AddCoursePlaceResult;
 import com.todayit.course.service.model.CopyCourseResult;
 import com.todayit.course.service.model.CourseDetailResult;
+import com.todayit.course.service.model.CourseLikeResult;
 import com.todayit.course.service.model.CoursePlaceItem;
 import com.todayit.course.service.model.CourseRegionResult;
 import com.todayit.course.service.model.CreateCourseResult;
+import com.todayit.course.service.model.MyCourseCardResult;
+import com.todayit.course.service.model.MyCourseSort;
 import com.todayit.course.service.model.RemoveCoursePlaceResult;
+import com.todayit.course.service.model.UpdateCourseConditionsResult;
 import com.todayit.course.service.model.UpdateCoursePlaceOrdersResult;
+import com.todayit.course.service.model.UpdateCourseTransportResult;
+import com.todayit.course.service.model.UpdateCourseVisibilityResult;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -37,6 +48,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class CourseFacadeTest {
@@ -112,12 +126,16 @@ class CourseFacadeTest {
   @Test
   @DisplayName("장소가 존재하지 않거나 비활성 상태이면 PlaceNotFoundException을 던진다")
   void throwsExceptionWhenPlaceNotFound() {
-    // given
+    // Given
     AddCoursePlaceCommand command = new AddCoursePlaceCommand(1, 999, 1, 60);
     when(placeCourseQueryService.existsActivePlace(999)).thenReturn(false);
 
-    // when & then
-    assertThrows(PlaceNotFoundException.class, () -> facade.addPlaceToCourse("member-1", command));
+    // When
+    CourseException exception =
+        assertThrows(CourseException.class, () -> facade.addPlaceToCourse("member-1", command));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.PLACE_NOT_FOUND);
     verifyNoInteractions(courses);
   }
 
@@ -205,9 +223,9 @@ class CourseFacadeTest {
   }
 
   @Test
-  @DisplayName("접근 권한이 없는 코스 상세 조회 시 CourseNotFoundException을 던진다")
+  @DisplayName("접근 권한이 없는 코스 상세 조회 시 CourseException을 던진다")
   void throwsExceptionWhenCannotAccessCourse() {
-    // given
+    // Given
     Course course =
         Course.createDraft(
             "member-1",
@@ -219,8 +237,12 @@ class CourseFacadeTest {
             LocalDateTime.now());
     when(courseQueryService.getCourse(1)).thenReturn(course);
 
-    // when & then
-    assertThrows(CourseNotFoundException.class, () -> facade.getCourseDetail(1, "member-2"));
+    // When
+    CourseException exception =
+        assertThrows(CourseException.class, () -> facade.getCourseDetail(1, "member-2"));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
     verifyNoInteractions(placeCourseQueryService);
   }
 
@@ -336,5 +358,156 @@ class CourseFacadeTest {
     CoursePlace cp = CoursePlace.create(course, placeId, assignedOrder, stayMinute);
     course.getCoursePlaces().add(cp);
     return cp;
+  }
+
+  @Test
+  @DisplayName("코스 좋아요 등록을 CourseCommandService에 정상적으로 위임한다")
+  void likesCourseSuccessfully() {
+    // given
+    CourseLikeResult expected = new CourseLikeResult(1, true, 3L);
+    when(courses.likeCourse(1, "member-1")).thenReturn(expected);
+
+    // when
+    CourseLikeResult result = facade.likeCourse(1, "member-1");
+
+    // then
+    assertThat(result).isEqualTo(expected);
+    verify(courses).likeCourse(1, "member-1");
+  }
+
+  @Test
+  @DisplayName("회원의 코스 목록을 정상적으로 조회하고 카드 모델 페이지로 조합한다")
+  void findsMyCoursesSuccessfully() {
+    // given
+    Course course =
+        Course.createDraft(
+            "member-1",
+            "내 코스",
+            CourseTransport.CAR,
+            LocalDateTime.of(2026, 11, 24, 10, 0),
+            LocalDateTime.of(2026, 11, 24, 18, 0),
+            List.of(),
+            LocalDateTime.of(2026, 11, 24, 9, 0));
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PUBLIC);
+    addPlace(course, 10, 1, 30);
+
+    when(courseQueryService.findMyCourses(
+            eq("member-1"), eq(CourseStatus.ACTIVE), any(PageRequest.class)))
+        .thenReturn(new PageImpl<>(List.of(course), PageRequest.of(0, 20), 1));
+    when(placeCourseQueryService.findPlacesByIds(List.of(10)))
+        .thenReturn(
+            Map.of(
+                10,
+                new CoursePlaceItem(
+                    10,
+                    "장소 1",
+                    "CAFE",
+                    "주소 1",
+                    BigDecimal.valueOf(37.1),
+                    BigDecimal.valueOf(127.1),
+                    "http://image.jpg")));
+    when(courseMemberLikeRepository.countByCourseIds(List.of(1)))
+        .thenReturn(List.<Object[]>of(new Object[] {1, 7L}));
+    when(regions.getCourseRegionSummary(List.of()))
+        .thenReturn(new CourseRegionResult("11", "서울특별시", "110", "종로구"));
+
+    // when
+    PageResult<MyCourseCardResult> result =
+        facade.findMyCourses("member-1", CourseStatus.ACTIVE, 0, 20, MyCourseSort.LATEST);
+
+    // then
+    assertThat(result.totalElements()).isEqualTo(1L);
+    assertThat(result.content()).hasSize(1);
+    MyCourseCardResult card = result.content().get(0);
+    assertThat(card.courseId()).isEqualTo(1);
+    assertThat(card.title()).isEqualTo("내 코스");
+    assertThat(card.status()).isEqualTo(CourseStatus.ACTIVE);
+    assertThat(card.thumbnailUrl()).isEqualTo("http://image.jpg");
+    assertThat(card.placeCount()).isEqualTo(1);
+    assertThat(card.likeCount()).isEqualTo(7L);
+    assertThat(card.sidoName()).isEqualTo("서울특별시");
+    assertThat(card.sigunguName()).isEqualTo("종로구");
+  }
+
+  @Test
+  @DisplayName("코스 공개 범위 수정을 CourseCommandService에 정상적으로 위임한다")
+  void updatesCourseVisibilitySuccessfully() {
+    // given
+    LocalDateTime now = LocalDateTime.now();
+    UpdateCourseVisibilityResult expected =
+        new UpdateCourseVisibilityResult(1, CourseVisibility.PUBLIC, now);
+    when(courses.updateCourseVisibility("member-1", 1, CourseVisibility.PUBLIC))
+        .thenReturn(expected);
+
+    // when
+    UpdateCourseVisibilityResult result =
+        facade.updateCourseVisibility("member-1", 1, CourseVisibility.PUBLIC);
+
+    // then
+    assertThat(result).isEqualTo(expected);
+    verify(courses).updateCourseVisibility("member-1", 1, CourseVisibility.PUBLIC);
+  }
+
+  @Test
+  @DisplayName("코스 생성 조건 수정을 수행하고 요약 지역 정보와 장소 목록을 조립하여 반환한다")
+  void updatesCourseConditionsSuccessfully() {
+    // given
+    LocalDateTime startAt = LocalDateTime.of(2026, 12, 1, 10, 0);
+    LocalDateTime endAt = LocalDateTime.of(2026, 12, 1, 14, 0);
+    LocalDateTime updatedAt = LocalDateTime.of(2026, 11, 24, 18, 0);
+
+    Course course =
+        Course.createDraft(
+            "member-1",
+            "임시 코스",
+            CourseTransport.CAR,
+            startAt,
+            endAt,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "updatedAt", updatedAt);
+
+    UpdateCourseConditionsCommand command =
+        new UpdateCourseConditionsCommand(1, "11", startAt, endAt, 240, CourseTransport.CAR);
+
+    when(courses.updateCourseConditions("member-1", command)).thenReturn(course);
+    when(regions.getCourseRegionSummary(any()))
+        .thenReturn(new CourseRegionResult("11", "서울특별시", "110", "종로구"));
+
+    // when
+    UpdateCourseConditionsResult result = facade.updateCourseConditions("member-1", command);
+
+    // then
+    assertThat(result.courseId()).isEqualTo(1);
+    assertThat(result.conditions().region().sidoCode()).isEqualTo("11");
+    assertThat(result.conditions().region().sidoName()).isEqualTo("서울특별시");
+    assertThat(result.conditions().region().sigunguCode()).isEqualTo("110");
+    assertThat(result.conditions().region().sigunguName()).isEqualTo("종로구");
+    assertThat(result.conditions().startAt()).isEqualTo(startAt);
+    assertThat(result.conditions().endAt()).isEqualTo(endAt);
+    assertThat(result.conditions().durationMinutes()).isEqualTo(240);
+    assertThat(result.conditions().transport()).isEqualTo(CourseTransport.CAR);
+    assertThat(result.updatedAt()).isEqualTo(updatedAt);
+  }
+
+  @Test
+  @DisplayName("코스 이동수단 변경을 CourseCommandService에 정상적으로 위임한다")
+  void updatesCourseTransportSuccessfully() {
+    // given
+    UpdateCourseTransportResult expected =
+        new UpdateCourseTransportResult(1, CourseTransport.WALKING);
+    when(courses.updateCourseTransport("member-1", 1, CourseTransport.WALKING))
+        .thenReturn(expected);
+
+    // when
+    UpdateCourseTransportResult result =
+        facade.updateCourseTransport("member-1", 1, CourseTransport.WALKING);
+
+    // then
+    assertThat(result).isEqualTo(expected);
+    verify(courses).updateCourseTransport("member-1", 1, CourseTransport.WALKING);
   }
 }

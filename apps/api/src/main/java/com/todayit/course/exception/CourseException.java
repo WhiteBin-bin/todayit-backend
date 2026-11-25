@@ -2,7 +2,7 @@ package com.todayit.course.exception;
 
 import com.todayit.common.exception.BusinessException;
 
-/** 코스 생성 조건이 올바르지 않을 때 발생하는 예외입니다. */
+/** 코스 기능의 업무 규칙 위반을 오류 코드로 구분하는 예외입니다. */
 public class CourseException extends BusinessException {
 
   /**

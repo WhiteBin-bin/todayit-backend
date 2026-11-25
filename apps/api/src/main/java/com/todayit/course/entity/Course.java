@@ -172,16 +172,28 @@ public class Course {
   }
 
   /**
-   * 확정된 원본 코스를 바탕으로 새로운 DRAFT 복사본을 생성합니다.
+   * 원본 확정 코스로부터 복사된 새 임시 코스를 생성합니다.
    *
    * @param memberId 복사를 수행하는 회원 식별자
-   * @param sourceCourse 복사할 원본 확정 코스
+   * @param sourceCourse 복사 대상 원본 확정 코스
    * @param createdAt 생성 시각
-   * @return 장소 순서가 복제된 DRAFT 코스
+   * @return 장소 목록과 순서가 복제된 새 DRAFT 코스
    */
   public static Course createCopyDraft(
       String memberId, Course sourceCourse, LocalDateTime createdAt) {
     return new Course(memberId, sourceCourse, createdAt);
+  }
+
+  /**
+   * 원본 확정 코스로부터 복사된 새 임시 코스를 생성합니다.
+   *
+   * @param memberId 복사를 수행하는 회원 식별자
+   * @param sourceCourse 복사 대상 원본 확정 코스
+   * @param createdAt 생성 시각
+   * @return 장소 목록과 순서가 복제된 새 DRAFT 코스
+   */
+  public static Course copyFrom(String memberId, Course sourceCourse, LocalDateTime createdAt) {
+    return createCopyDraft(memberId, sourceCourse, createdAt);
   }
 
   public int getCourseId() {

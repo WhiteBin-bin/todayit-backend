@@ -4,6 +4,9 @@ import com.todayit.common.openapi.OpenApiConfig;
 import com.todayit.common.pagination.PageResponse;
 import com.todayit.common.response.CommonResponse;
 import com.todayit.common.response.ErrorResponse;
+import com.todayit.course.dto.response.MyCourseCardResponse;
+import com.todayit.course.entity.CourseStatus;
+import com.todayit.course.service.model.MyCourseSort;
 import com.todayit.member.dto.request.MemberProfileRequest;
 import com.todayit.member.dto.response.MemberProfileDetailResponse;
 import com.todayit.member.dto.response.MemberProfileImageResponse;
@@ -562,4 +565,58 @@ public interface MemberApiDocs {
   })
   ResponseEntity<CommonResponse<MemberProfileImageResponse>> deleteProfileImage(
       Authentication authentication);
+
+  /**
+   * 인증된 회원이 작성한 코스 목록을 조회합니다.
+   *
+   * @param status 코스 상태 필터 (선택)
+   * @param page 페이지 번호 (기본값 0)
+   * @param sort 정렬 기준 (기본값 LATEST)
+   * @param authentication 인증된 회원 정보
+   * @return 내 코스 카드 목록과 페이지 정보
+   */
+  @Operation(
+      summary = "내 코스 목록 조회",
+      description =
+          "로그인한 회원이 작성한 코스 목록을 조회합니다. "
+              + "status는 DRAFT(임시저장), ACTIVE(확정) 중 선택할 수 있으며 생략 시 삭제되지 않은 모든 코스를 조회합니다. "
+              + "page는 0부터 시작하고 기본값은 0이며, 페이지 크기는 20으로 고정됩니다. "
+              + "sort는 LATEST(최신순, 기본값) 또는 OLDEST(오래된순)입니다.",
+      security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "내 코스 조회 성공",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":true,\"data\":{\"content\":[{\"courseId\":1,\"title\":\"데이트 코스\",\"status\":\"ACTIVE\",\"visibility\":\"PUBLIC\",\"thumbnailUrl\":\"https://example.com/place.jpg\",\"placeCount\":3,\"sidoName\":\"서울특별시\",\"sigunguName\":\"종로구\",\"themes\":[\"카페·디저트\"],\"likeCount\":5,\"startAt\":\"2026-11-24T10:00:00\",\"endAt\":\"2026-11-24T18:00:00\",\"createdAt\":\"2026-11-24T09:00:00\",\"updatedAt\":\"2026-11-24T12:00:00\"}],\"page\":0,\"size\":20,\"totalElements\":1,\"totalPages\":1}}"))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "잘못된 페이지 요청",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"INVALID_PAGINATION\",\"message\":\"페이지 요청값이 올바르지 않습니다.\"}"))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "Access Token 인증 필요",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"AUTHENTICATION_REQUIRED\",\"message\":\"인증이 필요합니다.\"}")))
+  })
+  ResponseEntity<CommonResponse<PageResponse<MyCourseCardResponse>>> findMyCourses(
+      CourseStatus status, int page, MyCourseSort sort, Authentication authentication);
 }

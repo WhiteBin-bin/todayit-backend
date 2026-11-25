@@ -1,6 +1,7 @@
 package com.todayit.course.dto.request;
 
-import com.todayit.course.exception.InvalidCoursePlaceOrderException;
+import com.todayit.course.exception.CourseErrorCode;
+import com.todayit.course.exception.CourseException;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -33,19 +34,19 @@ public record UpdateCoursePlaceOrdersRequest(
   /**
    * 요청값의 유효성을 검증합니다.
    *
-   * @throws InvalidCoursePlaceOrderException 식별자 목록이 비어 있거나 음수 또는 중복이 있는 경우
+   * @throws CourseException 식별자 목록이 비어 있거나 음수 또는 중복이 있는 경우
    */
   public void validate() {
     if (coursePlaceIds == null || coursePlaceIds.isEmpty()) {
-      throw new InvalidCoursePlaceOrderException();
+      throw new CourseException(CourseErrorCode.INVALID_ORDER);
     }
     for (Integer id : coursePlaceIds) {
       if (id == null || id <= 0) {
-        throw new InvalidCoursePlaceOrderException();
+        throw new CourseException(CourseErrorCode.INVALID_ORDER);
       }
     }
     if (coursePlaceIds.stream().distinct().count() != coursePlaceIds.size()) {
-      throw new InvalidCoursePlaceOrderException();
+      throw new CourseException(CourseErrorCode.INVALID_ORDER);
     }
   }
 }

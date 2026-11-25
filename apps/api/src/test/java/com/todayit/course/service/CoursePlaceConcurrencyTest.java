@@ -3,8 +3,8 @@ package com.todayit.course.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.todayit.course.exception.CourseNotFoundException;
-import com.todayit.course.exception.MaxPlaceDuplicationExceededException;
+import com.todayit.course.exception.CourseErrorCode;
+import com.todayit.course.exception.CourseException;
 import com.todayit.course.service.command.AddCoursePlaceCommand;
 import com.todayit.course.service.command.UpdateCoursePlaceOrdersCommand;
 import com.todayit.course.service.model.AddCoursePlaceEntities;
@@ -143,7 +143,7 @@ class CoursePlaceConcurrencyTest {
   @Test
   @DisplayName("같은 장소를 동시에 추가해도 두 번 제한을 지키고 초과 요청은 업무 오류로 거부한다")
   void preservesDuplicationLimitDuringConcurrentAdds() throws Exception {
-    // given
+    // Given
     service.addPlace(memberId, new AddCoursePlaceCommand(courseId, firstPlaceId, null, 30));
     CountDownLatch ready = new CountDownLatch(2);
     CountDownLatch start = new CountDownLatch(1);
@@ -168,7 +168,7 @@ class CoursePlaceConcurrencyTest {
       }
       awaitReadyAndStart(ready, start, attempts);
 
-      // when
+      // When
       awaitBlockedRequests();
       blocker.commit();
       List<AddCoursePlaceEntities> successes = new ArrayList<>();
@@ -181,11 +181,14 @@ class CoursePlaceConcurrencyTest {
         }
       }
 
-      // then
+      // Then
       assertThat(successes).hasSize(1);
       assertThat(successes.get(0).addedPlace().getOrder()).isEqualTo(2);
       assertThat(failures).hasSize(1);
-      assertThat(failures.get(0)).isInstanceOf(MaxPlaceDuplicationExceededException.class);
+      assertThat(failures.get(0))
+          .isInstanceOf(CourseException.class)
+          .extracting("errorCode")
+          .isEqualTo(CourseErrorCode.MAX_PLACE_DUPLICATION_EXCEEDED);
       assertThat(
               jdbc.queryForObject(
                   "select count(*) from course_place where course_id = ? and place_id = ?",
@@ -226,7 +229,10 @@ class CoursePlaceConcurrencyTest {
 
         ExecutionException exception =
             assertThrows(ExecutionException.class, () -> request.get(5, TimeUnit.SECONDS));
-        assertThat(exception.getCause()).isInstanceOf(CourseNotFoundException.class);
+        assertThat(exception.getCause())
+            .isInstanceOf(CourseException.class)
+            .extracting("errorCode")
+            .isEqualTo(CourseErrorCode.NOT_FOUND);
       } finally {
         blocker.rollback();
       }

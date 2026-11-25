@@ -3,9 +3,12 @@ package com.todayit.member.client.external;
 import com.nimbusds.jose.RemoteKeySourceException;
 import com.todayit.member.client.external.GoogleOAuthException.Reason;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.codec.CodecException;
 import org.springframework.http.HttpStatus;
@@ -37,7 +40,7 @@ public class GoogleOAuthClient {
   private final JwtDecoder jwtDecoder;
   private final String clientId;
   private final String clientSecret;
-  private final String redirectUri;
+  private final Set<String> redirectUris;
 
   /**
    * Google OAuth 클라이언트를 생성합니다.
@@ -45,7 +48,7 @@ public class GoogleOAuthClient {
    * @param webClientBuilder HTTP 클라이언트 빌더
    * @param clientId Google OAuth Client ID
    * @param clientSecret Google OAuth Client Secret
-   * @param redirectUri 서버에 등록된 Redirect URI
+   * @param redirectUri 쉼표로 구분한 허용 Redirect URI 목록
    */
   public GoogleOAuthClient(
       WebClient.Builder webClientBuilder,
@@ -72,7 +75,13 @@ public class GoogleOAuthClient {
     this.webClient = webClientBuilder.build();
     this.clientId = clientId;
     this.clientSecret = clientSecret;
-    this.redirectUri = redirectUri;
+    this.redirectUris =
+        redirectUri == null
+            ? Set.of()
+            : Arrays.stream(redirectUri.split(","))
+                .map(String::trim)
+                .filter(uri -> !uri.isBlank())
+                .collect(Collectors.toUnmodifiableSet());
     this.jwtDecoder = jwtDecoder;
   }
 
@@ -113,12 +122,12 @@ public class GoogleOAuthClient {
       throw new GoogleOAuthException(Reason.INVALID_AUTHORIZATION_CODE);
     }
 
-    // Google Cloud에 등록한 URI와 요청 URI가 동일해야 함
-    if (!redirectUri.equals(requestedRedirectUri)) {
+    // 서버에서 허용한 URI만 토큰 교환에 사용합니다.
+    if (requestedRedirectUri == null || !redirectUris.contains(requestedRedirectUri)) {
       throw new GoogleOAuthException(Reason.INVALID_AUTHORIZATION_CODE);
     }
 
-    String idToken = exchangeCode(authorizationCode);
+    String idToken = exchangeCode(authorizationCode, requestedRedirectUri);
 
     Jwt jwt;
 
@@ -204,17 +213,18 @@ public class GoogleOAuthClient {
    * <p>WebClient의 오류 처리 기능을 사용해 HTTP 오류, 네트워크 장애 및 응답 시간 초과를 Google OAuth 커스텀 예외로 변환합니다.
    *
    * @param authorizationCode Google 인가 코드
+   * @param requestedRedirectUri 검증된 Redirect URI
    * @return Google ID Token
    * @throws GoogleOAuthException 인가 코드가 유효하지 않거나 Google 서버 통신에 실패한 경우
    */
-  private String exchangeCode(String authorizationCode) {
+  private String exchangeCode(String authorizationCode, String requestedRedirectUri) {
 
     MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
 
     form.add("code", authorizationCode);
     form.add("client_id", clientId);
     form.add("client_secret", clientSecret);
-    form.add("redirect_uri", redirectUri);
+    form.add("redirect_uri", requestedRedirectUri);
     form.add("grant_type", "authorization_code");
 
     // 인가 코드를 Google 토큰 발급 API에 전달

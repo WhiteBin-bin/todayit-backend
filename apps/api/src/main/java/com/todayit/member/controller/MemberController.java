@@ -3,6 +3,10 @@ package com.todayit.member.controller;
 import com.todayit.common.pagination.PageResponse;
 import com.todayit.common.pagination.PaginationValidator;
 import com.todayit.common.response.CommonResponse;
+import com.todayit.course.dto.response.MyCourseCardResponse;
+import com.todayit.course.entity.CourseStatus;
+import com.todayit.course.service.MemberCourseQueryService;
+import com.todayit.course.service.model.MyCourseSort;
 import com.todayit.member.controller.docs.MemberApiDocs;
 import com.todayit.member.dto.request.MemberProfileRequest;
 import com.todayit.member.dto.response.MemberProfileDetailResponse;
@@ -43,6 +47,7 @@ public class MemberController implements MemberApiDocs {
   private final SignupService signupService;
   private final MemberProfileFacade memberProfileFacade;
   private final MemberProfileService memberProfileService;
+  private final MemberCourseQueryService memberCourseQueryService;
 
   /**
    * 회원 관련 API에 필요한 서비스를 받습니다.
@@ -51,16 +56,19 @@ public class MemberController implements MemberApiDocs {
    * @param placeScrapQueryService 장소 스크랩 조회 서비스
    * @param memberProfileFacade 프로필 이미지 등록 서비스
    * @param memberProfileService 회원 프로필 변경 서비스
+   * @param memberCourseQueryService 회원 작성 코스 조회 서비스
    */
   public MemberController(
       SignupService signupService,
       PlaceScrapQueryService placeScrapQueryService,
       MemberProfileFacade memberProfileFacade,
-      MemberProfileService memberProfileService) {
+      MemberProfileService memberProfileService,
+      MemberCourseQueryService memberCourseQueryService) {
     this.signupService = signupService;
     this.placeScrapQueryService = placeScrapQueryService;
     this.memberProfileFacade = memberProfileFacade;
     this.memberProfileService = memberProfileService;
+    this.memberCourseQueryService = memberCourseQueryService;
   }
 
   /**
@@ -161,5 +169,30 @@ public class MemberController implements MemberApiDocs {
     MemberProfileResult result = memberProfileFacade.deleteProfileImage(authentication.getName());
 
     return ResponseEntity.ok(CommonResponse.success(MemberProfileImageResponse.from(result)));
+  }
+
+  /**
+   * 인증된 회원이 작성한 코스를 상태별로 조회합니다.
+   *
+   * @param status 코스 상태 필터
+   * @param page 페이지 번호
+   * @param sort 정렬 기준
+   * @param authentication 인증된 회원 정보
+   * @return 내 코스 카드 페이지
+   */
+  @Override
+  @GetMapping("/me/courses")
+  public ResponseEntity<CommonResponse<PageResponse<MyCourseCardResponse>>> findMyCourses(
+      @RequestParam(required = false) CourseStatus status,
+      @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
+      @RequestParam(defaultValue = "LATEST") MyCourseSort sort,
+      Authentication authentication) {
+    PaginationValidator.validate(page, DEFAULT_SIZE);
+    return ResponseEntity.ok(
+        CommonResponse.success(
+            PageResponse.from(
+                memberCourseQueryService.findMyCourses(
+                    authentication.getName(), status, page, DEFAULT_SIZE, sort),
+                MyCourseCardResponse::from)));
   }
 }

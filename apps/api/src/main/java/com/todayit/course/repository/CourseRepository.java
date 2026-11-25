@@ -2,6 +2,7 @@ package com.todayit.course.repository;
 
 import com.todayit.course.entity.Course;
 import com.todayit.course.entity.CourseStatus;
+import com.todayit.course.entity.CourseTransport;
 import com.todayit.course.entity.CourseVisibility;
 import com.todayit.course.entity.Theme;
 import jakarta.persistence.LockModeType;
@@ -88,6 +89,30 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
   Page<Course> findPublicActiveByPlaceId(@Param("placeId") int placeId, Pageable pageable);
 
   /**
+   * 회원이 작성한 삭제되지 않은 코스를 상태 조건 및 페이징에 맞게 조회합니다.
+   *
+   * @param memberId 회원 식별자
+   * @param status 코스 상태 필터, null이면 DELETED 제외 전체 조회
+   * @param pageable 페이징 및 정렬 조건
+   * @return 코스 페이지
+   */
+  @Query(
+      value =
+          "select course from Course course "
+              + "where course.memberId = :memberId "
+              + "and (:status is null and course.status <> com.todayit.course.entity.CourseStatus.DELETED "
+              + "     or course.status = :status) "
+              + "and course.deletedAt is null",
+      countQuery =
+          "select count(course) from Course course "
+              + "where course.memberId = :memberId "
+              + "and (:status is null and course.status <> com.todayit.course.entity.CourseStatus.DELETED "
+              + "     or course.status = :status) "
+              + "and course.deletedAt is null")
+  Page<Course> findByMemberIdAndStatus(
+      @Param("memberId") String memberId, @Param("status") CourseStatus status, Pageable pageable);
+
+  /**
    * 코스의 공개 범위를 변경합니다.
    *
    * @param courseId 코스 식별자
@@ -95,7 +120,7 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
    * @param updatedAt 수정 시각
    * @return 변경된 행 수
    */
-  @Modifying(flushAutomatically = true)
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query(
       """
       update Course c
@@ -116,7 +141,7 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
    * @param updatedAt 수정 시각
    * @return 변경된 행 수
    */
-  @Modifying(flushAutomatically = true)
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query(
       """
       update Course c
@@ -135,7 +160,7 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
    * @param courseId 코스 식별자
    * @return 변경된 행 수
    */
-  @Modifying(flushAutomatically = true)
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query(
       """
       update Course c
@@ -143,4 +168,52 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
       where c.courseId = :courseId
       """)
   int increaseViewCount(@Param("courseId") int courseId);
+
+  /**
+   * 임시저장 코스의 생성 조건을 수정합니다.
+   *
+   * @param courseId 코스 식별자
+   * @param startAt 방문 시작 일시
+   * @param endAt 방문 종료 일시
+   * @param transport 이동수단
+   * @param updatedAt 수정 시각
+   * @return 변경된 행 수
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      """
+      update Course c
+      set c.startAt = :startAt,
+          c.endAt = :endAt,
+          c.transport = :transport,
+          c.updatedAt = :updatedAt
+      where c.courseId = :courseId
+      """)
+  int updateConditions(
+      @Param("courseId") int courseId,
+      @Param("startAt") LocalDateTime startAt,
+      @Param("endAt") LocalDateTime endAt,
+      @Param("transport") CourseTransport transport,
+      @Param("updatedAt") LocalDateTime updatedAt);
+
+  /**
+   * 코스의 이동수단을 변경합니다.
+   *
+   * @param courseId 코스 식별자
+   * @param transport 변경할 이동수단
+   * @param updatedAt 수정 시각
+   * @return 변경된 행 수
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      """
+      update Course c
+      set c.transport = :transport,
+          c.updatedAt = :updatedAt
+      where c.courseId = :courseId
+      """)
+  int updateTransport(
+      @Param("courseId") int courseId,
+      @Param("transport") CourseTransport transport,
+      @Param("updatedAt") LocalDateTime updatedAt);
 }

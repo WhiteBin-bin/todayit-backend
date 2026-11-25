@@ -4,18 +4,28 @@ import com.todayit.common.response.CommonResponse;
 import com.todayit.course.controller.docs.CourseApiDocs;
 import com.todayit.course.dto.request.AddCoursePlaceRequest;
 import com.todayit.course.dto.request.CreateCourseRequest;
+import com.todayit.course.dto.request.UpdateCourseConditionsRequest;
 import com.todayit.course.dto.request.UpdateCoursePlaceOrdersRequest;
+import com.todayit.course.dto.request.UpdateCourseTransportRequest;
+import com.todayit.course.dto.request.UpdateCourseVisibilityRequest;
 import com.todayit.course.dto.response.AddCoursePlaceResponse;
 import com.todayit.course.dto.response.CopyCourseResponse;
 import com.todayit.course.dto.response.CourseDetailResponse;
+import com.todayit.course.dto.response.CourseLikeResponse;
 import com.todayit.course.dto.response.CreateCourseResponse;
 import com.todayit.course.dto.response.RemoveCoursePlaceResponse;
+import com.todayit.course.dto.response.UpdateCourseConditionsResponse;
 import com.todayit.course.dto.response.UpdateCoursePlaceOrdersResponse;
+import com.todayit.course.dto.response.UpdateCourseTransportResponse;
+import com.todayit.course.dto.response.UpdateCourseVisibilityResponse;
 import com.todayit.course.service.CourseFacade;
 import com.todayit.course.service.command.AddCoursePlaceCommand;
 import com.todayit.course.service.command.UpdateCoursePlaceOrdersCommand;
 import com.todayit.course.service.model.RemoveCoursePlaceResult;
+import com.todayit.course.service.model.UpdateCourseConditionsResult;
 import com.todayit.course.service.model.UpdateCoursePlaceOrdersResult;
+import com.todayit.course.service.model.UpdateCourseTransportResult;
+import com.todayit.course.service.model.UpdateCourseVisibilityResult;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -178,5 +188,84 @@ public class CourseController implements CourseApiDocs {
             CommonResponse.success(
                 CopyCourseResponse.from(
                     courseFacade.copyCourse(authentication.getName(), courseId))));
+  }
+
+  /**
+   * 인증된 회원의 코스 좋아요를 등록합니다.
+   *
+   * @param courseId 코스 식별자
+   * @param authentication 인증된 회원 정보
+   * @return 코스 좋아요 결과
+   */
+  @Override
+  @PostMapping("/{courseId}/like")
+  public ResponseEntity<CommonResponse<CourseLikeResponse>> likeCourse(
+      @PathVariable int courseId, Authentication authentication) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(
+            CommonResponse.success(
+                CourseLikeResponse.from(
+                    courseFacade.likeCourse(courseId, authentication.getName()))));
+  }
+
+  /**
+   * 확정된 코스의 공개 범위를 변경합니다.
+   *
+   * @param courseId 코스 식별자
+   * @param request 공개 범위 변경 요청 본문
+   * @param authentication 인증된 작성자 정보
+   * @return 변경된 공개 범위 정보
+   */
+  @Override
+  @PatchMapping("/{courseId}/visibility")
+  public ResponseEntity<CommonResponse<UpdateCourseVisibilityResponse>> updateCourseVisibility(
+      @PathVariable int courseId,
+      @RequestBody UpdateCourseVisibilityRequest request,
+      Authentication authentication) {
+    request.validate();
+    UpdateCourseVisibilityResult result =
+        courseFacade.updateCourseVisibility(
+            authentication.getName(), courseId, request.visibility());
+    return ResponseEntity.ok(CommonResponse.success(UpdateCourseVisibilityResponse.from(result)));
+  }
+
+  /**
+   * 임시저장(DRAFT) 코스의 생성 조건을 수정합니다.
+   *
+   * @param courseId 코스 식별자
+   * @param request 생성 조건 수정 요청 본문
+   * @param authentication 인증된 작성자 정보
+   * @return 수정된 생성 조건 및 장소 목록
+   */
+  @Override
+  @PatchMapping("/{courseId}/conditions")
+  public ResponseEntity<CommonResponse<UpdateCourseConditionsResponse>> updateCourseConditions(
+      @PathVariable int courseId,
+      @RequestBody UpdateCourseConditionsRequest request,
+      Authentication authentication) {
+    request.validate();
+    UpdateCourseConditionsResult result =
+        courseFacade.updateCourseConditions(authentication.getName(), request.toCommand(courseId));
+    return ResponseEntity.ok(CommonResponse.success(UpdateCourseConditionsResponse.from(result)));
+  }
+
+  /**
+   * 임시저장(DRAFT) 코스의 이동수단을 변경합니다.
+   *
+   * @param courseId 코스 식별자
+   * @param request 이동수단 변경 요청 본문
+   * @param authentication 인증된 작성자 정보
+   * @return 변경된 이동수단 정보
+   */
+  @Override
+  @PatchMapping("/{courseId}/transport")
+  public ResponseEntity<CommonResponse<UpdateCourseTransportResponse>> updateCourseTransport(
+      @PathVariable int courseId,
+      @RequestBody UpdateCourseTransportRequest request,
+      Authentication authentication) {
+    request.validate();
+    UpdateCourseTransportResult result =
+        courseFacade.updateCourseTransport(authentication.getName(), courseId, request.transport());
+    return ResponseEntity.ok(CommonResponse.success(UpdateCourseTransportResponse.from(result)));
   }
 }

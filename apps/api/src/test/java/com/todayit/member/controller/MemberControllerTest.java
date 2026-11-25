@@ -16,6 +16,11 @@ import com.todayit.common.exception.BusinessException;
 import com.todayit.common.exception.GlobalExceptionHandler;
 import com.todayit.common.exception.InvalidRequestException;
 import com.todayit.common.pagination.PageResult;
+import com.todayit.course.entity.CourseStatus;
+import com.todayit.course.entity.CourseVisibility;
+import com.todayit.course.service.MemberCourseQueryService;
+import com.todayit.course.service.model.MyCourseCardResult;
+import com.todayit.course.service.model.MyCourseSort;
 import com.todayit.member.entity.PreferredRegionCode;
 import com.todayit.member.exception.MemberErrorCode;
 import com.todayit.member.service.MemberProfileFacade;
@@ -52,6 +57,7 @@ class MemberControllerTest {
   @Mock private SignupService signupService;
   @Mock private MemberProfileFacade memberProfileFacade;
   @Mock private MemberProfileService memberProfileService;
+  @Mock private MemberCourseQueryService memberCourseQueryService;
 
   private MockMvc mockMvc;
 
@@ -63,7 +69,8 @@ class MemberControllerTest {
                     signupService,
                     placeScrapQueryService,
                     memberProfileFacade,
-                    memberProfileService))
+                    memberProfileService,
+                    memberCourseQueryService))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
   }
@@ -398,5 +405,61 @@ class MemberControllerTest {
                 .principal(new UsernamePasswordAuthenticationToken("member-1", null)))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+  }
+
+  @Test
+  @DisplayName("회원이 작성한 코스 목록을 조회한다")
+  void returnsMyCoursesSuccessfully() throws Exception {
+    // Given
+    MyCourseCardResult card =
+        new MyCourseCardResult(
+            1,
+            "데이트 코스",
+            CourseStatus.ACTIVE,
+            CourseVisibility.PUBLIC,
+            "https://example.com/place.jpg",
+            2,
+            "서울특별시",
+            "종로구",
+            List.of("카페·디저트"),
+            5L,
+            LocalDateTime.of(2026, 11, 24, 10, 0),
+            LocalDateTime.of(2026, 11, 24, 18, 0),
+            LocalDateTime.of(2026, 11, 24, 9, 0),
+            LocalDateTime.of(2026, 11, 24, 12, 0));
+    PageResult<MyCourseCardResult> pageResult = new PageResult<>(List.of(card), 0, 20, 1L);
+
+    when(memberCourseQueryService.findMyCourses(
+            "member-1", CourseStatus.ACTIVE, 0, 20, MyCourseSort.LATEST))
+        .thenReturn(pageResult);
+
+    // When & Then
+    mockMvc
+        .perform(
+            get("/api/v1/members/me/courses")
+                .param("status", "ACTIVE")
+                .param("page", "0")
+                .param("sort", "LATEST")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.content").isArray())
+        .andExpect(jsonPath("$.data.content[0].courseId").value(1))
+        .andExpect(jsonPath("$.data.content[0].title").value("데이트 코스"))
+        .andExpect(jsonPath("$.data.content[0].status").value("ACTIVE"))
+        .andExpect(jsonPath("$.data.content[0].visibility").value("PUBLIC"))
+        .andExpect(
+            jsonPath("$.data.content[0].thumbnailUrl").value("https://example.com/place.jpg"))
+        .andExpect(jsonPath("$.data.content[0].placeCount").value(2))
+        .andExpect(jsonPath("$.data.content[0].sidoName").value("서울특별시"))
+        .andExpect(jsonPath("$.data.content[0].sigunguName").value("종로구"))
+        .andExpect(jsonPath("$.data.content[0].likeCount").value(5))
+        .andExpect(jsonPath("$.data.page").value(0))
+        .andExpect(jsonPath("$.data.size").value(20))
+        .andExpect(jsonPath("$.data.totalElements").value(1))
+        .andExpect(jsonPath("$.data.totalPages").value(1));
+
+    verify(memberCourseQueryService)
+        .findMyCourses("member-1", CourseStatus.ACTIVE, 0, 20, MyCourseSort.LATEST);
   }
 }

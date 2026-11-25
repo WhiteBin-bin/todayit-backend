@@ -108,4 +108,40 @@ class CourseSecurityTest {
     result.andExpect(status().isUnauthorized());
     verifyNoInteractions(facade);
   }
+
+  @Test
+  @DisplayName("코스 생성 조건 수정은 비회원 요청을 거부한다")
+  void rejectsAnonymousCourseConditionsUpdate() throws Exception {
+    // given
+    String request = "{\"transport\":\"CAR\"}";
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            patch("/api/v1/courses/1/conditions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+
+    // then
+    result.andExpect(status().isUnauthorized());
+    verifyNoInteractions(facade);
+  }
+
+  @Test
+  @DisplayName("코스 이동수단 변경은 비회원 요청을 거부한다")
+  void rejectsAnonymousCourseTransportUpdate() throws Exception {
+    // given
+    String request = "{\"transport\":\"CAR\"}";
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            patch("/api/v1/courses/1/transport")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+
+    // then
+    result.andExpect(status().isUnauthorized());
+    verifyNoInteractions(facade);
+  }
 }

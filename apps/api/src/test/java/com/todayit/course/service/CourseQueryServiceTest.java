@@ -11,7 +11,8 @@ import com.todayit.common.pagination.PageResult;
 import com.todayit.course.entity.Course;
 import com.todayit.course.entity.CourseStatus;
 import com.todayit.course.entity.CourseTransport;
-import com.todayit.course.exception.CourseNotFoundException;
+import com.todayit.course.exception.CourseErrorCode;
+import com.todayit.course.exception.CourseException;
 import com.todayit.course.repository.CourseRepository;
 import com.todayit.course.service.model.CourseResult;
 import com.todayit.course.service.model.CourseSort;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -128,23 +130,47 @@ class CourseQueryServiceTest {
   @Test
   @DisplayName("존재하지 않는 코스는 예외를 던진다")
   void throwsNotFoundWhenCourseDoesNotExist() {
-    // given
+    // Given
     when(courseRepository.findById(99)).thenReturn(Optional.empty());
     CourseQueryService service = new CourseQueryService(courseRepository);
 
-    // when & then
-    assertThrows(CourseNotFoundException.class, () -> service.getCourse(99));
+    // When
+    CourseException exception = assertThrows(CourseException.class, () -> service.getCourse(99));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
   }
 
   @Test
   @DisplayName("삭제된 코스는 조회 시 예외를 던진다")
   void throwsNotFoundWhenCourseIsDeleted() {
-    // given
+    // Given
     when(course.getStatus()).thenReturn(CourseStatus.DELETED);
     when(courseRepository.findById(1)).thenReturn(Optional.of(course));
     CourseQueryService service = new CourseQueryService(courseRepository);
 
-    // when & then
-    assertThrows(CourseNotFoundException.class, () -> service.getCourse(1));
+    // When
+    CourseException exception = assertThrows(CourseException.class, () -> service.getCourse(1));
+
+    // Then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("회원의 코스 목록 조회를 CourseRepository에 정상적으로 위임한다")
+  void delegatesFindMyCoursesToRepository() {
+    // given
+    CourseQueryService service = new CourseQueryService(courseRepository);
+    PageRequest pageRequest = PageRequest.of(0, 20);
+    Page<Course> expectedPage = new PageImpl<>(List.of(course), pageRequest, 1);
+    when(courseRepository.findByMemberIdAndStatus("member-1", CourseStatus.ACTIVE, pageRequest))
+        .thenReturn(expectedPage);
+
+    // when
+    Page<Course> result = service.findMyCourses("member-1", CourseStatus.ACTIVE, pageRequest);
+
+    // then
+    assertThat(result).isEqualTo(expectedPage);
+    verify(courseRepository).findByMemberIdAndStatus("member-1", CourseStatus.ACTIVE, pageRequest);
   }
 }

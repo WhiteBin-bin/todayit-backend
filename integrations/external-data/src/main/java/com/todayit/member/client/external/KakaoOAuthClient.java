@@ -2,8 +2,11 @@ package com.todayit.member.client.external;
 
 import com.todayit.member.client.external.KakaoOAuthException.Reason;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.codec.CodecException;
 import org.springframework.http.HttpStatus;
@@ -27,7 +30,7 @@ public class KakaoOAuthClient {
   private final WebClient webClient;
   private final String clientId;
   private final String clientSecret;
-  private final String redirectUri;
+  private final Set<String> redirectUris;
 
   /**
    * Kakao OAuth 클라이언트를 생성합니다.
@@ -35,7 +38,7 @@ public class KakaoOAuthClient {
    * @param webClientBuilder HTTP 클라이언트 빌더
    * @param clientId Kakao REST API 키
    * @param clientSecret Kakao Client Secret
-   * @param redirectUri 등록된 Redirect URI
+   * @param redirectUri 쉼표로 구분한 허용 Redirect URI 목록
    */
   public KakaoOAuthClient(
       WebClient.Builder webClientBuilder,
@@ -45,7 +48,13 @@ public class KakaoOAuthClient {
     this.webClient = webClientBuilder.build();
     this.clientId = clientId;
     this.clientSecret = clientSecret;
-    this.redirectUri = redirectUri;
+    this.redirectUris =
+        redirectUri == null
+            ? Set.of()
+            : Arrays.stream(redirectUri.split(","))
+                .map(String::trim)
+                .filter(uri -> !uri.isBlank())
+                .collect(Collectors.toUnmodifiableSet());
   }
 
   /**
@@ -63,15 +72,14 @@ public class KakaoOAuthClient {
         || clientId.isBlank()
         || clientSecret == null
         || clientSecret.isBlank()
-        || redirectUri == null
-        || redirectUri.isBlank()) {
+        || redirectUris.isEmpty()) {
       throw new IllegalStateException("Kakao OAuth 설정이 없습니다.");
     }
 
     // 인가 코드와 Redirect URI 검증
     if (authorizationCode == null
         || authorizationCode.isBlank()
-        || !redirectUri.equals(requestedRedirectUri)) {
+        || (requestedRedirectUri == null || !redirectUris.contains(requestedRedirectUri))) {
       throw new KakaoOAuthException(Reason.INVALID_AUTHORIZATION_CODE);
     }
 
@@ -81,7 +89,7 @@ public class KakaoOAuthClient {
     form.add("grant_type", "authorization_code");
     form.add("client_id", clientId);
     form.add("client_secret", clientSecret);
-    form.add("redirect_uri", redirectUri);
+    form.add("redirect_uri", requestedRedirectUri);
     form.add("code", authorizationCode);
 
     Map<String, Object> response =

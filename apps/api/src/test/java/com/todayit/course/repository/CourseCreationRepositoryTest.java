@@ -245,4 +245,68 @@ class CourseCreationRepositoryTest {
     course.getCoursePlaces().add(cp);
     return cp;
   }
+
+  @Test
+  @DisplayName("임시저장 코스의 생성 조건을 수정하면 변경 사항이 DB에 반영된다")
+  void updatesConditionsSuccessfully() {
+    // given
+    Course course =
+        Course.createDraft(
+            "member-1",
+            "내 코스",
+            CourseTransport.CAR,
+            LocalDateTime.of(2026, 12, 1, 10, 0),
+            LocalDateTime.of(2026, 12, 1, 14, 0),
+            List.of(),
+            LocalDateTime.of(2026, 11, 24, 9, 0));
+    course = courses.saveAndFlush(course);
+    int courseId = course.getCourseId();
+
+    LocalDateTime newStartAt = LocalDateTime.of(2026, 12, 2, 9, 0);
+    LocalDateTime newEndAt = LocalDateTime.of(2026, 12, 2, 18, 0);
+    LocalDateTime updatedAt = LocalDateTime.of(2026, 11, 24, 15, 0);
+
+    // when
+    int updatedCount =
+        courses.updateConditions(
+            courseId, newStartAt, newEndAt, CourseTransport.PUBLIC_TRANSPORT, updatedAt);
+    entities.clear();
+
+    // then
+    assertThat(updatedCount).isEqualTo(1);
+    Course updated = courses.findById(courseId).orElseThrow();
+    assertThat(updated.getStartAt()).isEqualTo(newStartAt);
+    assertThat(updated.getEndAt()).isEqualTo(newEndAt);
+    assertThat(updated.getTransport()).isEqualTo(CourseTransport.PUBLIC_TRANSPORT);
+    assertThat(updated.getUpdatedAt()).isEqualTo(updatedAt);
+  }
+
+  @Test
+  @DisplayName("임시저장 코스의 이동수단을 변경하면 변경 사항이 DB에 반영된다")
+  void updatesTransportSuccessfully() {
+    // given
+    Course course =
+        Course.createDraft(
+            "member-1",
+            "내 코스",
+            CourseTransport.CAR,
+            LocalDateTime.of(2026, 12, 1, 10, 0),
+            LocalDateTime.of(2026, 12, 1, 14, 0),
+            List.of(),
+            LocalDateTime.of(2026, 11, 24, 9, 0));
+    course = courses.saveAndFlush(course);
+    int courseId = course.getCourseId();
+
+    LocalDateTime updatedAt = LocalDateTime.of(2026, 11, 24, 16, 0);
+
+    // when
+    int updatedCount = courses.updateTransport(courseId, CourseTransport.WALKING, updatedAt);
+    entities.clear();
+
+    // then
+    assertThat(updatedCount).isEqualTo(1);
+    Course updated = courses.findById(courseId).orElseThrow();
+    assertThat(updated.getTransport()).isEqualTo(CourseTransport.WALKING);
+    assertThat(updated.getUpdatedAt()).isEqualTo(updatedAt);
+  }
 }

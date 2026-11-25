@@ -3,7 +3,8 @@ package com.todayit.course.service;
 import com.todayit.common.pagination.PageResult;
 import com.todayit.course.entity.Course;
 import com.todayit.course.entity.CourseStatus;
-import com.todayit.course.exception.CourseNotFoundException;
+import com.todayit.course.exception.CourseErrorCode;
+import com.todayit.course.exception.CourseException;
 import com.todayit.course.repository.CourseRepository;
 import com.todayit.course.service.model.CourseResult;
 import com.todayit.course.service.model.CourseSort;
@@ -11,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,13 +39,16 @@ public class CourseQueryService implements CoursePlaceQueryService {
    *
    * @param courseId 코스 식별자
    * @return 조회된 코스 엔티티
-   * @throws CourseNotFoundException 코스가 없거나 삭제된 경우
+   * @throws CourseException 코스가 없거나 삭제된 경우
    */
   @Transactional(readOnly = true)
   public Course getCourse(int courseId) {
-    Course course = courseRepository.findById(courseId).orElseThrow(CourseNotFoundException::new);
+    Course course =
+        courseRepository
+            .findById(courseId)
+            .orElseThrow(() -> new CourseException(CourseErrorCode.NOT_FOUND));
     if (course.getDeletedAt() != null || course.getStatus() == CourseStatus.DELETED) {
-      throw new CourseNotFoundException();
+      throw new CourseException(CourseErrorCode.NOT_FOUND);
     }
     return course;
   }
@@ -95,5 +100,19 @@ public class CourseQueryService implements CoursePlaceQueryService {
         coursePage.getNumber(),
         coursePage.getSize(),
         coursePage.getTotalElements());
+  }
+
+  /**
+   * 회원이 작성한 삭제되지 않은 코스를 상태 조건 및 페이징에 맞게 조회합니다.
+   *
+   * @param memberId 회원 식별자
+   * @param status 코스 상태 필터, null이면 DELETED 제외 전체 조회
+   * @param pageable 페이징 및 정렬 조건
+   * @return 코스 엔티티 페이지
+   */
+  @Transactional(readOnly = true)
+  public Page<Course> findMyCourses(String memberId, CourseStatus status, Pageable pageable) {
+    LOG.info("내 코스 엔티티 목록 조회: memberId={}, status={}, pageable={}", memberId, status, pageable);
+    return courseRepository.findByMemberIdAndStatus(memberId, status, pageable);
   }
 }
