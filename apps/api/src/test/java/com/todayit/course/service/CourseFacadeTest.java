@@ -53,6 +53,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
+@DisplayName("CourseFacade 단위 테스트")
 class CourseFacadeTest {
 
   @Mock private RegionQueryService regions;
@@ -126,15 +127,15 @@ class CourseFacadeTest {
   @Test
   @DisplayName("장소가 존재하지 않거나 비활성 상태이면 PlaceNotFoundException을 던진다")
   void throwsExceptionWhenPlaceNotFound() {
-    // Given
+    // given
     AddCoursePlaceCommand command = new AddCoursePlaceCommand(1, 999, 1, 60);
     when(placeCourseQueryService.existsActivePlace(999)).thenReturn(false);
 
-    // When
+    // when
     CourseException exception =
         assertThrows(CourseException.class, () -> facade.addPlaceToCourse("member-1", command));
 
-    // Then
+    // then
     assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.PLACE_NOT_FOUND);
     verifyNoInteractions(courses);
   }
@@ -225,7 +226,7 @@ class CourseFacadeTest {
   @Test
   @DisplayName("접근 권한이 없는 코스 상세 조회 시 CourseException을 던진다")
   void throwsExceptionWhenCannotAccessCourse() {
-    // Given
+    // given
     Course course =
         Course.createDraft(
             "member-1",
@@ -237,11 +238,11 @@ class CourseFacadeTest {
             LocalDateTime.now());
     when(courseQueryService.getCourse(1)).thenReturn(course);
 
-    // When
+    // when
     CourseException exception =
         assertThrows(CourseException.class, () -> facade.getCourseDetail(1, "member-2"));
 
-    // Then
+    // then
     assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
     verifyNoInteractions(placeCourseQueryService);
   }
@@ -317,11 +318,15 @@ class CourseFacadeTest {
   @Test
   @DisplayName("코스 영구 삭제를 정상적으로 위임한다")
   void deletesCourseSuccessfully() {
+    // given
+    String memberId = "member-1";
+    int courseId = 1;
+
     // when
-    facade.deleteCourse("member-1", 1);
+    facade.deleteCourse(memberId, courseId);
 
     // then
-    verify(courses).deleteCourse("member-1", 1);
+    verify(courses).deleteCourse(memberId, courseId);
   }
 
   @Test

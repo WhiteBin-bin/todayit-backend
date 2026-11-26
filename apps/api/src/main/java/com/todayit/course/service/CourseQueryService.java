@@ -50,6 +50,7 @@ public class CourseQueryService implements CoursePlaceQueryService {
     if (course.getDeletedAt() != null || course.getStatus() == CourseStatus.DELETED) {
       throw new CourseException(CourseErrorCode.NOT_FOUND);
     }
+    LOG.info("코스 단건 조회: courseId={}, status={}", courseId, course.getStatus());
     return course;
   }
 
@@ -63,7 +64,9 @@ public class CourseQueryService implements CoursePlaceQueryService {
   @Transactional(readOnly = true)
   public long getAverageStayMinutes(int placeId) {
     Double average = courseRepository.findAverageStayMinutes(placeId);
-    return average == null ? 0 : Math.round(average);
+    long averageStayMinutes = average == null ? 0 : Math.round(average);
+    LOG.info("장소 평균 체류 시간 조회: placeId={}, averageStayMinutes={}", placeId, averageStayMinutes);
+    return averageStayMinutes;
   }
 
   /**
@@ -112,7 +115,7 @@ public class CourseQueryService implements CoursePlaceQueryService {
    */
   @Transactional(readOnly = true)
   public Page<Course> findMyCourses(String memberId, CourseStatus status, Pageable pageable) {
-    LOG.info("내 코스 엔티티 목록 조회: memberId={}, status={}, pageable={}", memberId, status, pageable);
+    LOG.info("내 코스 엔티티 목록 조회: status={}, pageable={}", status, pageable);
     return courseRepository.findByMemberIdAndStatus(memberId, status, pageable);
   }
 }

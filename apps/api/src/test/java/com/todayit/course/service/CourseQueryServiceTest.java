@@ -31,6 +31,7 @@ import org.springframework.data.domain.Sort;
 
 /** 장소별 코스 조회 업무를 검증합니다. */
 @ExtendWith(MockitoExtension.class)
+@DisplayName("CourseQueryService 단위 테스트")
 class CourseQueryServiceTest {
 
   @Mock private CourseRepository courseRepository;
@@ -40,31 +41,33 @@ class CourseQueryServiceTest {
   @Test
   @DisplayName("체류 시간 데이터가 없으면 평균 체류 시간을 0분으로 반환한다")
   void returnsZeroWhenNoStayMinutesExist() {
-    // Given
+    // given
     when(courseRepository.findAverageStayMinutes(1)).thenReturn(null);
-    // When
+
+    // when
     long result = new CourseQueryService(courseRepository).getAverageStayMinutes(1);
 
-    // Then
+    // then
     assertThat(result).isZero();
   }
 
   @Test
   @DisplayName("평균 체류 시간을 분 단위 정수로 반올림한다")
   void roundsAverageStayMinutes() {
-    // Given
+    // given
     when(courseRepository.findAverageStayMinutes(1)).thenReturn(35.5);
-    // When
+
+    // when
     long result = new CourseQueryService(courseRepository).getAverageStayMinutes(1);
 
-    // Then
+    // then
     assertThat(result).isEqualTo(36);
   }
 
   @Test
   @DisplayName("장소를 포함한 코스를 최신순으로 페이지 조회한다")
   void findsLatestCoursesByPlace() {
-    // Given
+    // given
     Sort expectedSort = Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("courseId"));
     when(course.getSnapshot())
         .thenReturn(
@@ -80,10 +83,10 @@ class CourseQueryServiceTest {
         .thenReturn(new PageImpl<>(List.of(course), PageRequest.of(1, 5, expectedSort), 6));
     CourseQueryService service = new CourseQueryService(courseRepository);
 
-    // When
+    // when
     PageResult<CourseResult> result = service.findCoursesByPlace(1, 1, 5, CourseSort.LATEST);
 
-    // Then
+    // then
     assertThat(result.content()).hasSize(1);
     assertThat(result.content().getFirst().title()).isEqualTo("종로 맛집과 카페 코스");
     assertThat(result.page()).isEqualTo(1);
@@ -95,7 +98,7 @@ class CourseQueryServiceTest {
   @Test
   @DisplayName("장소를 포함한 코스를 인기순으로 조회한다")
   void findsPopularCoursesByPlace() {
-    // Given
+    // given
     Sort expectedSort = Sort.by(Sort.Order.desc("viewCount"), Sort.Order.desc("courseId"));
     when(courseRepository.findPublicActiveByPlaceId(
             eq(1),
@@ -103,10 +106,10 @@ class CourseQueryServiceTest {
         .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
     CourseQueryService service = new CourseQueryService(courseRepository);
 
-    // When
+    // when
     PageResult<CourseResult> result = service.findCoursesByPlace(1, 0, 20, CourseSort.POPULAR);
 
-    // Then
+    // then
     assertThat(result.content()).isEmpty();
     assertThat(result.totalElements()).isZero();
   }
@@ -130,29 +133,29 @@ class CourseQueryServiceTest {
   @Test
   @DisplayName("존재하지 않는 코스는 예외를 던진다")
   void throwsNotFoundWhenCourseDoesNotExist() {
-    // Given
+    // given
     when(courseRepository.findById(99)).thenReturn(Optional.empty());
     CourseQueryService service = new CourseQueryService(courseRepository);
 
-    // When
+    // when
     CourseException exception = assertThrows(CourseException.class, () -> service.getCourse(99));
 
-    // Then
+    // then
     assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
   }
 
   @Test
   @DisplayName("삭제된 코스는 조회 시 예외를 던진다")
   void throwsNotFoundWhenCourseIsDeleted() {
-    // Given
+    // given
     when(course.getStatus()).thenReturn(CourseStatus.DELETED);
     when(courseRepository.findById(1)).thenReturn(Optional.of(course));
     CourseQueryService service = new CourseQueryService(courseRepository);
 
-    // When
+    // when
     CourseException exception = assertThrows(CourseException.class, () -> service.getCourse(1));
 
-    // Then
+    // then
     assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
   }
 

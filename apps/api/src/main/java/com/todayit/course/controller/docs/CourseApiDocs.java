@@ -4,6 +4,7 @@ import com.todayit.common.openapi.OpenApiConfig;
 import com.todayit.common.response.CommonResponse;
 import com.todayit.common.response.ErrorResponse;
 import com.todayit.course.dto.request.AddCoursePlaceRequest;
+import com.todayit.course.dto.request.CourseRecommendationRequest;
 import com.todayit.course.dto.request.CreateCourseRequest;
 import com.todayit.course.dto.request.UpdateCourseConditionsRequest;
 import com.todayit.course.dto.request.UpdateCoursePlaceOrdersRequest;
@@ -14,6 +15,7 @@ import com.todayit.course.dto.response.CopyCourseResponse;
 import com.todayit.course.dto.response.CourseDetailResponse;
 import com.todayit.course.dto.response.CourseLikeResponse;
 import com.todayit.course.dto.response.CreateCourseResponse;
+import com.todayit.course.dto.response.RecommendedCoursesResponse;
 import com.todayit.course.dto.response.RemoveCoursePlaceResponse;
 import com.todayit.course.dto.response.UpdateCourseConditionsResponse;
 import com.todayit.course.dto.response.UpdateCoursePlaceOrdersResponse;
@@ -28,6 +30,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -1169,5 +1172,90 @@ public interface CourseApiDocs {
   ResponseEntity<CommonResponse<UpdateCourseTransportResponse>> updateCourseTransport(
       @Parameter(description = "코스 식별자입니다.", example = "1", required = true) int courseId,
       UpdateCourseTransportRequest request,
+      @Parameter(hidden = true) Authentication authentication);
+
+  /**
+   * 인증된 회원의 추천 코스를 조회합니다.
+   *
+   * @param request 선택 조회 필터
+   * @param authentication 인증된 회원 정보
+   * @return 추천 순서의 코스 목록
+   */
+  @Operation(
+      summary = "추천 코스 조회",
+      description =
+          "공개·확정·미삭제 코스를 기존 추천 알고리즘으로 정렬합니다. "
+              + "지역은 시·도 2자리 또는 시·도와 시·군·구 5자리 코드입니다. "
+              + "themes는 등록된 콘셉트 이름을 같은 키로 반복하여 최대 2개 전달합니다. "
+              + "이동수단은 CAR/WALK/PUBLIC_TRANSIT입니다. "
+              + "durationMinutes는 검증된 총 예상시간의 상한이며 시간 미확인 코스는 제외됩니다. "
+              + "선호정보 이용 미동의 또는 개인화 신호가 없으면 최근 인기순으로 대체합니다. "
+              + "조회 중 AI를 호출하거나 추천 이유를 생성하지 않습니다.",
+      security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "추천 코스 조회 성공", useReturnTypeSchema = true),
+    @ApiResponse(
+        responseCode = "400",
+        description = "지역, 콘셉트, 예상시간 또는 이동수단 조회 조건 오류",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples = {
+                  @ExampleObject(
+                      name = "잘못된 예상시간",
+                      value =
+                          """
+                          {"success":false,"code":"INVALID_REQUEST","message":"예상시간 상한은 양수이어야 합니다."}
+                          """),
+                  @ExampleObject(
+                      name = "잘못된 입력 형식",
+                      value =
+                          """
+                          {"success":false,"code":"INVALID_REQUEST","message":"요청값이 올바르지 않습니다."}
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 정보가 없거나 유효하지 않은 경우",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {"success":false,"code":"AUTHENTICATION_REQUIRED","message":"인증이 필요합니다."}
+                            """))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "인증된 회원이 없거나 비활성 상태인 경우",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                            {"success":false,"code":"MEMBER_NOT_FOUND","message":"회원을 찾을 수 없습니다."}
+                            """))),
+    @ApiResponse(
+        responseCode = "403",
+        description = "접근 권한이 없는 경우",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                {"success":false,"code":"ACCESS_DENIED","message":"접근 권한이 없습니다."}
+                """)))
+  })
+  CommonResponse<RecommendedCoursesResponse> recommend(
+      @ParameterObject CourseRecommendationRequest request,
       @Parameter(hidden = true) Authentication authentication);
 }

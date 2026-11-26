@@ -3,6 +3,7 @@ package com.todayit.course.controller;
 import com.todayit.common.response.CommonResponse;
 import com.todayit.course.controller.docs.CourseApiDocs;
 import com.todayit.course.dto.request.AddCoursePlaceRequest;
+import com.todayit.course.dto.request.CourseRecommendationRequest;
 import com.todayit.course.dto.request.CreateCourseRequest;
 import com.todayit.course.dto.request.UpdateCourseConditionsRequest;
 import com.todayit.course.dto.request.UpdateCoursePlaceOrdersRequest;
@@ -13,12 +14,14 @@ import com.todayit.course.dto.response.CopyCourseResponse;
 import com.todayit.course.dto.response.CourseDetailResponse;
 import com.todayit.course.dto.response.CourseLikeResponse;
 import com.todayit.course.dto.response.CreateCourseResponse;
+import com.todayit.course.dto.response.RecommendedCoursesResponse;
 import com.todayit.course.dto.response.RemoveCoursePlaceResponse;
 import com.todayit.course.dto.response.UpdateCourseConditionsResponse;
 import com.todayit.course.dto.response.UpdateCoursePlaceOrdersResponse;
 import com.todayit.course.dto.response.UpdateCourseTransportResponse;
 import com.todayit.course.dto.response.UpdateCourseVisibilityResponse;
 import com.todayit.course.service.CourseFacade;
+import com.todayit.course.service.CourseRecommendationFacade;
 import com.todayit.course.service.command.AddCoursePlaceCommand;
 import com.todayit.course.service.command.UpdateCoursePlaceOrdersCommand;
 import com.todayit.course.service.model.RemoveCoursePlaceResult;
@@ -26,11 +29,14 @@ import com.todayit.course.service.model.UpdateCourseConditionsResult;
 import com.todayit.course.service.model.UpdateCoursePlaceOrdersResult;
 import com.todayit.course.service.model.UpdateCourseTransportResult;
 import com.todayit.course.service.model.UpdateCourseVisibilityResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,15 +49,38 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/courses")
 public class CourseController implements CourseApiDocs {
 
+  private static final Logger LOG = LoggerFactory.getLogger(CourseController.class);
+
   private final CourseFacade courseFacade;
+  private final CourseRecommendationFacade recommendations;
 
   /**
    * 코스 생성 및 조회 조정 서비스를 받습니다.
    *
    * @param courseFacade 코스 Facade
+   * @param recommendations 코스 추천 Facade
    */
-  public CourseController(CourseFacade courseFacade) {
+  public CourseController(CourseFacade courseFacade, CourseRecommendationFacade recommendations) {
     this.courseFacade = courseFacade;
+    this.recommendations = recommendations;
+  }
+
+  /**
+   * 인증된 회원의 추천 코스를 조회합니다.
+   *
+   * @param request 추천 조회 필터
+   * @param authentication 인증된 회원 정보
+   * @return 추천 순서의 코스 목록
+   */
+  @Override
+  @GetMapping("/recommendations")
+  public CommonResponse<RecommendedCoursesResponse> recommend(
+      @ModelAttribute CourseRecommendationRequest request, Authentication authentication) {
+    RecommendedCoursesResponse response =
+        RecommendedCoursesResponse.from(
+            recommendations.recommend(authentication.getName(), request.toCommand()));
+    LOG.info("추천 코스 조회 완료: count={}", response.courses().size());
+    return CommonResponse.success(response);
   }
 
   /**
@@ -66,11 +95,11 @@ public class CourseController implements CourseApiDocs {
   public ResponseEntity<CommonResponse<CreateCourseResponse>> createCourse(
       @RequestBody CreateCourseRequest request, Authentication authentication) {
     request.validate();
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(
-            CommonResponse.success(
-                CreateCourseResponse.from(
-                    courseFacade.createCourse(authentication.getName(), request.toCommand()))));
+    CreateCourseResponse response =
+        CreateCourseResponse.from(
+            courseFacade.createCourse(authentication.getName(), request.toCommand()));
+    LOG.info("코스 생성 완료: courseId={}", response.courseId());
+    return ResponseEntity.status(HttpStatus.CREATED).body(CommonResponse.success(response));
   }
 
   /**
@@ -85,9 +114,10 @@ public class CourseController implements CourseApiDocs {
   public ResponseEntity<CommonResponse<CourseDetailResponse>> getCourseDetail(
       @PathVariable int courseId, Authentication authentication) {
     String memberId = authentication != null ? authentication.getName() : null;
-    return ResponseEntity.ok(
-        CommonResponse.success(
-            CourseDetailResponse.from(courseFacade.getCourseDetail(courseId, memberId))));
+    CourseDetailResponse response =
+        CourseDetailResponse.from(courseFacade.getCourseDetail(courseId, memberId));
+    LOG.info("코스 상세 조회 완료: courseId={}", courseId);
+    return ResponseEntity.ok(CommonResponse.success(response));
   }
 
   /**
@@ -105,17 +135,14 @@ public class CourseController implements CourseApiDocs {
       @RequestBody AddCoursePlaceRequest request,
       Authentication authentication) {
     request.validate();
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(
-            CommonResponse.success(
-                AddCoursePlaceResponse.from(
-                    courseFacade.addPlaceToCourse(
-                        authentication.getName(),
-                        new AddCoursePlaceCommand(
-                            courseId,
-                            request.placeId(),
-                            request.order(),
-                            request.resolveStayMinute())))));
+    AddCoursePlaceResponse response =
+        AddCoursePlaceResponse.from(
+            courseFacade.addPlaceToCourse(
+                authentication.getName(),
+                new AddCoursePlaceCommand(
+                    courseId, request.placeId(), request.order(), request.resolveStayMinute())));
+    LOG.info("코스 장소 추가 완료: courseId={}, placeId={}", courseId, request.placeId());
+    return ResponseEntity.status(HttpStatus.CREATED).body(CommonResponse.success(response));
   }
 
   /**
@@ -137,6 +164,7 @@ public class CourseController implements CourseApiDocs {
         courseFacade.updateCoursePlaceOrders(
             authentication.getName(),
             new UpdateCoursePlaceOrdersCommand(courseId, request.coursePlaceIds()));
+    LOG.info("코스 장소 순서 변경 완료: courseId={}", courseId);
     return ResponseEntity.ok(CommonResponse.success(UpdateCoursePlaceOrdersResponse.from(result)));
   }
 
@@ -154,6 +182,7 @@ public class CourseController implements CourseApiDocs {
       @PathVariable int courseId, @PathVariable int coursePlaceId, Authentication authentication) {
     RemoveCoursePlaceResult result =
         courseFacade.removePlaceFromCourse(authentication.getName(), courseId, coursePlaceId);
+    LOG.info("코스 장소 삭제 완료: courseId={}, coursePlaceId={}", courseId, coursePlaceId);
     return ResponseEntity.ok(CommonResponse.success(RemoveCoursePlaceResponse.from(result)));
   }
 
@@ -169,6 +198,7 @@ public class CourseController implements CourseApiDocs {
   public ResponseEntity<Void> deleteCourse(
       @PathVariable int courseId, Authentication authentication) {
     courseFacade.deleteCourse(authentication.getName(), courseId);
+    LOG.info("코스 삭제 완료: courseId={}", courseId);
     return ResponseEntity.noContent().build();
   }
 
@@ -183,11 +213,10 @@ public class CourseController implements CourseApiDocs {
   @PostMapping("/{courseId}/copy")
   public ResponseEntity<CommonResponse<CopyCourseResponse>> copyCourse(
       @PathVariable int courseId, Authentication authentication) {
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(
-            CommonResponse.success(
-                CopyCourseResponse.from(
-                    courseFacade.copyCourse(authentication.getName(), courseId))));
+    CopyCourseResponse response =
+        CopyCourseResponse.from(courseFacade.copyCourse(authentication.getName(), courseId));
+    LOG.info("코스 복사 완료: originalCourseId={}, courseId={}", courseId, response.courseId());
+    return ResponseEntity.status(HttpStatus.CREATED).body(CommonResponse.success(response));
   }
 
   /**
@@ -201,11 +230,10 @@ public class CourseController implements CourseApiDocs {
   @PostMapping("/{courseId}/like")
   public ResponseEntity<CommonResponse<CourseLikeResponse>> likeCourse(
       @PathVariable int courseId, Authentication authentication) {
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(
-            CommonResponse.success(
-                CourseLikeResponse.from(
-                    courseFacade.likeCourse(courseId, authentication.getName()))));
+    CourseLikeResponse response =
+        CourseLikeResponse.from(courseFacade.likeCourse(courseId, authentication.getName()));
+    LOG.info("코스 좋아요 등록 완료: courseId={}", courseId);
+    return ResponseEntity.status(HttpStatus.CREATED).body(CommonResponse.success(response));
   }
 
   /**
@@ -226,6 +254,7 @@ public class CourseController implements CourseApiDocs {
     UpdateCourseVisibilityResult result =
         courseFacade.updateCourseVisibility(
             authentication.getName(), courseId, request.visibility());
+    LOG.info("코스 공개 범위 변경 완료: courseId={}", courseId);
     return ResponseEntity.ok(CommonResponse.success(UpdateCourseVisibilityResponse.from(result)));
   }
 
@@ -246,6 +275,7 @@ public class CourseController implements CourseApiDocs {
     request.validate();
     UpdateCourseConditionsResult result =
         courseFacade.updateCourseConditions(authentication.getName(), request.toCommand(courseId));
+    LOG.info("코스 조건 수정 완료: courseId={}", courseId);
     return ResponseEntity.ok(CommonResponse.success(UpdateCourseConditionsResponse.from(result)));
   }
 
@@ -266,6 +296,7 @@ public class CourseController implements CourseApiDocs {
     request.validate();
     UpdateCourseTransportResult result =
         courseFacade.updateCourseTransport(authentication.getName(), courseId, request.transport());
+    LOG.info("코스 이동수단 변경 완료: courseId={}", courseId);
     return ResponseEntity.ok(CommonResponse.success(UpdateCourseTransportResponse.from(result)));
   }
 }

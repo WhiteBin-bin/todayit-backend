@@ -27,6 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,8 @@ import org.springframework.transaction.annotation.Transactional;
 /** 코스의 생성 조건과 분류 관계를 저장합니다. */
 @Service
 public class CourseCommandService {
+
+  private static final Logger LOG = LoggerFactory.getLogger(CourseCommandService.class);
 
   /** 한 코스 내 동일한 장소의 최대 중복 허용 개수입니다. */
   public static final int MAX_PLACE_DUPLICATION_COUNT = 2;
@@ -81,7 +85,13 @@ public class CourseCommandService {
             command.endAt(),
             themes,
             LocalDateTime.now());
-    return CreateCourseResult.from(courseRepository.save(course));
+    Course savedCourse = courseRepository.save(course);
+    LOG.info(
+        "코스 DRAFT 저장: courseId={}, transport={}, themeCount={}",
+        savedCourse.getCourseId(),
+        savedCourse.getTransport(),
+        themes.size());
+    return CreateCourseResult.from(savedCourse);
   }
 
   /**
@@ -124,6 +134,13 @@ public class CourseCommandService {
             .findFirst()
             .orElse(coursePlace);
 
+    LOG.info(
+        "코스 장소 추가 저장: courseId={}, coursePlaceId={}, placeId={}, order={}, stayMinute={}",
+        command.courseId(),
+        persistedPlace.getCoursePlaceId(),
+        persistedPlace.getPlaceId(),
+        persistedPlace.getOrder(),
+        persistedPlace.getStayMinute());
     return new AddCoursePlaceEntities(persistedPlace, savedCourse.getCoursePlaces());
   }
 
@@ -151,6 +168,10 @@ public class CourseCommandService {
     courseRepository.flush();
     confirmReorder(course);
     Course savedCourse = courseRepository.saveAndFlush(course);
+    LOG.info(
+        "코스 장소 순서 변경 저장: courseId={}, placeCount={}",
+        command.courseId(),
+        savedCourse.getCoursePlaces().size());
     return savedCourse.getCoursePlaces();
   }
 
@@ -187,6 +208,11 @@ public class CourseCommandService {
       restoreShiftedOrdersForRemoval(subsequentPlaces);
     }
     Course savedCourse = courseRepository.saveAndFlush(course);
+    LOG.info(
+        "코스 장소 삭제 저장: courseId={}, coursePlaceId={}, remainingPlaceCount={}",
+        courseId,
+        coursePlaceId,
+        savedCourse.getCoursePlaces().size());
     return savedCourse.getCoursePlaces();
   }
 
@@ -210,6 +236,7 @@ public class CourseCommandService {
     }
     courseRepository.delete(course);
     courseRepository.flush();
+    LOG.info("코스 영구 삭제 저장: courseId={}", courseId);
   }
 
   /**
@@ -244,7 +271,13 @@ public class CourseCommandService {
     }
 
     Course copiedDraft = Course.createCopyDraft(memberId, sourceCourse, LocalDateTime.now());
-    return courseRepository.save(copiedDraft);
+    Course savedCourse = courseRepository.save(copiedDraft);
+    LOG.info(
+        "코스 복사 저장: originalCourseId={}, copiedCourseId={}, placeCount={}",
+        courseId,
+        savedCourse.getCourseId(),
+        savedCourse.getCoursePlaces().size());
+    return savedCourse;
   }
 
   /**
@@ -417,6 +450,7 @@ public class CourseCommandService {
     }
 
     long likeCount = courseMemberLikeRepository.countByCourseId(courseId);
+    LOG.info("코스 좋아요 저장: courseId={}, likeCount={}", courseId, likeCount);
     return new CourseLikeResult(courseId, true, likeCount);
   }
 
@@ -445,6 +479,7 @@ public class CourseCommandService {
     LocalDateTime now = LocalDateTime.now();
     courseRepository.updateVisibility(courseId, visibility, now);
 
+    LOG.info("코스 공개 범위 변경 저장: courseId={}, visibility={}", courseId, visibility);
     return new UpdateCourseVisibilityResult(course.getCourseId(), visibility, now);
   }
 
@@ -526,6 +561,11 @@ public class CourseCommandService {
 
     courseRepository.updateConditions(command.courseId(), startAt, endAt, transport, now);
 
+    LOG.info(
+        "코스 생성 조건 변경 저장: courseId={}, transport={}, regionCount={}",
+        command.courseId(),
+        transport,
+        course.getRegions().size());
     return courseRepository
         .findByIdAndMemberIdForUpdate(command.courseId(), memberId)
         .orElseThrow(() -> new CourseException(CourseErrorCode.NOT_FOUND));
@@ -556,6 +596,7 @@ public class CourseCommandService {
     LocalDateTime now = LocalDateTime.now();
     courseRepository.updateTransport(courseId, transport, now);
 
+    LOG.info("코스 이동수단 변경 저장: courseId={}, transport={}", courseId, transport);
     return new UpdateCourseTransportResult(course.getCourseId(), transport);
   }
 

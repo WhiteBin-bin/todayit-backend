@@ -39,6 +39,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -48,6 +50,8 @@ import org.springframework.transaction.annotation.Transactional;
 /** 행정 지역 검증과 코스 생성 및 조회를 조정합니다. */
 @Service
 public class CourseFacade implements MemberCourseQueryService {
+
+  private static final Logger LOG = LoggerFactory.getLogger(CourseFacade.class);
 
   private final RegionQueryService regionQueryService;
   private final CourseCommandService courseCommandService;
@@ -91,7 +95,9 @@ public class CourseFacade implements MemberCourseQueryService {
    */
   @Transactional
   public CreateCourseResult createCourse(String memberId, CreateCourseCommand command) {
-    return courseCommandService.createCourse(memberId, command);
+    CreateCourseResult result = courseCommandService.createCourse(memberId, command);
+    LOG.info("코스 생성 조정 완료: courseId={}", result.courseId());
+    return result;
   }
 
   /**
@@ -132,6 +138,12 @@ public class CourseFacade implements MemberCourseQueryService {
                       entities.addedPlace().getStayMinute());
                 });
 
+    LOG.info(
+        "코스 장소 추가 조정 완료: courseId={}, coursePlaceId={}, placeId={}, totalPlaceCount={}",
+        command.courseId(),
+        addedPlace.coursePlaceId(),
+        addedPlace.placeId(),
+        places.size());
     return new AddCoursePlaceResult(addedPlace, places);
   }
 
@@ -148,6 +160,8 @@ public class CourseFacade implements MemberCourseQueryService {
   public UpdateCoursePlaceOrdersResult updateCoursePlaceOrders(
       String memberId, UpdateCoursePlaceOrdersCommand command) {
     List<CoursePlace> updatedPlaces = courseCommandService.updatePlaceOrders(memberId, command);
+    LOG.info(
+        "코스 장소 순서 변경 조정 완료: courseId={}, placeCount={}", command.courseId(), updatedPlaces.size());
     return new UpdateCoursePlaceOrdersResult(toCoursePlaceDetailResults(updatedPlaces));
   }
 
@@ -165,6 +179,11 @@ public class CourseFacade implements MemberCourseQueryService {
       String memberId, int courseId, int coursePlaceId) {
     List<CoursePlace> remainingPlaces =
         courseCommandService.removePlace(memberId, courseId, coursePlaceId);
+    LOG.info(
+        "코스 장소 삭제 조정 완료: courseId={}, coursePlaceId={}, remainingPlaceCount={}",
+        courseId,
+        coursePlaceId,
+        remainingPlaces.size());
     return new RemoveCoursePlaceResult(coursePlaceId, toCoursePlaceDetailResults(remainingPlaces));
   }
 
@@ -178,6 +197,7 @@ public class CourseFacade implements MemberCourseQueryService {
   @Transactional
   public void deleteCourse(String memberId, int courseId) {
     courseCommandService.deleteCourse(memberId, courseId);
+    LOG.info("코스 영구 삭제 조정 완료: courseId={}", courseId);
   }
 
   /**
@@ -193,6 +213,11 @@ public class CourseFacade implements MemberCourseQueryService {
     Course copiedCourse = courseCommandService.copyCourse(memberId, courseId);
     List<CoursePlaceDetailResult> places =
         toCoursePlaceDetailResults(copiedCourse.getCoursePlaces());
+    LOG.info(
+        "코스 복사 조정 완료: originalCourseId={}, copiedCourseId={}, placeCount={}",
+        courseId,
+        copiedCourse.getCourseId(),
+        places.size());
     return new CopyCourseResult(
         copiedCourse.getCourseId(),
         courseId,
@@ -233,6 +258,13 @@ public class CourseFacade implements MemberCourseQueryService {
             && courseScrapRepository.existsByMemberIdAndCourseCourseIdAndActiveTrueAndDeletedFalse(
                 memberId, courseId);
 
+    LOG.info(
+        "코스 상세 조회 조정 완료: courseId={}, authenticated={}, placeCount={}, liked={}, scrapped={}",
+        courseId,
+        memberId != null,
+        places.size(),
+        liked,
+        scrapped);
     return new CourseDetailResult(
         course.getCourseId(),
         course.getTitle(),
@@ -267,7 +299,9 @@ public class CourseFacade implements MemberCourseQueryService {
    */
   @Transactional
   public CourseLikeResult likeCourse(int courseId, String memberId) {
-    return courseCommandService.likeCourse(courseId, memberId);
+    CourseLikeResult result = courseCommandService.likeCourse(courseId, memberId);
+    LOG.info("코스 좋아요 등록 조정 완료: courseId={}, likeCount={}", courseId, result.likeCount());
+    return result;
   }
 
   /**
@@ -282,7 +316,10 @@ public class CourseFacade implements MemberCourseQueryService {
   @Transactional
   public UpdateCourseVisibilityResult updateCourseVisibility(
       String memberId, int courseId, CourseVisibility visibility) {
-    return courseCommandService.updateCourseVisibility(memberId, courseId, visibility);
+    UpdateCourseVisibilityResult result =
+        courseCommandService.updateCourseVisibility(memberId, courseId, visibility);
+    LOG.info("코스 공개 범위 변경 조정 완료: courseId={}, visibility={}", courseId, result.visibility());
+    return result;
   }
 
   /**
@@ -297,7 +334,10 @@ public class CourseFacade implements MemberCourseQueryService {
   @Transactional
   public UpdateCourseTransportResult updateCourseTransport(
       String memberId, int courseId, CourseTransport transport) {
-    return courseCommandService.updateCourseTransport(memberId, courseId, transport);
+    UpdateCourseTransportResult result =
+        courseCommandService.updateCourseTransport(memberId, courseId, transport);
+    LOG.info("코스 이동수단 변경 조정 완료: courseId={}, transport={}", courseId, result.transport());
+    return result;
   }
 
   /**
@@ -332,6 +372,12 @@ public class CourseFacade implements MemberCourseQueryService {
 
     List<CoursePlaceDetailResult> places = toCoursePlaceDetailResults(course.getCoursePlaces());
 
+    LOG.info(
+        "코스 생성 조건 수정 조정 완료: courseId={}, transport={}, durationMinutes={}, placeCount={}",
+        course.getCourseId(),
+        course.getTransport(),
+        durationMinutes,
+        places.size());
     return new UpdateCourseConditionsResult(
         course.getCourseId(), conditionsResult, places, course.getUpdatedAt());
   }
@@ -404,6 +450,12 @@ public class CourseFacade implements MemberCourseQueryService {
     List<Course> courses = coursePage.getContent();
 
     if (courses.isEmpty()) {
+      LOG.info(
+          "내 코스 목록 조회 완료: status={}, page={}, size={}, sort={}, resultCount=0",
+          status,
+          page,
+          size,
+          sort);
       return new PageResult<>(
           List.of(), coursePage.getNumber(), coursePage.getSize(), coursePage.getTotalElements());
     }
@@ -473,6 +525,13 @@ public class CourseFacade implements MemberCourseQueryService {
                 })
             .toList();
 
+    LOG.info(
+        "내 코스 목록 조회 완료: status={}, page={}, size={}, sort={}, resultCount={}",
+        status,
+        page,
+        size,
+        sort,
+        cardList.size());
     return new PageResult<>(
         cardList, coursePage.getNumber(), coursePage.getSize(), coursePage.getTotalElements());
   }

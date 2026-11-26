@@ -53,15 +53,16 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("코스 생성 HTTP 계약")
+@DisplayName("CourseController 단위 테스트")
 class CourseControllerTest {
   @Mock private CourseFacade courseFacade;
+  @Mock private com.todayit.course.service.CourseRecommendationFacade recommendations;
   private MockMvc mvc;
 
   @BeforeEach
   void setUp() {
     mvc =
-        MockMvcBuilders.standaloneSetup(new CourseController(courseFacade))
+        MockMvcBuilders.standaloneSetup(new CourseController(courseFacade, recommendations))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
   }
@@ -386,7 +387,7 @@ class CourseControllerTest {
   @Test
   @DisplayName("지원하지 않는 콘셉트는 400과 UNSUPPORTED_COURSE_THEME을 반환한다")
   void returnsBadRequestWhenUnsupportedTheme() throws Exception {
-    // Given
+    // given
     when(courseFacade.createCourse(eq("member-1"), any()))
         .thenThrow(new CourseException(CourseErrorCode.UNSUPPORTED_THEME));
     String request =
@@ -399,7 +400,7 @@ class CourseControllerTest {
         }
         """;
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             post("/api/v1/courses")
@@ -407,7 +408,7 @@ class CourseControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request));
 
-    // Then
+    // then
     result
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false))
@@ -538,17 +539,17 @@ class CourseControllerTest {
   @Test
   @DisplayName("존재하지 않거나 접근 권한이 없는 코스는 404와 COURSE_NOT_FOUND를 반환한다")
   void returnsNotFoundWhenCourseCannotBeAccessed() throws Exception {
-    // Given
+    // given
     when(courseFacade.getCourseDetail(99, "member-1"))
         .thenThrow(new CourseException(CourseErrorCode.NOT_FOUND));
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             get("/api/v1/courses/99")
                 .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
 
-    // Then
+    // then
     result
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.success").value(false))
@@ -765,7 +766,7 @@ class CourseControllerTest {
   @Test
   @DisplayName("코스를 찾을 수 없으면 404와 COURSE_NOT_FOUND를 반환한다")
   void returnsNotFoundWhenCourseNotFoundOnAddPlace() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.NOT_FOUND))
         .when(courseFacade)
         .addPlaceToCourse(eq("member-1"), any(AddCoursePlaceCommand.class));
@@ -776,7 +777,7 @@ class CourseControllerTest {
         }
         """;
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             post("/api/v1/courses/999/places")
@@ -784,7 +785,7 @@ class CourseControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request));
 
-    // Then
+    // then
     result
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.success").value(false))
@@ -794,7 +795,7 @@ class CourseControllerTest {
   @Test
   @DisplayName("장소를 찾을 수 없거나 삭제된 장소이면 404와 PLACE_NOT_FOUND를 반환한다")
   void returnsNotFoundWhenPlaceNotFoundOnAddPlace() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.PLACE_NOT_FOUND))
         .when(courseFacade)
         .addPlaceToCourse(eq("member-1"), any(AddCoursePlaceCommand.class));
@@ -805,7 +806,7 @@ class CourseControllerTest {
         }
         """;
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             post("/api/v1/courses/1/places")
@@ -813,7 +814,7 @@ class CourseControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request));
 
-    // Then
+    // then
     result
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.success").value(false))
@@ -823,7 +824,7 @@ class CourseControllerTest {
   @Test
   @DisplayName("동일 장소 중복 추가 횟수(2회)를 초과하면 400과 MAX_PLACE_DUPLICATION_EXCEEDED를 반환한다")
   void returnsBadRequestWhenMaxDuplicationExceeded() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.MAX_PLACE_DUPLICATION_EXCEEDED))
         .when(courseFacade)
         .addPlaceToCourse(eq("member-1"), any(AddCoursePlaceCommand.class));
@@ -834,7 +835,7 @@ class CourseControllerTest {
         }
         """;
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             post("/api/v1/courses/1/places")
@@ -842,7 +843,7 @@ class CourseControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request));
 
-    // Then
+    // then
     result
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false))
@@ -938,7 +939,7 @@ class CourseControllerTest {
   @Test
   @DisplayName("순서 변경 시 코스를 찾을 수 없거나 작성자가 아니면 404를 반환한다")
   void returnsNotFoundWhenCourseNotFoundOnReorder() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.NOT_FOUND))
         .when(courseFacade)
         .updateCoursePlaceOrders(eq("member-1"), any(UpdateCoursePlaceOrdersCommand.class));
@@ -949,7 +950,7 @@ class CourseControllerTest {
         }
         """;
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             patch("/api/v1/courses/999/places/order")
@@ -957,7 +958,7 @@ class CourseControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request));
 
-    // Then
+    // then
     result
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.success").value(false))
@@ -967,7 +968,7 @@ class CourseControllerTest {
   @Test
   @DisplayName("순서 변경 시 전달된 장소 목록이 코스 장소와 일치하지 않으면 400을 반환한다")
   void returnsBadRequestWhenFacadeRejectsCoursePlaceOrder() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.INVALID_ORDER))
         .when(courseFacade)
         .updateCoursePlaceOrders(eq("member-1"), any(UpdateCoursePlaceOrdersCommand.class));
@@ -978,7 +979,7 @@ class CourseControllerTest {
         }
         """;
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             patch("/api/v1/courses/1/places/order")
@@ -986,7 +987,7 @@ class CourseControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request));
 
-    // Then
+    // then
     result
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false))
@@ -1018,18 +1019,18 @@ class CourseControllerTest {
   @Test
   @DisplayName("장소 삭제 시 코스를 찾을 수 없거나 작성자가 아니면 404를 반환한다")
   void returnsNotFoundWhenCourseNotFoundOnDeletePlace() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.NOT_FOUND))
         .when(courseFacade)
         .removePlaceFromCourse("member-1", 999, 10);
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             delete("/api/v1/courses/999/places/10")
                 .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
 
-    // Then
+    // then
     result
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.success").value(false))
@@ -1039,18 +1040,18 @@ class CourseControllerTest {
   @Test
   @DisplayName("장소 삭제 시 코스 내 장소를 찾을 수 없으면 404를 반환한다")
   void returnsNotFoundWhenCoursePlaceNotFoundOnDeletePlace() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.COURSE_PLACE_NOT_FOUND))
         .when(courseFacade)
         .removePlaceFromCourse("member-1", 1, 999);
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             delete("/api/v1/courses/1/places/999")
                 .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
 
-    // Then
+    // then
     result
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.success").value(false))
@@ -1060,11 +1061,12 @@ class CourseControllerTest {
   @Test
   @DisplayName("코스를 정상적으로 영구 삭제하고 204를 반환한다")
   void deletesCourseSuccessfully() throws Exception {
+    // given
+    UsernamePasswordAuthenticationToken principal =
+        new UsernamePasswordAuthenticationToken("member-1", null, List.of());
+
     // when
-    ResultActions result =
-        mvc.perform(
-            delete("/api/v1/courses/1")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
+    ResultActions result = mvc.perform(delete("/api/v1/courses/1").principal(principal));
 
     // then
     result.andExpect(status().isNoContent());
@@ -1074,18 +1076,18 @@ class CourseControllerTest {
   @Test
   @DisplayName("코스 삭제 시 코스를 찾을 수 없거나 작성자가 아니면 404를 반환한다")
   void returnsNotFoundWhenCourseNotFoundOnDeleteCourse() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.NOT_FOUND))
         .when(courseFacade)
         .deleteCourse("member-1", 999);
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             delete("/api/v1/courses/999")
                 .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
 
-    // Then
+    // then
     result
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.success").value(false))
@@ -1122,18 +1124,18 @@ class CourseControllerTest {
   @Test
   @DisplayName("코스 복사 시 코스를 찾을 수 없거나 타인의 비공개 코스이면 404를 반환한다")
   void returnsNotFoundWhenCourseNotFoundOnCopyCourse() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.NOT_FOUND))
         .when(courseFacade)
         .copyCourse("member-1", 999);
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             post("/api/v1/courses/999/copy")
                 .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
 
-    // Then
+    // then
     result
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.success").value(false))
@@ -1143,18 +1145,18 @@ class CourseControllerTest {
   @Test
   @DisplayName("코스 복사 시 DRAFT 상태의 코스이면 400과 CANNOT_COPY_DRAFT를 반환한다")
   void returnsBadRequestWhenCopyCourseIsDraft() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.CANNOT_COPY_DRAFT))
         .when(courseFacade)
         .copyCourse("member-1", 1);
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             post("/api/v1/courses/1/copy")
                 .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
 
-    // Then
+    // then
     result
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false))
@@ -1187,18 +1189,18 @@ class CourseControllerTest {
   @Test
   @DisplayName("이미 좋아요를 누른 코스에 좋아요 요청 시 409 Conflict를 반환한다")
   void returnsConflictWhenCourseAlreadyLiked() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.ALREADY_LIKED))
         .when(courseFacade)
         .likeCourse(1, "member-1");
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             post("/api/v1/courses/1/like")
                 .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
 
-    // Then
+    // then
     result
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.success").value(false))
@@ -1209,18 +1211,18 @@ class CourseControllerTest {
   @Test
   @DisplayName("존재하지 않거나 비활성·삭제된 코스에 좋아요 요청 시 404를 반환한다")
   void returnsNotFoundWhenCourseNotFoundOnLikeCourse() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.NOT_FOUND))
         .when(courseFacade)
         .likeCourse(999, "member-1");
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             post("/api/v1/courses/999/like")
                 .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
 
-    // Then
+    // then
     result
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.success").value(false))
@@ -1291,7 +1293,7 @@ class CourseControllerTest {
   @Test
   @DisplayName("임시저장(DRAFT) 상태의 코스 공개 범위를 변경하려고 하면 400 Bad Request를 반환한다")
   void rejectsUpdatingVisibilityForDraftCourse() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.CANNOT_CHANGE_DRAFT_VISIBILITY))
         .when(courseFacade)
         .updateCourseVisibility("member-1", 1, CourseVisibility.PUBLIC);
@@ -1303,7 +1305,7 @@ class CourseControllerTest {
         }
         """;
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             patch("/api/v1/courses/1/visibility")
@@ -1311,7 +1313,7 @@ class CourseControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request));
 
-    // Then
+    // then
     result
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false))
@@ -1322,7 +1324,7 @@ class CourseControllerTest {
   @Test
   @DisplayName("존재하지 않거나 삭제된 코스 또는 타인의 코스 공개 범위 변경 요청 시 404를 반환한다")
   void returnsNotFoundWhenCourseNotFoundOnUpdateVisibility() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.NOT_FOUND))
         .when(courseFacade)
         .updateCourseVisibility("member-1", 999, CourseVisibility.PUBLIC);
@@ -1334,7 +1336,7 @@ class CourseControllerTest {
         }
         """;
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             patch("/api/v1/courses/999/visibility")
@@ -1342,7 +1344,7 @@ class CourseControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request));
 
-    // Then
+    // then
     result
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.success").value(false))
@@ -1467,7 +1469,7 @@ class CourseControllerTest {
   @Test
   @DisplayName("확정(ACTIVE) 상태의 코스 생성 조건을 수정하려고 하면 400 Bad Request를 반환한다")
   void rejectsUpdatingConditionsWhenActiveCourse() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.CANNOT_EDIT_ACTIVE_COURSE))
         .when(courseFacade)
         .updateCourseConditions(eq("member-1"), any(UpdateCourseConditionsCommand.class));
@@ -1479,7 +1481,7 @@ class CourseControllerTest {
         }
         """;
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             patch("/api/v1/courses/1/conditions")
@@ -1487,7 +1489,7 @@ class CourseControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request));
 
-    // Then
+    // then
     result
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false))
@@ -1497,7 +1499,7 @@ class CourseControllerTest {
   @Test
   @DisplayName("존재하지 않거나 삭제된 코스 또는 타인의 코스 조건 수정 요청 시 404를 반환한다")
   void returnsNotFoundWhenCourseNotFoundOnUpdateConditions() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.NOT_FOUND))
         .when(courseFacade)
         .updateCourseConditions(eq("member-1"), any(UpdateCourseConditionsCommand.class));
@@ -1509,7 +1511,7 @@ class CourseControllerTest {
         }
         """;
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             patch("/api/v1/courses/999/conditions")
@@ -1517,7 +1519,7 @@ class CourseControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request));
 
-    // Then
+    // then
     result
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.success").value(false))
@@ -1583,7 +1585,7 @@ class CourseControllerTest {
   @Test
   @DisplayName("확정된 코스의 이동수단을 변경하려고 하면 400을 반환한다")
   void rejectsUpdatingTransportForActiveCourse() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.CANNOT_EDIT_ACTIVE_COURSE))
         .when(courseFacade)
         .updateCourseTransport(eq("member-1"), eq(1), eq(CourseTransport.CAR));
@@ -1595,7 +1597,7 @@ class CourseControllerTest {
         }
         """;
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             patch("/api/v1/courses/1/transport")
@@ -1603,7 +1605,7 @@ class CourseControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request));
 
-    // Then
+    // then
     result
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false))
@@ -1613,7 +1615,7 @@ class CourseControllerTest {
   @Test
   @DisplayName("존재하지 않거나 삭제된 코스 또는 타인의 코스 이동수단 변경 요청 시 404를 반환한다")
   void returnsNotFoundWhenCourseNotFoundOnUpdateTransport() throws Exception {
-    // Given
+    // given
     doThrow(new CourseException(CourseErrorCode.NOT_FOUND))
         .when(courseFacade)
         .updateCourseTransport(eq("member-1"), eq(999), eq(CourseTransport.CAR));
@@ -1625,7 +1627,7 @@ class CourseControllerTest {
         }
         """;
 
-    // When
+    // when
     ResultActions result =
         mvc.perform(
             patch("/api/v1/courses/999/transport")
@@ -1633,7 +1635,7 @@ class CourseControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request));
 
-    // Then
+    // then
     result
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.success").value(false))

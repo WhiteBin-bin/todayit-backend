@@ -12,6 +12,18 @@ import org.springframework.data.repository.query.Param;
 
 /** 장소 정보를 조회하고 저장하는 JPA Repository입니다. */
 public interface PlaceRepository extends JpaRepository<Place, Integer> {
+  /**
+   * 코스의 장소별 행정구역을 일괄 조회합니다.
+   *
+   * @param placeIds 장소 식별자 목록
+   * @return 확인된 장소 지역 목록
+   */
+  @Query(
+      "select new com.todayit.course.service.model.CoursePlaceRegion("
+          + "rp.place.placeId, rp.region.sidoCode, rp.region.sigunguCode) "
+          + "from RegionPlace rp where rp.place.placeId in :placeIds")
+  List<com.todayit.course.service.model.CoursePlaceRegion> findCoursePlaceRegions(
+      @Param("placeIds") List<Integer> placeIds);
 
   /**
    * 활성화되고 삭제되지 않은 장소를 페이지 단위로 조회합니다.
