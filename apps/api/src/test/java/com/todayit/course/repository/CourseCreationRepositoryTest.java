@@ -5,7 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.todayit.course.entity.Course;
 import com.todayit.course.entity.CoursePlace;
+import com.todayit.course.entity.CourseStatus;
 import com.todayit.course.entity.CourseTransport;
+import com.todayit.course.entity.CourseVisibility;
+import com.todayit.course.entity.RegionCourse;
 import com.todayit.course.entity.Theme;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
@@ -19,8 +22,12 @@ import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @DataJpaTest(
     properties = {
@@ -28,9 +35,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
       "spring.jpa.hibernate.ddl-auto=create-drop",
       "spring.jpa.properties.hibernate.auto_quote_keyword=true"
     })
-@EntityScan("com.todayit.course.entity")
+@EntityScan({"com.todayit.course.entity", "com.todayit.region.entity"})
 @Import(CourseCreationRepositoryTest.RepositoryConfiguration.class)
-@DisplayName("코스 생성 저장소")
 class CourseCreationRepositoryTest {
   @TestConfiguration(proxyBeanMethods = false)
   @EnableJpaRepositories(basePackageClasses = CourseRepository.class)
@@ -308,5 +314,101 @@ class CourseCreationRepositoryTest {
     Course updated = courses.findById(courseId).orElseThrow();
     assertThat(updated.getTransport()).isEqualTo(CourseTransport.WALKING);
     assertThat(updated.getUpdatedAt()).isEqualTo(updatedAt);
+  }
+
+  @Test
+  @DisplayName("공개·확정·미삭제 코스를 지역, 콘셉트, 이동수단 조건 및 정렬에 맞게 페이지 조회한다")
+  void findsPublicActiveCoursesWithFilters() {
+    // given
+    jdbc.update("insert into theme (theme_id, name) values (1, '로맨틱'), (2, '아늑함'), (3, '감성적')");
+    List<Theme> romanticThemes = courses.findThemesByNames(List.of("로맨틱", "아늑함"));
+    List<Theme> emotionalThemes = courses.findThemesByNames(List.of("감성적"));
+
+    LocalDateTime now = LocalDateTime.of(2026, 11, 25, 10, 0);
+    Course matchCourse =
+        Course.createDraft(
+            "member-1", "행궁동 로맨틱 코스", CourseTransport.WALKING, now, null, romanticThemes, now);
+    ReflectionTestUtils.setField(matchCourse, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(matchCourse, "visibility", CourseVisibility.PUBLIC);
+    ReflectionTestUtils.setField(matchCourse, "viewCount", 50);
+    matchCourse.getRegions().add(RegionCourse.create(matchCourse, 7));
+    courses.saveAndFlush(matchCourse);
+
+    Course privateCourse =
+        Course.createDraft(
+            "member-1", "비공개 코스", CourseTransport.WALKING, now, null, romanticThemes, now);
+    ReflectionTestUtils.setField(privateCourse, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(privateCourse, "visibility", CourseVisibility.PRIVATE);
+    privateCourse.getRegions().add(RegionCourse.create(privateCourse, 7));
+    courses.saveAndFlush(privateCourse);
+
+    Course otherThemeCourse =
+        Course.createDraft(
+            "member-1", "다른 콘셉트 코스", CourseTransport.WALKING, now, null, emotionalThemes, now);
+    ReflectionTestUtils.setField(otherThemeCourse, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(otherThemeCourse, "visibility", CourseVisibility.PUBLIC);
+    otherThemeCourse.getRegions().add(RegionCourse.create(otherThemeCourse, 7));
+    courses.saveAndFlush(otherThemeCourse);
+    entities.clear();
+
+    // when
+    Page<Course> page =
+        courses.findPublicActiveCourses(
+            List.of(7),
+            true,
+            List.of("로맨틱"),
+            true,
+            CourseTransport.WALKING,
+            PageRequest.of(
+                0, 20, Sort.by(Sort.Order.desc("viewCount"), Sort.Order.desc("courseId"))));
+
+    // then
+    assertThat(page.getTotalElements()).isEqualTo(1L);
+    assertThat(page.getContent()).hasSize(1);
+    assertThat(page.getContent().getFirst().getTitle()).isEqualTo("행궁동 로맨틱 코스");
+  }
+
+  @Test
+  @DisplayName("시간 구간 검색은 분 경계와 초 단위 차이, 미입력 일정을 구분한다")
+  void filtersByScheduledDurationBoundaries() {
+    // given
+    LocalDateTime start = LocalDateTime.of(2026, 12, 1, 23, 0);
+    for (Long seconds : List.of(0L, 7200L, 7201L, 14400L, 14401L, -60L)) {
+      Course course =
+          Course.createDraft(
+              "member-1",
+              seconds.toString(),
+              CourseTransport.CAR,
+              start,
+              start.plusSeconds(seconds),
+              List.of(),
+              start);
+      ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+      ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PUBLIC);
+      courses.save(course);
+    }
+    Course missing =
+        Course.createDraft("member-1", "미입력", CourseTransport.CAR, start, null, List.of(), start);
+    ReflectionTestUtils.setField(missing, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(missing, "visibility", CourseVisibility.PUBLIC);
+    courses.saveAndFlush(missing);
+    PageRequest pageable = PageRequest.of(0, 1, Sort.by("courseId"));
+    // when
+    Page<Course> under =
+        courses.findPublicActiveCoursesInDuration(
+            List.of(-1), false, List.of(""), false, null, null, 120, pageable);
+    Page<Course> middle =
+        courses.findPublicActiveCoursesInDuration(
+            List.of(-1), false, List.of(""), false, null, 120, 240, pageable);
+    Page<Course> over =
+        courses.findPublicActiveCoursesInDuration(
+            List.of(-1), false, List.of(""), false, null, 240, null, pageable);
+    // then
+    assertThat(under.getTotalElements()).isEqualTo(1);
+    assertThat(under.getContent()).extracting(Course::getTitle).containsExactly("7200");
+    assertThat(middle.getTotalElements()).isEqualTo(2);
+    assertThat(middle.getContent()).extracting(Course::getTitle).containsExactly("7201");
+    assertThat(over.getTotalElements()).isEqualTo(1);
+    assertThat(over.getContent()).extracting(Course::getTitle).containsExactly("14401");
   }
 }

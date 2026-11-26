@@ -29,7 +29,6 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("CourseRecommendationController 단위 테스트")
 class CourseRecommendationControllerTest {
   @Mock private CourseRecommendationFacade facade;
   @Mock private CourseFacade courseFacade;

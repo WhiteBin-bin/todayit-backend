@@ -136,6 +136,8 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/courses/recommendations")
                     .authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/courses")
+                    .permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/courses/*")
                     .permitAll()
 

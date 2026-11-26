@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.todayit.common.exception.GlobalExceptionHandler;
+import com.todayit.common.pagination.PageResult;
 import com.todayit.course.entity.CourseStatus;
 import com.todayit.course.entity.CourseTransport;
 import com.todayit.course.entity.CourseVisibility;
@@ -21,22 +22,27 @@ import com.todayit.course.exception.CourseErrorCode;
 import com.todayit.course.exception.CourseException;
 import com.todayit.course.service.CourseFacade;
 import com.todayit.course.service.command.AddCoursePlaceCommand;
+import com.todayit.course.service.command.CourseSearchCommand;
 import com.todayit.course.service.command.CreateCourseCommand;
 import com.todayit.course.service.command.UpdateCourseConditionsCommand;
 import com.todayit.course.service.command.UpdateCoursePlaceOrdersCommand;
 import com.todayit.course.service.model.AddCoursePlaceResult;
 import com.todayit.course.service.model.CopyCourseResult;
+import com.todayit.course.service.model.CourseCardResult;
 import com.todayit.course.service.model.CourseConditionsResult;
 import com.todayit.course.service.model.CourseDetailResult;
+import com.todayit.course.service.model.CourseDurationFilter;
 import com.todayit.course.service.model.CourseLikeResult;
 import com.todayit.course.service.model.CoursePlaceDetailResult;
-import com.todayit.course.service.model.CourseRegionResult;
+import com.todayit.course.service.model.CourseSort;
 import com.todayit.course.service.model.CreateCourseResult;
 import com.todayit.course.service.model.RemoveCoursePlaceResult;
 import com.todayit.course.service.model.UpdateCourseConditionsResult;
 import com.todayit.course.service.model.UpdateCoursePlaceOrdersResult;
 import com.todayit.course.service.model.UpdateCourseTransportResult;
 import com.todayit.course.service.model.UpdateCourseVisibilityResult;
+import com.todayit.region.service.model.RegionFilter;
+import com.todayit.region.service.model.RegionSummaryResult;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -53,7 +59,6 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("CourseController 단위 테스트")
 class CourseControllerTest {
   @Mock private CourseFacade courseFacade;
   @Mock private com.todayit.course.service.CourseRecommendationFacade recommendations;
@@ -1362,7 +1367,7 @@ class CourseControllerTest {
 
     CourseConditionsResult conditionsResult =
         new CourseConditionsResult(
-            new CourseRegionResult("11", "서울특별시", "110", "종로구"),
+            new RegionSummaryResult("11", "서울특별시", "110", "종로구"),
             startAt,
             endAt,
             240,
@@ -1640,5 +1645,149 @@ class CourseControllerTest {
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.code").value("COURSE_NOT_FOUND"));
+  }
+
+  @Test
+  @DisplayName("코스 목록 및 필터 조회 시 조건에 맞는 페이지 응답을 반환한다")
+  void findsCoursesWithFiltersSuccessfully() throws Exception {
+    // given
+    LocalDateTime createdAt = LocalDateTime.of(2026, 11, 20, 10, 0);
+    LocalDateTime updatedAt = LocalDateTime.of(2026, 11, 20, 12, 0);
+    CourseCardResult card =
+        new CourseCardResult(
+            1,
+            "행궁동 로맨틱 산책 코스",
+            "행궁동 일대를 여유롭게 산책하는 데이트 코스입니다.",
+            "https://example.com/place.jpg",
+            new RegionSummaryResult("41", "경기도", "111", "수원시 장안구"),
+            List.of("로맨틱", "아늑함"),
+            180,
+            CourseTransport.WALKING,
+            CourseStatus.ACTIVE,
+            CourseVisibility.PUBLIC,
+            3,
+            128L,
+            createdAt,
+            updatedAt);
+    CourseSearchCommand expectedCommand =
+        new CourseSearchCommand(
+            List.of(new RegionFilter("41", List.of("111"))),
+            List.of("로맨틱", "아늑함"),
+            CourseDurationFilter.ALL,
+            CourseTransport.WALKING,
+            CourseSort.POPULAR,
+            0,
+            20);
+    when(courseFacade.findCourses(expectedCommand))
+        .thenReturn(new PageResult<>(List.of(card), 0, 20, 1));
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            get("/api/v1/courses")
+                .param("regions", "[{\"sidoCode\":\"41\",\"sigunguCodes\":[\"111\"]}]")
+                .param("themes", "로맨틱", "아늑함")
+                .param("duration", "ALL")
+                .param("transport", "WALK")
+                .param("sort", "POPULAR")
+                .param("page", "0")
+                .param("size", "20"));
+
+    // then
+    result
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.content[0].courseId").value(1))
+        .andExpect(jsonPath("$.data.content[0].title").value("행궁동 로맨틱 산책 코스"))
+        .andExpect(
+            jsonPath("$.data.content[0].courseSummary").value("행궁동 일대를 여유롭게 산책하는 데이트 코스입니다."))
+        .andExpect(
+            jsonPath("$.data.content[0].thumbnailUrl").value("https://example.com/place.jpg"))
+        .andExpect(jsonPath("$.data.content[0].region.sidoCode").value("41"))
+        .andExpect(jsonPath("$.data.content[0].region.sidoName").value("경기도"))
+        .andExpect(jsonPath("$.data.content[0].region.sigunguCode").value("111"))
+        .andExpect(jsonPath("$.data.content[0].region.sigunguName").value("수원시 장안구"))
+        .andExpect(jsonPath("$.data.content[0].themes[0]").value("로맨틱"))
+        .andExpect(jsonPath("$.data.content[0].themes[1]").value("아늑함"))
+        .andExpect(jsonPath("$.data.content[0].durationMinutes").value(180))
+        .andExpect(jsonPath("$.data.content[0].transport").value("WALK"))
+        .andExpect(jsonPath("$.data.content[0].status").value("CONFIRMED"))
+        .andExpect(jsonPath("$.data.content[0].visibility").value("PUBLIC"))
+        .andExpect(jsonPath("$.data.content[0].placeCount").value(3))
+        .andExpect(jsonPath("$.data.content[0].likeCount").value(128))
+        .andExpect(jsonPath("$.data.page").value(0))
+        .andExpect(jsonPath("$.data.size").value(20))
+        .andExpect(jsonPath("$.data.totalElements").value(1))
+        .andExpect(jsonPath("$.data.totalPages").value(1));
+    verify(courseFacade).findCourses(expectedCommand);
+  }
+
+  @Test
+  @DisplayName("코스 필터 조회 시 콘셉트가 2개를 초과하면 400과 INVALID_REQUEST를 반환한다")
+  void rejectsTooManyThemesOnFindCourses() throws Exception {
+    // given
+
+    // when
+    ResultActions result = mvc.perform(get("/api/v1/courses").param("themes", "로맨틱", "아늑함", "감성적"));
+
+    // then
+    result
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    verifyNoInteractions(courseFacade);
+  }
+
+  @Test
+  @DisplayName("코스 필터 조회 시 지원하지 않는 소요 시간 필터이면 400과 INVALID_REQUEST를 반환한다")
+  void rejectsUnsupportedDurationOnFindCourses() throws Exception {
+    // given
+
+    // when
+    ResultActions result = mvc.perform(get("/api/v1/courses").param("duration", "120"));
+
+    // then
+    result
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    verifyNoInteractions(courseFacade);
+  }
+
+  @Test
+  @DisplayName("코스 필터 조회 시 지역 필터 JSON 형식이 잘못되면 400과 INVALID_REGION_PATH를 반환한다")
+  void rejectsInvalidRegionsJsonOnFindCourses() throws Exception {
+    // given
+
+    // when
+    ResultActions result = mvc.perform(get("/api/v1/courses").param("regions", "invalid-json"));
+
+    // then
+    result
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("INVALID_REGION_PATH"));
+    verifyNoInteractions(courseFacade);
+  }
+
+  @Test
+  @DisplayName("코스 필터 조회 시 끝자리가 0인 시군구 코드가 시도당 3개를 초과하면 400과 EXCEEDED_SIGUNGU_LIMIT을 반환한다")
+  void rejectsExceededSigunguLimitOnFindCourses() throws Exception {
+    // given
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            get("/api/v1/courses")
+                .param(
+                    "regions",
+                    "[{\"sidoCode\":\"11\",\"sigunguCodes\":[\"680\",\"650\",\"710\",\"110\"]}]"));
+
+    // then
+    result
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("EXCEEDED_SIGUNGU_LIMIT"));
+    verifyNoInteractions(courseFacade);
   }
 }

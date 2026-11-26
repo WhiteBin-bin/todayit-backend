@@ -12,9 +12,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.todayit.common.exception.BusinessException;
-import com.todayit.course.entity.Region;
-import com.todayit.course.exception.InvalidRegionPathException;
-import com.todayit.course.repository.RegionRepository;
 import com.todayit.member.entity.Member;
 import com.todayit.member.entity.PreferredRegionCode;
 import com.todayit.member.exception.MemberErrorCode;
@@ -23,6 +20,9 @@ import com.todayit.member.repository.MemberRepository;
 import com.todayit.member.service.command.MemberProfileCommand;
 import com.todayit.member.service.model.MemberProfileDetailsResult;
 import com.todayit.member.service.model.MemberProfileResult;
+import com.todayit.region.entity.Region;
+import com.todayit.region.exception.RegionException;
+import com.todayit.region.repository.RegionRepository;
 import com.todayit.theme.Theme;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -273,7 +273,7 @@ class MemberProfileServiceTest {
         new MemberProfileCommand(null, List.of(new PreferredRegionCode("11", "350")), null);
 
     assertThatThrownBy(() -> service.updateProfile(memberId, command))
-        .isInstanceOf(InvalidRegionPathException.class);
+        .isInstanceOf(RegionException.class);
 
     assertThat(member.getPreferredRegion()).isNull();
 

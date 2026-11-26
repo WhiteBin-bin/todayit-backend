@@ -7,7 +7,6 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("코스 엔티티 단위 테스트")
 class CourseTest {
 
   @Test

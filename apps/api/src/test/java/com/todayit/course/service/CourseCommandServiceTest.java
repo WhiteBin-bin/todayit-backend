@@ -18,7 +18,6 @@ import com.todayit.course.entity.CourseVisibility;
 import com.todayit.course.entity.Theme;
 import com.todayit.course.exception.CourseErrorCode;
 import com.todayit.course.exception.CourseException;
-import com.todayit.course.exception.InvalidRegionPathException;
 import com.todayit.course.repository.CourseMemberLikeRepository;
 import com.todayit.course.repository.CourseRepository;
 import com.todayit.course.service.command.AddCoursePlaceCommand;
@@ -30,6 +29,9 @@ import com.todayit.course.service.model.CourseLikeResult;
 import com.todayit.course.service.model.CreateCourseResult;
 import com.todayit.course.service.model.UpdateCourseTransportResult;
 import com.todayit.course.service.model.UpdateCourseVisibilityResult;
+import com.todayit.region.exception.RegionErrorCode;
+import com.todayit.region.exception.RegionException;
+import com.todayit.region.service.RegionQueryService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -46,7 +48,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("CourseCommandService 단위 테스트")
 class CourseCommandServiceTest {
   @Mock private CourseRepository courses;
   @Mock private CourseMemberLikeRepository courseMemberLikeRepository;
@@ -1089,7 +1090,8 @@ class CourseCommandServiceTest {
     ReflectionTestUtils.setField(course, "courseId", 1);
 
     when(courses.findByIdAndMemberIdForUpdate(1, "owner-member")).thenReturn(Optional.of(course));
-    when(regionQueryService.findRegionIds("99", null)).thenThrow(new InvalidRegionPathException());
+    when(regionQueryService.findRegionIds("99", null))
+        .thenThrow(new RegionException(RegionErrorCode.INVALID_PATH));
 
     UpdateCourseConditionsCommand command =
         new UpdateCourseConditionsCommand(1, "99", null, null, null, null);

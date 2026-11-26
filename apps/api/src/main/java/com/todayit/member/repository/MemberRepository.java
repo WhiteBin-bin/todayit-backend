@@ -1,8 +1,8 @@
 package com.todayit.member.repository;
 
-import com.todayit.course.entity.Region;
 import com.todayit.member.entity.Member;
 import com.todayit.member.entity.MemberProvider;
+import com.todayit.region.entity.Region;
 import jakarta.persistence.LockModeType;
 import java.time.LocalDateTime;
 import java.util.List;

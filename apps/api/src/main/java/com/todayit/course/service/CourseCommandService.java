@@ -9,7 +9,6 @@ import com.todayit.course.entity.RegionCourse;
 import com.todayit.course.entity.Theme;
 import com.todayit.course.exception.CourseErrorCode;
 import com.todayit.course.exception.CourseException;
-import com.todayit.course.exception.InvalidRegionPathException;
 import com.todayit.course.repository.CourseMemberLikeRepository;
 import com.todayit.course.repository.CourseRepository;
 import com.todayit.course.service.command.AddCoursePlaceCommand;
@@ -21,6 +20,8 @@ import com.todayit.course.service.model.CourseLikeResult;
 import com.todayit.course.service.model.CreateCourseResult;
 import com.todayit.course.service.model.UpdateCourseTransportResult;
 import com.todayit.course.service.model.UpdateCourseVisibilityResult;
+import com.todayit.region.exception.RegionException;
+import com.todayit.region.service.RegionQueryService;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
@@ -545,7 +546,7 @@ public class CourseCommandService {
         } else {
           throw new CourseException(CourseErrorCode.INVALID_REGION);
         }
-      } catch (InvalidRegionPathException e) {
+      } catch (RegionException e) {
         throw new CourseException(CourseErrorCode.INVALID_REGION);
       }
       course.getRegions().clear();

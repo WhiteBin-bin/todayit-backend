@@ -1,6 +1,7 @@
 package com.todayit.course.service.model;
 
 import com.todayit.course.entity.CourseTransport;
+import com.todayit.region.service.model.RegionSummaryResult;
 import java.time.LocalDateTime;
 
 /**
@@ -13,7 +14,7 @@ import java.time.LocalDateTime;
  * @param transport 이동수단, 설정되지 않았으면 null
  */
 public record CourseConditionsResult(
-    CourseRegionResult region,
+    RegionSummaryResult region,
     LocalDateTime startAt,
     LocalDateTime endAt,
     Integer durationMinutes,

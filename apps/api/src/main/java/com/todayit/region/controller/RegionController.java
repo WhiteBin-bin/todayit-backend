@@ -1,10 +1,12 @@
-package com.todayit.course.controller;
+package com.todayit.region.controller;
 
 import com.todayit.common.response.CommonResponse;
-import com.todayit.course.controller.docs.RegionApiDocs;
-import com.todayit.course.dto.response.RegionResponse;
-import com.todayit.course.service.RegionQueryService;
+import com.todayit.region.controller.docs.RegionApiDocs;
+import com.todayit.region.dto.response.RegionResponse;
+import com.todayit.region.service.RegionQueryService;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -14,6 +16,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/regions")
 public class RegionController implements RegionApiDocs {
+
+  private static final Logger LOG = LoggerFactory.getLogger(RegionController.class);
 
   private final RegionQueryService regionQueryService;
 
@@ -36,6 +40,7 @@ public class RegionController implements RegionApiDocs {
   public ResponseEntity<CommonResponse<List<RegionResponse>>> getRegions() {
     List<RegionResponse> regions =
         regionQueryService.findAllRegions().stream().map(RegionResponse::from).toList();
+    LOG.info("전체 행정 지역 목록 조회 완료: sidoCount={}", regions.size());
     return ResponseEntity.ok(CommonResponse.success(regions));
   }
 }

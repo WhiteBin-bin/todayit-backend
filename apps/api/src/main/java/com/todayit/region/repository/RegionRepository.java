@@ -1,6 +1,6 @@
-package com.todayit.course.repository;
+package com.todayit.region.repository;
 
-import com.todayit.course.entity.Region;
+import com.todayit.region.entity.Region;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

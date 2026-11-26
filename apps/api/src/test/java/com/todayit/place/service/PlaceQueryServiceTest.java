@@ -8,9 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.todayit.common.pagination.PageResult;
-import com.todayit.course.service.RegionPlaceQueryService;
 import com.todayit.course.service.model.CoursePlaceItem;
-import com.todayit.course.service.model.RegionFilter;
 import com.todayit.place.entity.Category;
 import com.todayit.place.entity.Place;
 import com.todayit.place.entity.PlaceImage;
@@ -22,6 +20,8 @@ import com.todayit.place.service.model.PlaceLocationResult;
 import com.todayit.place.service.model.PlaceResult;
 import com.todayit.place.service.model.PlaceScrapSort;
 import com.todayit.place.service.model.PlaceSort;
+import com.todayit.region.service.RegionPlaceQueryService;
+import com.todayit.region.service.model.RegionFilter;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;

@@ -2,9 +2,9 @@ package com.todayit.member.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.todayit.course.entity.Region;
-import com.todayit.course.repository.RegionRepository;
 import com.todayit.member.entity.Member;
+import com.todayit.region.entity.Region;
+import com.todayit.region.repository.RegionRepository;
 import com.todayit.theme.Theme;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;

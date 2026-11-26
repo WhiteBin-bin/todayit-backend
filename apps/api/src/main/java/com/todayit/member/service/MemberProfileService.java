@@ -2,9 +2,6 @@ package com.todayit.member.service;
 
 import com.todayit.common.exception.BusinessException;
 import com.todayit.common.exception.InvalidRequestException;
-import com.todayit.course.entity.Region;
-import com.todayit.course.exception.InvalidRegionPathException;
-import com.todayit.course.repository.RegionRepository;
 import com.todayit.member.entity.Member;
 import com.todayit.member.entity.PreferredRegionCode;
 import com.todayit.member.exception.MemberErrorCode;
@@ -13,6 +10,10 @@ import com.todayit.member.repository.MemberRepository;
 import com.todayit.member.service.command.MemberProfileCommand;
 import com.todayit.member.service.model.MemberProfileDetailsResult;
 import com.todayit.member.service.model.MemberProfileResult;
+import com.todayit.region.entity.Region;
+import com.todayit.region.exception.RegionErrorCode;
+import com.todayit.region.exception.RegionException;
+import com.todayit.region.repository.RegionRepository;
 import com.todayit.theme.Theme;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -129,7 +130,7 @@ public class MemberProfileService {
    * @return 변경된 회원 프로필 정보
    * @throws BusinessException 회원이 없거나 닉네임 변경 정책을 위반한 경우
    * @throws InvalidRequestException 수정 항목이 없거나 입력값이 잘못된 경우
-   * @throws InvalidRegionPathException 선택할 수 없거나 존재하지 않는 지역인 경우
+   * @throws RegionException 선택할 수 없거나 존재하지 않는 지역인 경우
    */
   @Transactional
   public MemberProfileDetailsResult updateProfile(String memberId, MemberProfileCommand command) {
@@ -287,21 +288,23 @@ public class MemberProfileService {
    *
    * @param requested 요청된 선호 지역 코드
    * @return 조회된 지역
-   * @throws InvalidRegionPathException 선택 불가능하거나 존재하지 않는 지역인 경우
+   * @throws RegionException 선택 불가능하거나 존재하지 않는 지역인 경우
    */
   private Region resolvePreferredRegion(PreferredRegionCode requested) {
     if (!ALLOWED_PREFERRED_REGIONS.contains(requested)) {
-      throw new InvalidRegionPathException();
+      throw new RegionException(RegionErrorCode.INVALID_PATH);
     }
 
     List<Integer> regionIds =
         regionRepository.findIdsByCodes(requested.sidoCode(), requested.sigunguCode());
 
     if (regionIds.size() != 1) {
-      throw new InvalidRegionPathException();
+      throw new RegionException(RegionErrorCode.INVALID_PATH);
     }
 
-    return regionRepository.findById(regionIds.get(0)).orElseThrow(InvalidRegionPathException::new);
+    return regionRepository
+        .findById(regionIds.get(0))
+        .orElseThrow(() -> new RegionException(RegionErrorCode.INVALID_PATH));
   }
 
   private String validateNicknameChange(Member member, String nickname, LocalDateTime now) {

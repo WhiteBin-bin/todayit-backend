@@ -1,20 +1,20 @@
-package com.todayit.course.service;
+package com.todayit.region.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import com.todayit.course.entity.Region;
-import com.todayit.course.exception.InvalidRegionPathException;
-import com.todayit.course.repository.RegionRepository;
-import com.todayit.course.service.model.CourseRegionResult;
-import com.todayit.course.service.model.RegionFilter;
-import com.todayit.course.service.model.RegionResult;
-import com.todayit.course.service.model.SigunguResult;
-import com.todayit.course.service.model.SubRegionResult;
+import com.todayit.region.entity.Region;
+import com.todayit.region.exception.RegionException;
+import com.todayit.region.repository.RegionRepository;
+import com.todayit.region.service.model.RegionFilter;
+import com.todayit.region.service.model.RegionResult;
+import com.todayit.region.service.model.RegionSummaryResult;
+import com.todayit.region.service.model.SigunguResult;
+import com.todayit.region.service.model.SubRegionResult;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,7 +31,7 @@ class RegionQueryServiceTest {
   @Test
   @DisplayName("전체 지역 엔티티 목록을 시도 및 하위 시군구 계층 구조로 변환하여 조회한다")
   void findsAllRegionsHierarchically() {
-    // Given
+    // given
     List<Region> regions =
         List.of(
             new Region(1, "11", "110", "서울특별시", "종로구"),
@@ -40,10 +40,10 @@ class RegionQueryServiceTest {
     when(regionRepository.findAllByOrderBySidoCodeAscSigunguCodeAsc()).thenReturn(regions);
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When
+    // when
     List<RegionResult> result = service.findAllRegions();
 
-    // Then
+    // then
     assertThat(result).hasSize(2);
 
     RegionResult seoul = result.get(0);
@@ -61,7 +61,7 @@ class RegionQueryServiceTest {
   @Test
   @DisplayName("세부 지역이 있는 시군구는 공백을 기준으로 3단계 계층 구조로 그룹화하여 조회한다")
   void findsAllRegionsInThreeDepthHierarchy() {
-    // Given
+    // given
     List<Region> regions =
         List.of(
             new Region(1, "41", "110", "경기도", "수원시"),
@@ -74,10 +74,10 @@ class RegionQueryServiceTest {
     when(regionRepository.findAllByOrderBySidoCodeAscSigunguCodeAsc()).thenReturn(regions);
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When
+    // when
     List<RegionResult> result = service.findAllRegions();
 
-    // Then
+    // then
     assertThat(result).hasSize(1);
     RegionResult gyeonggi = result.get(0);
     assertThat(gyeonggi.sidoCode()).isEqualTo("41");
@@ -105,14 +105,14 @@ class RegionQueryServiceTest {
   @Test
   @DisplayName("지역 엔티티 데이터가 비어있으면 빈 목록을 반환한다")
   void returnsEmptyListWhenNoRegions() {
-    // Given
+    // given
     when(regionRepository.findAllByOrderBySidoCodeAscSigunguCodeAsc()).thenReturn(List.of());
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When
+    // when
     List<RegionResult> result = service.findAllRegions();
 
-    // Then
+    // then
     assertThat(result).isEmpty();
   }
 
@@ -120,14 +120,14 @@ class RegionQueryServiceTest {
   @CsvSource({"41,", ",115", "41,115", ","})
   @DisplayName("전달된 시도 또는 시군구 코드로 지역 식별자를 조회한다")
   void findsRegionsByProvidedCodes(String sidoCode, String sigunguCode) {
-    // Given
+    // given
     when(regionRepository.findIdsByCodes(sidoCode, sigunguCode)).thenReturn(List.of(1, 2));
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When
+    // when
     List<Integer> result = service.findRegionIds(sidoCode, sigunguCode);
 
-    // Then
+    // then
     assertThat(result).containsExactly(1, 2);
   }
 
@@ -135,39 +135,45 @@ class RegionQueryServiceTest {
   @CsvSource({"1,", "411,", "ab,", "' ',", "'',", ",11", ",1100", ",abc", ",' '", ",''"})
   @DisplayName("잘못된 형식의 지역 코드는 조회 전에 예외를 던진다")
   void rejectsMalformedCodesBeforeQuerying(String sidoCode, String sigunguCode) {
-    // Given
+    // given
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When & Then
-    assertThatThrownBy(() -> service.findRegionIds(sidoCode, sigunguCode))
-        .isInstanceOf(InvalidRegionPathException.class);
+    // when
+    RegionException exception =
+        assertThrows(RegionException.class, () -> service.findRegionIds(sidoCode, sigunguCode));
+
+    // then
+    assertThat(exception.getErrorCode().code()).isEqualTo("INVALID_REGION_PATH");
     verifyNoInteractions(regionRepository);
   }
 
   @Test
   @DisplayName("조회된 지역 식별자가 없으면 예외를 던진다")
   void throwsExceptionWhenNoRegionIdsFound() {
-    // Given
+    // given
     when(regionRepository.findIdsByCodes("41", "115")).thenReturn(List.of());
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When & Then
-    assertThatThrownBy(() -> service.findRegionIds("41", "115"))
-        .isInstanceOf(InvalidRegionPathException.class);
+    // when
+    RegionException exception =
+        assertThrows(RegionException.class, () -> service.findRegionIds("41", "115"));
+
+    // then
+    assertThat(exception.getErrorCode().code()).isEqualTo("INVALID_REGION_PATH");
   }
 
   @Test
   @DisplayName("단일 지역 코스로 요약 정보를 반환한다")
   void getsSummaryForSingleRegion() {
-    // Given
+    // given
     List<Region> regions = List.of(new Region(1, "11", "110", "서울특별시", "종로구"));
     when(regionRepository.findAllById(List.of(1))).thenReturn(regions);
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When
-    CourseRegionResult result = service.getCourseRegionSummary(List.of(1));
+    // when
+    RegionSummaryResult result = service.getRegionSummary(List.of(1));
 
-    // Then
+    // then
     assertThat(result).isNotNull();
     assertThat(result.sidoCode()).isEqualTo("11");
     assertThat(result.sidoName()).isEqualTo("서울특별시");
@@ -178,17 +184,17 @@ class RegionQueryServiceTest {
   @Test
   @DisplayName("여러 시군구가 포함된 경우 시군구 정보 없이 시도만 반환한다")
   void getsSummaryForMultipleSigungusInSameSido() {
-    // Given
+    // given
     List<Region> regions =
         List.of(
             new Region(1, "11", "110", "서울특별시", "종로구"), new Region(2, "11", "680", "서울특별시", "강남구"));
     when(regionRepository.findAllById(List.of(1, 2))).thenReturn(regions);
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When
-    CourseRegionResult result = service.getCourseRegionSummary(List.of(1, 2));
+    // when
+    RegionSummaryResult result = service.getRegionSummary(List.of(1, 2));
 
-    // Then
+    // then
     assertThat(result).isNotNull();
     assertThat(result.sidoCode()).isEqualTo("11");
     assertThat(result.sidoName()).isEqualTo("서울특별시");
@@ -199,14 +205,14 @@ class RegionQueryServiceTest {
   @Test
   @DisplayName("전달된 지역 ID 목록이 null이거나 비어있으면 null을 반환한다")
   void returnsNullWhenRegionIdsEmpty() {
-    // Given
+    // given
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When
-    CourseRegionResult resultNull = service.getCourseRegionSummary(null);
-    CourseRegionResult resultEmpty = service.getCourseRegionSummary(List.of());
+    // when
+    RegionSummaryResult resultNull = service.getRegionSummary(null);
+    RegionSummaryResult resultEmpty = service.getRegionSummary(List.of());
 
-    // Then
+    // then
     assertThat(resultNull).isNull();
     assertThat(resultEmpty).isNull();
   }
@@ -214,21 +220,21 @@ class RegionQueryServiceTest {
   @Test
   @DisplayName("지역 엔티티를 찾을 수 없으면 null을 반환한다")
   void returnsNullWhenNoRegionsFoundForSummary() {
-    // Given
+    // given
     when(regionRepository.findAllById(List.of(999))).thenReturn(List.of());
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When
-    CourseRegionResult result = service.getCourseRegionSummary(List.of(999));
+    // when
+    RegionSummaryResult result = service.getRegionSummary(List.of(999));
 
-    // Then
+    // then
     assertThat(result).isNull();
   }
 
   @Test
   @DisplayName("유효한 지역 필터 목록으로 지역 식별자 목록을 조회한다")
   void findsRegionIdsWithValidFilters() {
-    // Given
+    // given
     List<RegionFilter> filters =
         List.of(new RegionFilter("11", List.of("110", "680")), new RegionFilter("41", List.of()));
     List<Region> seoulRegions =
@@ -239,10 +245,10 @@ class RegionQueryServiceTest {
     when(regionRepository.findIdsBySidoCode("41")).thenReturn(List.of(10, 11));
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When
+    // when
     List<Integer> result = service.findRegionIds(filters);
 
-    // Then
+    // then
     assertThat(result).containsExactly(1, 2, 10, 11);
   }
 
@@ -250,6 +256,7 @@ class RegionQueryServiceTest {
   @CsvSource({"190", "190:192", "192:194:196"})
   @DisplayName("시와 하위 구를 자동 확장하지 않고 전달한 코드의 지역만 반환한다")
   void returnsOnlyRegionsForExplicitCodes(String codes) {
+    // given
     List<String> selectedCodes = List.of(codes.split(":"));
     List<Region> regions =
         List.of(
@@ -265,8 +272,10 @@ class RegionQueryServiceTest {
         .thenReturn(selectedRegions);
     RegionQueryService service = new RegionQueryService(regionRepository);
 
+    // when
     List<Integer> result = service.findRegionIds(List.of(new RegionFilter("41", selectedCodes)));
 
+    // then
     assertThat(result)
         .containsExactlyElementsOf(
             selectedRegions.stream().map(r -> r.getSnapshot().regionId()).toList());
@@ -277,12 +286,15 @@ class RegionQueryServiceTest {
   @Test
   @DisplayName("하위 구만 선택하면 상위 시나 다른 구를 포함하지 않는다")
   void keepsSelectedDistrictOnly() {
+    // given
     when(regionRepository.findBySidoCodeAndSigunguCodeIn("41", List.of("192")))
         .thenReturn(List.of(new Region(11, "41", "192", "경기도", "부천시 원미구")));
     RegionQueryService service = new RegionQueryService(regionRepository);
 
+    // when
     List<Integer> result = service.findRegionIds(List.of(new RegionFilter("41", List.of("192"))));
 
+    // then
     assertThat(result).containsExactly(11);
     verify(regionRepository).findBySidoCodeAndSigunguCodeIn("41", List.of("192"));
     verifyNoMoreInteractions(regionRepository);
@@ -291,14 +303,14 @@ class RegionQueryServiceTest {
   @Test
   @DisplayName("지역 필터 목록이 null이거나 비어있으면 빈 목록을 반환한다")
   void returnsEmptyListWhenFiltersEmpty() {
-    // Given
+    // given
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When
+    // when
     List<Integer> resultNull = service.findRegionIds((List<RegionFilter>) null);
     List<Integer> resultEmpty = service.findRegionIds(List.of());
 
-    // Then
+    // then
     assertThat(resultNull).isEmpty();
     assertThat(resultEmpty).isEmpty();
   }
@@ -307,79 +319,97 @@ class RegionQueryServiceTest {
   @CsvSource({"1", "411", "ab", "' '", "''"})
   @DisplayName("필터의 시도 코드가 잘못된 형식인 경우 예외를 던진다")
   void rejectsInvalidSidoCodeInFilters(String invalidSidoCode) {
-    // Given
+    // given
     List<RegionFilter> filters = List.of(new RegionFilter(invalidSidoCode, List.of()));
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When & Then
-    assertThatThrownBy(() -> service.findRegionIds(filters))
-        .isInstanceOf(InvalidRegionPathException.class);
+    // when
+    RegionException exception =
+        assertThrows(RegionException.class, () -> service.findRegionIds(filters));
+
+    // then
+    assertThat(exception.getErrorCode().code()).isEqualTo("INVALID_REGION_PATH");
   }
 
   @ParameterizedTest
   @CsvSource({"11", "1100", "abc", "' '", "''"})
   @DisplayName("필터의 시군구 코드가 잘못된 형식인 경우 예외를 던진다")
   void rejectsInvalidSigunguCodeInFilters(String invalidSigunguCode) {
-    // Given
+    // given
     List<RegionFilter> filters = List.of(new RegionFilter("11", List.of(invalidSigunguCode)));
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When & Then
-    assertThatThrownBy(() -> service.findRegionIds(filters))
-        .isInstanceOf(InvalidRegionPathException.class);
+    // when
+    RegionException exception =
+        assertThrows(RegionException.class, () -> service.findRegionIds(filters));
+
+    // then
+    assertThat(exception.getErrorCode().code()).isEqualTo("INVALID_REGION_PATH");
   }
 
   @Test
   @DisplayName("시군구 목록이 비어있을 때 해당 시도의 지역이 없으면 예외를 던진다")
   void throwsExceptionWhenSidoNotFoundInFilters() {
-    // Given
+    // given
     List<RegionFilter> filters = List.of(new RegionFilter("99", List.of()));
     when(regionRepository.findIdsBySidoCode("99")).thenReturn(List.of());
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When & Then
-    assertThatThrownBy(() -> service.findRegionIds(filters))
-        .isInstanceOf(InvalidRegionPathException.class);
+    // when
+    RegionException exception =
+        assertThrows(RegionException.class, () -> service.findRegionIds(filters));
+
+    // then
+    assertThat(exception.getErrorCode().code()).isEqualTo("INVALID_REGION_PATH");
   }
 
   @Test
   @DisplayName("일부 시군구가 조회되지 않으면 예외를 던진다")
   void throwsExceptionWhenSomeSigunguNotFoundInFilters() {
-    // Given
+    // given
     List<RegionFilter> filters = List.of(new RegionFilter("11", List.of("110", "999")));
     List<Region> matchedRegions = List.of(new Region(1, "11", "110", "서울특별시", "종로구"));
     when(regionRepository.findBySidoCodeAndSigunguCodeIn("11", List.of("110", "999")))
         .thenReturn(matchedRegions);
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When & Then
-    assertThatThrownBy(() -> service.findRegionIds(filters))
-        .isInstanceOf(InvalidRegionPathException.class);
+    // when
+    RegionException exception =
+        assertThrows(RegionException.class, () -> service.findRegionIds(filters));
+
+    // then
+    assertThat(exception.getErrorCode().code()).isEqualTo("INVALID_REGION_PATH");
   }
 
   @Test
   @DisplayName("지역 목록이 둘 이상의 시·도에 걸쳐 있으면 true를 반환한다")
   void returnsTrueWhenRegionIdsSpanMultipleSidos() {
-    // Given
+    // given
     Region r1 = new Region(1, "11", "110", "서울특별시", "종로구");
     Region r2 = new Region(2, "41", "110", "경기도", "수원시");
     when(regionRepository.findAllById(List.of(1, 2))).thenReturn(List.of(r1, r2));
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When & Then
-    assertThat(service.hasMultipleSidos(List.of(1, 2))).isTrue();
+    // when
+    boolean result = service.hasMultipleSidos(List.of(1, 2));
+
+    // then
+    assertThat(result).isTrue();
   }
 
   @Test
   @DisplayName("지역 목록이 동일한 시·도에 속하면 false를 반환한다")
   void returnsFalseWhenRegionIdsBelongToSameSido() {
-    // Given
+    // given
     Region r1 = new Region(1, "11", "110", "서울특별시", "종로구");
     Region r2 = new Region(2, "11", "140", "서울특별시", "중구");
     when(regionRepository.findAllById(List.of(1, 2))).thenReturn(List.of(r1, r2));
     RegionQueryService service = new RegionQueryService(regionRepository);
 
-    // When & Then
-    assertThat(service.hasMultipleSidos(List.of(1, 2))).isFalse();
+    // when
+    boolean result = service.hasMultipleSidos(List.of(1, 2));
+
+    // then
+    assertThat(result).isFalse();
   }
 }

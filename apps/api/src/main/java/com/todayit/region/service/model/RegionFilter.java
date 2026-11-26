@@ -1,4 +1,4 @@
-package com.todayit.course.service.model;
+package com.todayit.region.service.model;
 
 import java.util.List;
 

@@ -1,6 +1,7 @@
 package com.todayit.course.service.model;
 
 import com.todayit.course.entity.CourseTransport;
+import com.todayit.region.service.model.RegionSummaryResult;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -23,7 +24,7 @@ public record RecommendedCourseResult(
     String title,
     String courseSummary,
     String thumbnailUrl,
-    CourseRegionResult region,
+    RegionSummaryResult region,
     List<String> themes,
     CourseTransport transport,
     int placeCount,

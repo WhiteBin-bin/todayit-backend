@@ -21,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 @ActiveProfiles("test")
 @SpringBootTest
 @Transactional
-@DisplayName("코스 좋아요·스크랩 마이그레이션")
 class CourseReactionMigrationTest {
   @Autowired private EntityManager entities;
   @Autowired private JdbcTemplate jdbc;

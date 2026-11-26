@@ -1,6 +1,6 @@
 package com.todayit.member.entity;
 
-import com.todayit.course.entity.Region;
+import com.todayit.region.entity.Region;
 import com.todayit.theme.Theme;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

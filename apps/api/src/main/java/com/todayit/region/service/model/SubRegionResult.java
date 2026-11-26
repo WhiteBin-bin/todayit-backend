@@ -1,4 +1,4 @@
-package com.todayit.course.service.model;
+package com.todayit.region.service.model;
 
 /**
  * 세부 지역 조회 결과 모델입니다.

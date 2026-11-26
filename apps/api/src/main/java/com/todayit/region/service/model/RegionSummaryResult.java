@@ -1,4 +1,4 @@
-package com.todayit.course.service.model;
+package com.todayit.region.service.model;
 
 /**
  * 코스 지역 요약 정보입니다.
@@ -8,5 +8,5 @@ package com.todayit.course.service.model;
  * @param sigunguCode 시·군·구 코드, 시·도 전체 대상인 경우 null
  * @param sigunguName 시·군·구 이름, 시·도 전체 대상인 경우 null
  */
-public record CourseRegionResult(
+public record RegionSummaryResult(
     String sidoCode, String sidoName, String sigunguCode, String sigunguName) {}

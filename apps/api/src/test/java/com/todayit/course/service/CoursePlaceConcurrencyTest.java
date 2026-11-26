@@ -33,7 +33,6 @@ import org.springframework.test.context.ActiveProfiles;
 
 @ActiveProfiles("test")
 @SpringBootTest
-@DisplayName("코스 장소 추가 동시성")
 class CoursePlaceConcurrencyTest {
   @Autowired private CourseCommandService service;
   @Autowired private JdbcTemplate jdbc;

@@ -24,9 +24,8 @@ import org.springframework.test.util.ReflectionTestUtils;
       "spring.jpa.hibernate.ddl-auto=create-drop",
       "spring.jpa.properties.hibernate.auto_quote_keyword=true"
     })
-@EntityScan("com.todayit.course.entity")
+@EntityScan({"com.todayit.course.entity", "com.todayit.region.entity"})
 @Import(CourseCreationRepositoryTest.RepositoryConfiguration.class)
-@DisplayName("CourseRecommendationRepository 슬라이스 테스트")
 class CourseRecommendationRepositoryTest {
   @Autowired private CourseRecommendationRepository recommendations;
   @Autowired private CourseRepository courses;

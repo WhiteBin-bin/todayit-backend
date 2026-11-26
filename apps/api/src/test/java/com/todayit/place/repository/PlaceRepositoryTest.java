@@ -2,9 +2,9 @@ package com.todayit.place.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.todayit.course.repository.RegionRepository;
 import com.todayit.place.entity.Category;
 import com.todayit.place.entity.Place;
+import com.todayit.region.repository.RegionRepository;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

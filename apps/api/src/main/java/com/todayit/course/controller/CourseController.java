@@ -1,9 +1,12 @@
 package com.todayit.course.controller;
 
+import com.todayit.common.pagination.PageResponse;
+import com.todayit.common.pagination.PageResult;
 import com.todayit.common.response.CommonResponse;
 import com.todayit.course.controller.docs.CourseApiDocs;
 import com.todayit.course.dto.request.AddCoursePlaceRequest;
 import com.todayit.course.dto.request.CourseRecommendationRequest;
+import com.todayit.course.dto.request.CourseSearchRequest;
 import com.todayit.course.dto.request.CreateCourseRequest;
 import com.todayit.course.dto.request.UpdateCourseConditionsRequest;
 import com.todayit.course.dto.request.UpdateCoursePlaceOrdersRequest;
@@ -11,6 +14,7 @@ import com.todayit.course.dto.request.UpdateCourseTransportRequest;
 import com.todayit.course.dto.request.UpdateCourseVisibilityRequest;
 import com.todayit.course.dto.response.AddCoursePlaceResponse;
 import com.todayit.course.dto.response.CopyCourseResponse;
+import com.todayit.course.dto.response.CourseCardResponse;
 import com.todayit.course.dto.response.CourseDetailResponse;
 import com.todayit.course.dto.response.CourseLikeResponse;
 import com.todayit.course.dto.response.CreateCourseResponse;
@@ -24,6 +28,7 @@ import com.todayit.course.service.CourseFacade;
 import com.todayit.course.service.CourseRecommendationFacade;
 import com.todayit.course.service.command.AddCoursePlaceCommand;
 import com.todayit.course.service.command.UpdateCoursePlaceOrdersCommand;
+import com.todayit.course.service.model.CourseCardResult;
 import com.todayit.course.service.model.RemoveCoursePlaceResult;
 import com.todayit.course.service.model.UpdateCourseConditionsResult;
 import com.todayit.course.service.model.UpdateCoursePlaceOrdersResult;
@@ -63,6 +68,26 @@ public class CourseController implements CourseApiDocs {
   public CourseController(CourseFacade courseFacade, CourseRecommendationFacade recommendations) {
     this.courseFacade = courseFacade;
     this.recommendations = recommendations;
+  }
+
+  /**
+   * 공개·확정 코스 목록을 필터, 정렬 및 페이징 조건에 맞게 조회합니다.
+   *
+   * @param request 코스 목록 및 필터 조회 조건
+   * @return 공개 코스 카드 페이지 응답
+   */
+  @Override
+  @GetMapping
+  public ResponseEntity<CommonResponse<PageResponse<CourseCardResponse>>> findCourses(
+      @ModelAttribute CourseSearchRequest request) {
+    PageResult<CourseCardResult> result = courseFacade.findCourses(request.toCommand());
+    PageResponse<CourseCardResponse> response = PageResponse.from(result, CourseCardResponse::from);
+    LOG.info(
+        "코스 목록 조회 완료: page={}, size={}, count={}",
+        response.page(),
+        response.size(),
+        response.content().size());
+    return ResponseEntity.ok(CommonResponse.success(response));
   }
 
   /**

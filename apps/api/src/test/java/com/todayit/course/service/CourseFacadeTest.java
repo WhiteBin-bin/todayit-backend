@@ -15,21 +15,24 @@ import com.todayit.course.entity.CoursePlace;
 import com.todayit.course.entity.CourseStatus;
 import com.todayit.course.entity.CourseTransport;
 import com.todayit.course.entity.CourseVisibility;
+import com.todayit.course.entity.RegionCourse;
+import com.todayit.course.entity.Theme;
 import com.todayit.course.exception.CourseErrorCode;
 import com.todayit.course.exception.CourseException;
-import com.todayit.course.repository.CourseMemberLikeRepository;
-import com.todayit.course.repository.CourseScrapRepository;
 import com.todayit.course.service.command.AddCoursePlaceCommand;
+import com.todayit.course.service.command.CourseSearchCommand;
 import com.todayit.course.service.command.CreateCourseCommand;
 import com.todayit.course.service.command.UpdateCourseConditionsCommand;
 import com.todayit.course.service.command.UpdateCoursePlaceOrdersCommand;
 import com.todayit.course.service.model.AddCoursePlaceEntities;
 import com.todayit.course.service.model.AddCoursePlaceResult;
 import com.todayit.course.service.model.CopyCourseResult;
+import com.todayit.course.service.model.CourseCardResult;
 import com.todayit.course.service.model.CourseDetailResult;
+import com.todayit.course.service.model.CourseDurationFilter;
 import com.todayit.course.service.model.CourseLikeResult;
 import com.todayit.course.service.model.CoursePlaceItem;
-import com.todayit.course.service.model.CourseRegionResult;
+import com.todayit.course.service.model.CourseSort;
 import com.todayit.course.service.model.CreateCourseResult;
 import com.todayit.course.service.model.MyCourseCardResult;
 import com.todayit.course.service.model.MyCourseSort;
@@ -38,6 +41,9 @@ import com.todayit.course.service.model.UpdateCourseConditionsResult;
 import com.todayit.course.service.model.UpdateCoursePlaceOrdersResult;
 import com.todayit.course.service.model.UpdateCourseTransportResult;
 import com.todayit.course.service.model.UpdateCourseVisibilityResult;
+import com.todayit.region.service.RegionQueryService;
+import com.todayit.region.service.model.RegionFilter;
+import com.todayit.region.service.model.RegionSummaryResult;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -53,17 +59,122 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("CourseFacade 단위 테스트")
 class CourseFacadeTest {
 
   @Mock private RegionQueryService regions;
   @Mock private CourseCommandService courses;
   @Mock private CourseQueryService courseQueryService;
   @Mock private PlaceCourseQueryService placeCourseQueryService;
-  @Mock private CourseMemberLikeRepository courseMemberLikeRepository;
-  @Mock private CourseScrapRepository courseScrapRepository;
+  @Mock private CourseReactionQueryService courseReactionQueryService;
 
   @InjectMocks private CourseFacade facade;
+
+  @Test
+  @DisplayName("공개 코스 목록을 필터와 정렬에 맞게 조회하고 카드 모델 페이지로 반환한다")
+  void findsCoursesWithFiltersSuccessfully() {
+    // given
+    Theme theme = mock(Theme.class);
+    when(theme.getName()).thenReturn("로맨틱");
+
+    Course course =
+        Course.createDraft(
+            "member-1",
+            "행궁동 데이트 코스",
+            CourseTransport.WALKING,
+            LocalDateTime.of(2026, 11, 24, 10, 0),
+            LocalDateTime.of(2026, 11, 24, 18, 0),
+            List.of(theme),
+            LocalDateTime.of(2026, 11, 24, 9, 0));
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "courseSummary", "행궁동 감성 산책 코스");
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PUBLIC);
+    course.getRegions().add(RegionCourse.create(course, 7));
+    addPlace(course, 10, 1, 60);
+
+    List<RegionFilter> regionFilters = List.of(new RegionFilter("41", List.of("111")));
+    CourseSearchCommand command =
+        new CourseSearchCommand(
+            regionFilters,
+            List.of("로맨틱"),
+            null,
+            CourseTransport.WALKING,
+            CourseSort.POPULAR,
+            0,
+            20);
+
+    when(regions.findRegionIds(regionFilters)).thenReturn(List.of(7));
+    when(courseQueryService.findPublicCourses(
+            eq(List.of(7)),
+            eq(List.of("로맨틱")),
+            eq(CourseTransport.WALKING),
+            any(PageRequest.class)))
+        .thenReturn(new PageImpl<>(List.of(course), PageRequest.of(0, 20), 1));
+    when(placeCourseQueryService.findPlacesByIds(List.of(10)))
+        .thenReturn(
+            Map.of(
+                10,
+                new CoursePlaceItem(
+                    10,
+                    "장소 1",
+                    "CAFE",
+                    "주소 1",
+                    BigDecimal.valueOf(37.1),
+                    BigDecimal.valueOf(127.1),
+                    "https://example.com/place.jpg")));
+    when(courseReactionQueryService.countLikes(List.of(1)))
+        .thenReturn(List.<Object[]>of(new Object[] {1, 15L}));
+    when(regions.getRegionSummary(List.of(7)))
+        .thenReturn(new RegionSummaryResult("41", "경기도", "111", "수원시 장안구"));
+
+    // when
+    PageResult<CourseCardResult> result = facade.findCourses(command);
+
+    // then
+    verify(courseQueryService).validateThemes(List.of("로맨틱"));
+    assertThat(result.totalElements()).isEqualTo(1L);
+    assertThat(result.content()).hasSize(1);
+    CourseCardResult card = result.content().getFirst();
+    assertThat(card.courseId()).isEqualTo(1);
+    assertThat(card.title()).isEqualTo("행궁동 데이트 코스");
+    assertThat(card.courseSummary()).isEqualTo("행궁동 감성 산책 코스");
+    assertThat(card.thumbnailUrl()).isEqualTo("https://example.com/place.jpg");
+    assertThat(card.region().sidoName()).isEqualTo("경기도");
+    assertThat(card.region().sigunguName()).isEqualTo("수원시 장안구");
+    assertThat(card.themes()).containsExactly("로맨틱");
+    assertThat(card.durationMinutes()).isEqualTo(480);
+    assertThat(card.transport()).isEqualTo(CourseTransport.WALKING);
+    assertThat(card.status()).isEqualTo(CourseStatus.ACTIVE);
+    assertThat(card.visibility()).isEqualTo(CourseVisibility.PUBLIC);
+    assertThat(card.placeCount()).isEqualTo(1);
+    assertThat(card.likeCount()).isEqualTo(15L);
+  }
+
+  @Test
+  @DisplayName("소요 시간 구간 필터를 조회 서비스에 전달한다")
+  void returnsEmptyPageWhenDurationFilterIsPresent() {
+    // given
+    CourseSearchCommand command =
+        new CourseSearchCommand(
+            List.of(),
+            List.of("로맨틱"),
+            CourseDurationFilter.TWO_TO_FOUR_HOURS,
+            null,
+            CourseSort.LATEST,
+            0,
+            20);
+
+    when(courseQueryService.findPublicCoursesInDuration(any(), any(), any(), any(), any()))
+        .thenReturn(org.springframework.data.domain.Page.empty());
+    // when
+    PageResult<CourseCardResult> result = facade.findCourses(command);
+
+    // then
+    verify(courseQueryService).validateThemes(List.of("로맨틱"));
+    assertThat(result.content()).isEmpty();
+    assertThat(result.totalElements()).isZero();
+    verifyNoInteractions(placeCourseQueryService);
+  }
 
   @Test
   @DisplayName("코스 생성 명령을 CourseCommandService에 정상적으로 위임한다")
@@ -155,7 +266,7 @@ class CourseFacadeTest {
             LocalDateTime.now());
     addPlace(course, 10, null, 60);
 
-    CourseRegionResult regionResult = new CourseRegionResult("11", "서울특별시", "110", "종로구");
+    RegionSummaryResult regionResult = new RegionSummaryResult("11", "서울특별시", "110", "종로구");
     CoursePlaceItem placeItem =
         new CoursePlaceItem(
             10,
@@ -167,13 +278,10 @@ class CourseFacadeTest {
             "https://example.com/place.jpg");
 
     when(courseQueryService.getCourse(1)).thenReturn(course);
-    when(regions.getCourseRegionSummary(List.of())).thenReturn(regionResult);
+    when(regions.getRegionSummary(List.of())).thenReturn(regionResult);
     when(placeCourseQueryService.findPlacesByIds(List.of(10))).thenReturn(Map.of(10, placeItem));
-    when(courseMemberLikeRepository.existsByMemberIdAndCourseCourseId("member-1", 1))
-        .thenReturn(true);
-    when(courseScrapRepository.existsByMemberIdAndCourseCourseIdAndActiveTrueAndDeletedFalse(
-            "member-1", 1))
-        .thenReturn(false);
+    when(courseReactionQueryService.isLiked("member-1", 1)).thenReturn(true);
+    when(courseReactionQueryService.isScrapped("member-1", 1)).thenReturn(false);
 
     // when
     CourseDetailResult result = facade.getCourseDetail(1, "member-1");
@@ -206,7 +314,7 @@ class CourseFacadeTest {
             LocalDateTime.now());
 
     when(courseQueryService.getCourse(1)).thenReturn(course);
-    when(regions.getCourseRegionSummary(List.of())).thenReturn(null);
+    when(regions.getRegionSummary(List.of())).thenReturn(null);
 
     // when
     CourseDetailResult result = facade.getCourseDetail(1, "member-1");
@@ -413,10 +521,10 @@ class CourseFacadeTest {
                     BigDecimal.valueOf(37.1),
                     BigDecimal.valueOf(127.1),
                     "http://image.jpg")));
-    when(courseMemberLikeRepository.countByCourseIds(List.of(1)))
+    when(courseReactionQueryService.countLikes(List.of(1)))
         .thenReturn(List.<Object[]>of(new Object[] {1, 7L}));
-    when(regions.getCourseRegionSummary(List.of()))
-        .thenReturn(new CourseRegionResult("11", "서울특별시", "110", "종로구"));
+    when(regions.getRegionSummary(List.of()))
+        .thenReturn(new RegionSummaryResult("11", "서울특별시", "110", "종로구"));
 
     // when
     PageResult<MyCourseCardResult> result =
@@ -479,8 +587,8 @@ class CourseFacadeTest {
         new UpdateCourseConditionsCommand(1, "11", startAt, endAt, 240, CourseTransport.CAR);
 
     when(courses.updateCourseConditions("member-1", command)).thenReturn(course);
-    when(regions.getCourseRegionSummary(any()))
-        .thenReturn(new CourseRegionResult("11", "서울특별시", "110", "종로구"));
+    when(regions.getRegionSummary(any()))
+        .thenReturn(new RegionSummaryResult("11", "서울특별시", "110", "종로구"));
 
     // when
     UpdateCourseConditionsResult result = facade.updateCourseConditions("member-1", command);

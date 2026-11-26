@@ -1,4 +1,4 @@
-package com.todayit.course.controller;
+package com.todayit.region.controller;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -6,10 +6,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.todayit.common.exception.GlobalExceptionHandler;
-import com.todayit.course.service.RegionQueryService;
-import com.todayit.course.service.model.RegionResult;
-import com.todayit.course.service.model.SigunguResult;
-import com.todayit.course.service.model.SubRegionResult;
+import com.todayit.region.service.RegionQueryService;
+import com.todayit.region.service.model.RegionResult;
+import com.todayit.region.service.model.SigunguResult;
+import com.todayit.region.service.model.SubRegionResult;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,7 +40,7 @@ class RegionControllerTest {
   @Test
   @DisplayName("전체 지역 목록을 3단계 계층 구조로 조회한다")
   void getsAllRegionsHierarchically() throws Exception {
-    // Given
+    // given
     List<RegionResult> results =
         List.of(
             new RegionResult(
@@ -60,9 +61,11 @@ class RegionControllerTest {
                             new SubRegionResult("135", "분당구"))))));
     when(regionQueryService.findAllRegions()).thenReturn(results);
 
-    // When & Then
-    mockMvc
-        .perform(get("/api/v1/regions"))
+    // when
+    ResultActions result = mockMvc.perform(get("/api/v1/regions"));
+
+    // then
+    result
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data[0].sidoCode").value("11"))
@@ -86,12 +89,14 @@ class RegionControllerTest {
   @Test
   @DisplayName("지역 데이터가 없으면 빈 배열을 반환한다")
   void returnsEmptyListWhenNoRegions() throws Exception {
-    // Given
+    // given
     when(regionQueryService.findAllRegions()).thenReturn(List.of());
 
-    // When & Then
-    mockMvc
-        .perform(get("/api/v1/regions"))
+    // when
+    ResultActions result = mockMvc.perform(get("/api/v1/regions"));
+
+    // then
+    result
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data").isArray())

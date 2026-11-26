@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-@DisplayName("UpdateCourseConditionsRequest 단위 테스트")
 class UpdateCourseConditionsRequestTest {
   @Test
   @DisplayName("durationMinutes가 양수로 전달되면 endAt보다 우선 적용되어 검증을 통과한다")

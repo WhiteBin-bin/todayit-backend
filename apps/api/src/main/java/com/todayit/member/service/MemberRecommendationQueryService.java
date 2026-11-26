@@ -1,13 +1,13 @@
 package com.todayit.member.service;
 
 import com.todayit.common.exception.BusinessException;
-import com.todayit.course.entity.Region;
 import com.todayit.course.service.MemberCourseRecommendationQueryService;
 import com.todayit.course.service.model.CourseRecommendationProfile;
 import com.todayit.member.entity.Member;
 import com.todayit.member.exception.MemberErrorCode;
 import com.todayit.member.repository.MemberAgreementRepository;
 import com.todayit.member.repository.MemberRepository;
+import com.todayit.region.entity.Region;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

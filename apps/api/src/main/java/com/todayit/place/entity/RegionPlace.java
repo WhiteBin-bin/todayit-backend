@@ -1,6 +1,6 @@
 package com.todayit.place.entity;
 
-import com.todayit.course.entity.Region;
+import com.todayit.region.entity.Region;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

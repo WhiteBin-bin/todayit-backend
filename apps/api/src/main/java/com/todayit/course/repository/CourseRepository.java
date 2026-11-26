@@ -55,6 +55,104 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
   List<Theme> findThemesByNames(@Param("names") List<String> names);
 
   /**
+   * 공개·확정·미삭제 코스를 지역, 콘셉트, 이동수단 필터 조건으로 페이지 단위 조회합니다.
+   *
+   * @param regionIds 지역 필터에 해당하는 지역 식별자 목록
+   * @param regionFiltered 지역 필터 적용 여부
+   * @param themeNames 콘셉트 이름 필터 목록
+   * @param themeFiltered 콘셉트 필터 적용 여부
+   * @param transport 이동수단 필터, 생략 시 null
+   * @param pageable 페이징 및 정렬 조건
+   * @return 조건에 맞는 공개 확정 코스 페이지
+   */
+  @Query(
+      value =
+          "select course from Course course "
+              + "where course.status = com.todayit.course.entity.CourseStatus.ACTIVE "
+              + "and course.visibility = com.todayit.course.entity.CourseVisibility.PUBLIC "
+              + "and course.deletedAt is null "
+              + "and (:transport is null or course.transport = :transport) "
+              + "and (:regionFiltered = false or exists ("
+              + "  select rc from RegionCourse rc "
+              + "  where rc.course = course and rc.regionId in :regionIds)) "
+              + "and (:themeFiltered = false or exists ("
+              + "  select ct from CourseTheme ct "
+              + "  where ct.course = course and ct.theme.name in :themeNames))",
+      countQuery =
+          "select count(course) from Course course "
+              + "where course.status = com.todayit.course.entity.CourseStatus.ACTIVE "
+              + "and course.visibility = com.todayit.course.entity.CourseVisibility.PUBLIC "
+              + "and course.deletedAt is null "
+              + "and (:transport is null or course.transport = :transport) "
+              + "and (:regionFiltered = false or exists ("
+              + "  select rc from RegionCourse rc "
+              + "  where rc.course = course and rc.regionId in :regionIds)) "
+              + "and (:themeFiltered = false or exists ("
+              + "  select ct from CourseTheme ct "
+              + "  where ct.course = course and ct.theme.name in :themeNames))")
+  Page<Course> findPublicActiveCourses(
+      @Param("regionIds") List<Integer> regionIds,
+      @Param("regionFiltered") boolean regionFiltered,
+      @Param("themeNames") List<String> themeNames,
+      @Param("themeFiltered") boolean themeFiltered,
+      @Param("transport") CourseTransport transport,
+      Pageable pageable);
+
+  /**
+   * 공개·확정·미삭제 코스를 지역, 콘셉트, 이동수단 필터 조건으로 페이지 단위 조회합니다.
+   *
+   * @param regionIds 지역 필터에 해당하는 지역 식별자 목록
+   * @param regionFiltered 지역 필터 적용 여부
+   * @param themeNames 콘셉트 이름 필터 목록
+   * @param themeFiltered 콘셉트 필터 적용 여부
+   * @param transport 이동수단 필터, 생략 시 null
+   * @param minMinutes 하한(분, 초과), 생략 시 null
+   * @param maxMinutes 상한(분, 이하), 생략 시 null
+   * @param pageable 페이징 및 정렬 조건
+   * @return 조건에 맞는 공개 확정 코스 페이지
+   */
+  @Query(
+      value =
+          "select course from Course course "
+              + "where course.status = com.todayit.course.entity.CourseStatus.ACTIVE "
+              + "and course.visibility = com.todayit.course.entity.CourseVisibility.PUBLIC "
+              + "and course.deletedAt is null "
+              + "and course.startAt is not null and course.endAt > course.startAt "
+              + "and (:minMinutes is null or course.endAt > timestampadd(minute, :minMinutes, course.startAt)) "
+              + "and (:maxMinutes is null or course.endAt <= timestampadd(minute, :maxMinutes, course.startAt)) "
+              + "and (:transport is null or course.transport = :transport) "
+              + "and (:regionFiltered = false or exists ("
+              + "  select rc from RegionCourse rc "
+              + "  where rc.course = course and rc.regionId in :regionIds)) "
+              + "and (:themeFiltered = false or exists ("
+              + "  select ct from CourseTheme ct "
+              + "  where ct.course = course and ct.theme.name in :themeNames))",
+      countQuery =
+          "select count(course) from Course course "
+              + "where course.status = com.todayit.course.entity.CourseStatus.ACTIVE "
+              + "and course.visibility = com.todayit.course.entity.CourseVisibility.PUBLIC "
+              + "and course.deletedAt is null "
+              + "and course.startAt is not null and course.endAt > course.startAt "
+              + "and (:minMinutes is null or course.endAt > timestampadd(minute, :minMinutes, course.startAt)) "
+              + "and (:maxMinutes is null or course.endAt <= timestampadd(minute, :maxMinutes, course.startAt)) "
+              + "and (:transport is null or course.transport = :transport) "
+              + "and (:regionFiltered = false or exists ("
+              + "  select rc from RegionCourse rc "
+              + "  where rc.course = course and rc.regionId in :regionIds)) "
+              + "and (:themeFiltered = false or exists ("
+              + "  select ct from CourseTheme ct "
+              + "  where ct.course = course and ct.theme.name in :themeNames))")
+  Page<Course> findPublicActiveCoursesInDuration(
+      @Param("regionIds") List<Integer> regionIds,
+      @Param("regionFiltered") boolean regionFiltered,
+      @Param("themeNames") List<String> themeNames,
+      @Param("themeFiltered") boolean themeFiltered,
+      @Param("transport") CourseTransport transport,
+      @Param("minMinutes") Integer minMinutes,
+      @Param("maxMinutes") Integer maxMinutes,
+      Pageable pageable);
+
+  /**
    * 공개 여부와 관계없이 해당 장소가 포함된 활성 코스에서 0분을 제외한 체류 시간 평균을 조회합니다.
    *
    * @param placeId 장소 식별자

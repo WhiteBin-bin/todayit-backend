@@ -19,6 +19,7 @@ import com.todayit.course.service.model.CoursePlaceRegion;
 import com.todayit.course.service.model.CourseRecommendationProfile;
 import com.todayit.course.service.model.RecommendedCourseResult;
 import com.todayit.recommendation.service.RecommendationEngineService;
+import com.todayit.region.service.RegionQueryService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -36,7 +37,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("CourseRecommendationFacade 단위 테스트")
 class CourseRecommendationFacadeTest {
   private static final Clock CLOCK =
       Clock.fixed(Instant.parse("2026-11-26T03:00:00Z"), ZoneId.of("Asia/Seoul"));

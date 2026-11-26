@@ -12,6 +12,7 @@ import com.todayit.course.service.model.RecommendedCourseResult;
 import com.todayit.recommendation.model.CourseCandidate;
 import com.todayit.recommendation.model.RecommendationContext;
 import com.todayit.recommendation.service.RecommendationEngineService;
+import com.todayit.region.service.RegionQueryService;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -218,7 +219,7 @@ public class CourseRecommendationFacade {
         course.getTitle(),
         course.getCourseSummary(),
         first == null ? null : first.imageUrl(),
-        regionQueryService.getCourseRegionSummary(
+        regionQueryService.getRegionSummary(
             course.getRegions().stream().map(r -> r.getRegionId()).toList()),
         themeNames(course).stream().sorted().toList(),
         course.getTransport(),

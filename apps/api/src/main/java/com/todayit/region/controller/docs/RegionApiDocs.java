@@ -1,8 +1,8 @@
-package com.todayit.course.controller.docs;
+package com.todayit.region.controller.docs;
 
 import com.todayit.common.response.CommonResponse;
 import com.todayit.common.response.ErrorResponse;
-import com.todayit.course.dto.response.RegionResponse;
+import com.todayit.region.dto.response.RegionResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;

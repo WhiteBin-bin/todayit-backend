@@ -12,6 +12,34 @@ import org.springframework.stereotype.Controller;
 
 @AnalyzeClasses(packages = "com.todayit", importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
+  @ArchTest
+  static final ArchRule COURSE_FACADES_SHOULD_NOT_ACCESS_REPOSITORIES =
+      noClasses()
+          .that()
+          .resideInAPackage("com.todayit.course.service")
+          .and()
+          .haveSimpleNameEndingWith("Facade")
+          .should()
+          .dependOnClassesThat()
+          .resideInAPackage("..repository..");
+
+  @ArchTest
+  static final ArchRule COURSE_SHOULD_NOT_ACCESS_REGION_STORAGE =
+      noClasses()
+          .that()
+          .resideInAPackage("com.todayit.course..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage("com.todayit.region.entity..", "com.todayit.region.repository..");
+
+  @ArchTest
+  static final ArchRule REGION_SHOULD_NOT_DEPEND_ON_COURSE =
+      noClasses()
+          .that()
+          .resideInAPackage("com.todayit.region..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAPackage("com.todayit.course..");
 
   @ArchTest
   static final ArchRule AGGREGATE_PACKAGES_SHOULD_BE_FREE_OF_CYCLES =

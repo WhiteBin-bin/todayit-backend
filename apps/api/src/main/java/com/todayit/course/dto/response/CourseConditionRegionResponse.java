@@ -1,6 +1,6 @@
 package com.todayit.course.dto.response;
 
-import com.todayit.course.service.model.CourseRegionResult;
+import com.todayit.region.service.model.RegionSummaryResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
@@ -25,7 +25,7 @@ public record CourseConditionRegionResponse(
    * @param result 서비스 지역 요약 결과
    * @return 지역 응답 DTO, 전달된 결과가 null이면 null
    */
-  public static CourseConditionRegionResponse from(CourseRegionResult result) {
+  public static CourseConditionRegionResponse from(RegionSummaryResult result) {
     if (result == null) {
       return null;
     }

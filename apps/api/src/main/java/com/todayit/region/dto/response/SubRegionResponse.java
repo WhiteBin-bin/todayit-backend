@@ -1,6 +1,6 @@
-package com.todayit.course.dto.response;
+package com.todayit.region.dto.response;
 
-import com.todayit.course.service.model.SubRegionResult;
+import com.todayit.region.service.model.SubRegionResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**

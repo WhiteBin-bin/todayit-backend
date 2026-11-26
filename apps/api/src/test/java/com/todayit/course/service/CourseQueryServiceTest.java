@@ -4,13 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.todayit.common.exception.InvalidRequestException;
 import com.todayit.common.pagination.PageResult;
 import com.todayit.course.entity.Course;
 import com.todayit.course.entity.CourseStatus;
 import com.todayit.course.entity.CourseTransport;
+import com.todayit.course.entity.Theme;
 import com.todayit.course.exception.CourseErrorCode;
 import com.todayit.course.exception.CourseException;
 import com.todayit.course.repository.CourseRepository;
@@ -31,7 +34,6 @@ import org.springframework.data.domain.Sort;
 
 /** 장소별 코스 조회 업무를 검증합니다. */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("CourseQueryService 단위 테스트")
 class CourseQueryServiceTest {
 
   @Mock private CourseRepository courseRepository;
@@ -175,5 +177,46 @@ class CourseQueryServiceTest {
     // then
     assertThat(result).isEqualTo(expectedPage);
     verify(courseRepository).findByMemberIdAndStatus("member-1", CourseStatus.ACTIVE, pageRequest);
+  }
+
+  @Test
+  @DisplayName("등록된 콘셉트 목록은 검증을 통과하고 미등록 콘셉트는 InvalidRequestException을 던진다")
+  void validatesThemesSuccessfully() {
+    // given
+    CourseQueryService service = new CourseQueryService(courseRepository);
+    Theme theme = mock(Theme.class);
+    when(courseRepository.findThemesByNames(List.of("로맨틱"))).thenReturn(List.of(theme));
+    when(courseRepository.findThemesByNames(List.of("우주여행"))).thenReturn(List.of());
+
+    // when
+    service.validateThemes(List.of("로맨틱"));
+    InvalidRequestException exception =
+        assertThrows(InvalidRequestException.class, () -> service.validateThemes(List.of("우주여행")));
+
+    // then
+    assertThat(exception.getMessage()).isEqualTo("지원하지 않는 코스 콘셉트입니다.");
+  }
+
+  @Test
+  @DisplayName("공개 코스 목록을 지역, 콘셉트, 이동수단 필터와 함께 조회한다")
+  void findsPublicCoursesWithFilters() {
+    // given
+    CourseQueryService service = new CourseQueryService(courseRepository);
+    PageRequest pageRequest = PageRequest.of(0, 20);
+    Page<Course> expectedPage = new PageImpl<>(List.of(course), pageRequest, 1);
+    when(courseRepository.findPublicActiveCourses(
+            List.of(7, 8), true, List.of("로맨틱"), true, CourseTransport.WALKING, pageRequest))
+        .thenReturn(expectedPage);
+
+    // when
+    Page<Course> result =
+        service.findPublicCourses(
+            List.of(7, 8), List.of("로맨틱"), CourseTransport.WALKING, pageRequest);
+
+    // then
+    assertThat(result).isEqualTo(expectedPage);
+    verify(courseRepository)
+        .findPublicActiveCourses(
+            List.of(7, 8), true, List.of("로맨틱"), true, CourseTransport.WALKING, pageRequest);
   }
 }

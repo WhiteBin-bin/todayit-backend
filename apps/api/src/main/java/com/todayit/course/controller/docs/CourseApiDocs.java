@@ -1,10 +1,12 @@
 package com.todayit.course.controller.docs;
 
 import com.todayit.common.openapi.OpenApiConfig;
+import com.todayit.common.pagination.PageResponse;
 import com.todayit.common.response.CommonResponse;
 import com.todayit.common.response.ErrorResponse;
 import com.todayit.course.dto.request.AddCoursePlaceRequest;
 import com.todayit.course.dto.request.CourseRecommendationRequest;
+import com.todayit.course.dto.request.CourseSearchRequest;
 import com.todayit.course.dto.request.CreateCourseRequest;
 import com.todayit.course.dto.request.UpdateCourseConditionsRequest;
 import com.todayit.course.dto.request.UpdateCoursePlaceOrdersRequest;
@@ -12,6 +14,7 @@ import com.todayit.course.dto.request.UpdateCourseTransportRequest;
 import com.todayit.course.dto.request.UpdateCourseVisibilityRequest;
 import com.todayit.course.dto.response.AddCoursePlaceResponse;
 import com.todayit.course.dto.response.CopyCourseResponse;
+import com.todayit.course.dto.response.CourseCardResponse;
 import com.todayit.course.dto.response.CourseDetailResponse;
 import com.todayit.course.dto.response.CourseLikeResponse;
 import com.todayit.course.dto.response.CreateCourseResponse;
@@ -38,6 +41,116 @@ import org.springframework.security.core.Authentication;
 /** 코스 생성, 조회 및 관리 API 문서입니다. */
 @Tag(name = "코스", description = "코스 생성, 조회 및 관리 API")
 public interface CourseApiDocs {
+
+  /**
+   * 공개·확정 코스 목록을 필터, 정렬 및 페이징 조건에 맞게 조회합니다.
+   *
+   * @param request 코스 목록 및 필터 조회 조건
+   * @return 공개 코스 카드 페이지 응답
+   */
+  @Operation(
+      summary = "코스 목록 및 필터 조회",
+      description =
+          "공개·확정·미삭제 코스를 지역, 콘셉트(최대 2개), 소요 시간(ALL/UNDER_2_HOURS/TWO_TO_FOUR_HOURS/OVER_4_HOURS), "
+              + "이동수단, 정렬(LATEST/POPULAR) 및 페이징 조건에 맞게 조회합니다. "
+              + "regions는 시도 및 시군구 목록을 담은 JSON 배열 문자열입니다. regions를 생략하면 지역 필터를 적용하지 않으며, "
+              + "빈 배열([])이나 빈 문자열 또는 공백 문자열은 400 INVALID_REGION_PATH를 반환합니다. "
+              + "각 시도 항목의 sigunguCodes를 생략하거나 빈 배열로 전달하면 해당 시도 전체를 조회합니다. "
+              + "끝자리가 0인 시군구 코드만 시도당 최대 3개로 제한하며, 나머지 코드는 개수 제한에서 제외합니다. "
+              + "duration은 단일 선택 구간(ALL: 전체, UNDER_2_HOURS: 2시간 이하, TWO_TO_FOUR_HOURS: 2~4시간, OVER_4_HOURS: 4시간 초과)이며 생략 시 전체를 조회합니다. "
+              + "시간 구간은 endAt - startAt 기준이며, 시각이 없거나 종료 시각이 시작 시각 이후가 아니면 시간 필터에서 제외합니다.")
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "코스 목록 조회 성공",
+        useReturnTypeSchema = true,
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                    {
+                      "success": true,
+                      "data": {
+                        "content": [
+                          {
+                            "courseId": 1,
+                            "title": "행궁동 로맨틱 산책 코스",
+                            "courseSummary": "행궁동 일대를 여유롭게 산책하는 데이트 코스입니다.",
+                            "thumbnailUrl": "https://example.com/place.jpg",
+                            "region": {
+                              "sidoCode": "41",
+                              "sidoName": "경기도",
+                              "sigunguCode": "111",
+                              "sigunguName": "수원시 장안구"
+                            },
+                            "themes": ["로맨틱", "아늑함"],
+                            "durationMinutes": 180,
+                            "transport": "WALK",
+                            "status": "CONFIRMED",
+                            "visibility": "PUBLIC",
+                            "placeCount": 3,
+                            "likeCount": 128,
+                            "createdAt": "2026-10-12T10:00:00",
+                            "updatedAt": "2026-10-12T12:00:00"
+                          }
+                        ],
+                        "page": 0,
+                        "size": 20,
+                        "totalElements": 1,
+                        "totalPages": 1
+                      }
+                    }
+                    """))),
+    @ApiResponse(
+        responseCode = "400",
+        description = "지역, 콘셉트, 소요 시간, 이동수단, 정렬 또는 페이지 조회 조건 오류",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples = {
+                  @ExampleObject(
+                      name = "잘못된 지역 코드",
+                      value =
+                          """
+                          {"success":false,"code":"INVALID_REGION_PATH","message":"지역 필터 값이 올바르지 않습니다."}
+                          """),
+                  @ExampleObject(
+                      name = "시군구 제한 초과",
+                      value =
+                          """
+                          {"success":false,"code":"EXCEEDED_SIGUNGU_LIMIT","message":"끝자리가 0인 시군구 코드는 시도당 최대 3개까지 선택할 수 있습니다."}
+                          """),
+                  @ExampleObject(
+                      name = "콘셉트 개수 또는 중복 오류",
+                      value =
+                          """
+                          {"success":false,"code":"INVALID_REQUEST","message":"콘셉트는 중복 없이 최대 2개까지 입력할 수 있습니다."}
+                          """),
+                  @ExampleObject(
+                      name = "지원하지 않는 소요 시간 필터",
+                      value =
+                          """
+                          {"success":false,"code":"INVALID_REQUEST","message":"지원하지 않는 소요 시간 필터입니다."}
+                          """)
+                })),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 내부 오류",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"서버 내부 오류가 발생했습니다.\"}")))
+  })
+  ResponseEntity<CommonResponse<PageResponse<CourseCardResponse>>> findCourses(
+      @ParameterObject CourseSearchRequest request);
 
   /**
    * 새로운 코스를 DRAFT 상태로 생성합니다.

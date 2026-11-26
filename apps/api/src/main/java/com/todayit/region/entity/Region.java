@@ -1,4 +1,4 @@
-package com.todayit.course.entity;
+package com.todayit.region.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

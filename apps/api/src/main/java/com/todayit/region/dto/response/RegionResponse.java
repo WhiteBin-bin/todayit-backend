@@ -1,6 +1,6 @@
-package com.todayit.course.dto.response;
+package com.todayit.region.dto.response;
 
-import com.todayit.course.service.model.RegionResult;
+import com.todayit.region.service.model.RegionResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 

@@ -1,14 +1,15 @@
-package com.todayit.course.service;
+package com.todayit.region.service;
 
-import com.todayit.course.entity.Region;
-import com.todayit.course.entity.Region.RegionSnapshot;
-import com.todayit.course.exception.InvalidRegionPathException;
-import com.todayit.course.repository.RegionRepository;
-import com.todayit.course.service.model.CourseRegionResult;
-import com.todayit.course.service.model.RegionFilter;
-import com.todayit.course.service.model.RegionResult;
-import com.todayit.course.service.model.SigunguResult;
-import com.todayit.course.service.model.SubRegionResult;
+import com.todayit.region.entity.Region;
+import com.todayit.region.entity.Region.RegionSnapshot;
+import com.todayit.region.exception.RegionErrorCode;
+import com.todayit.region.exception.RegionException;
+import com.todayit.region.repository.RegionRepository;
+import com.todayit.region.service.model.RegionFilter;
+import com.todayit.region.service.model.RegionResult;
+import com.todayit.region.service.model.RegionSummaryResult;
+import com.todayit.region.service.model.SigunguResult;
+import com.todayit.region.service.model.SubRegionResult;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -16,12 +17,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 행정 지역 코드를 검증하고 조회하는 Query Service입니다. */
 @Service
 public class RegionQueryService implements RegionPlaceQueryService {
+
+  private static final Logger LOG = LoggerFactory.getLogger(RegionQueryService.class);
 
   private final RegionRepository regionRepository;
 
@@ -52,40 +57,45 @@ public class RegionQueryService implements RegionPlaceQueryService {
                 Collectors.groupingBy(
                     RegionSnapshot::sidoCode, LinkedHashMap::new, Collectors.toList()));
 
-    return groupedBySido.values().stream()
-        .map(
-            regionList -> {
-              RegionSnapshot first = regionList.get(0);
-              Map<String, String> parentCodes = new LinkedHashMap<>();
-              Map<String, List<SubRegionResult>> subRegionsMap = new LinkedHashMap<>();
+    List<RegionResult> results =
+        groupedBySido.values().stream()
+            .map(
+                regionList -> {
+                  RegionSnapshot first = regionList.get(0);
+                  Map<String, String> parentCodes = new LinkedHashMap<>();
+                  Map<String, List<SubRegionResult>> subRegionsMap = new LinkedHashMap<>();
 
-              for (RegionSnapshot r : regionList) {
-                String[] parts = r.sigunguName().split(" ", 2);
-                String parentName = parts[0];
+                  for (RegionSnapshot r : regionList) {
+                    String[] parts = r.sigunguName().split(" ", 2);
+                    String parentName = parts[0];
 
-                parentCodes.putIfAbsent(parentName, null);
-                subRegionsMap.putIfAbsent(parentName, new ArrayList<>());
+                    parentCodes.putIfAbsent(parentName, null);
+                    subRegionsMap.putIfAbsent(parentName, new ArrayList<>());
 
-                if (parts.length == 1) {
-                  parentCodes.put(parentName, r.sigunguCode());
-                } else {
-                  subRegionsMap.get(parentName).add(new SubRegionResult(r.sigunguCode(), parts[1]));
-                }
-              }
+                    if (parts.length == 1) {
+                      parentCodes.put(parentName, r.sigunguCode());
+                    } else {
+                      subRegionsMap
+                          .get(parentName)
+                          .add(new SubRegionResult(r.sigunguCode(), parts[1]));
+                    }
+                  }
 
-              List<SigunguResult> sigungus =
-                  parentCodes.entrySet().stream()
-                      .map(
-                          entry ->
-                              new SigunguResult(
-                                  entry.getValue(),
-                                  entry.getKey(),
-                                  subRegionsMap.get(entry.getKey())))
-                      .toList();
+                  List<SigunguResult> sigungus =
+                      parentCodes.entrySet().stream()
+                          .map(
+                              entry ->
+                                  new SigunguResult(
+                                      entry.getValue(),
+                                      entry.getKey(),
+                                      subRegionsMap.get(entry.getKey())))
+                          .toList();
 
-              return new RegionResult(first.sidoCode(), first.sidoName(), sigungus);
-            })
-        .toList();
+                  return new RegionResult(first.sidoCode(), first.sidoName(), sigungus);
+                })
+            .toList();
+    LOG.info("전체 행정 지역 계층 조회: totalRowCount={}, sidoCount={}", snapshots.size(), results.size());
+    return results;
   }
 
   /**
@@ -95,7 +105,7 @@ public class RegionQueryService implements RegionPlaceQueryService {
    * @return 코스 지역 요약 정보, 지역 정보가 없으면 null
    */
   @Transactional(readOnly = true)
-  public CourseRegionResult getCourseRegionSummary(List<Integer> regionIds) {
+  public RegionSummaryResult getRegionSummary(List<Integer> regionIds) {
     if (regionIds == null || regionIds.isEmpty()) {
       return null;
     }
@@ -113,7 +123,12 @@ public class RegionQueryService implements RegionPlaceQueryService {
       sigunguCode = regions.get(0).getSnapshot().sigunguCode();
       sigunguName = regions.get(0).getSnapshot().sigunguName();
     }
-    return new CourseRegionResult(sidoCode, sidoName, sigunguCode, sigunguName);
+    LOG.info(
+        "지역 요약 정보 조회: requestedCount={}, sidoCode={}, sigunguCode={}",
+        regionIds.size(),
+        sidoCode,
+        sigunguCode);
+    return new RegionSummaryResult(sidoCode, sidoName, sigunguCode, sigunguName);
   }
 
   /**
@@ -129,7 +144,13 @@ public class RegionQueryService implements RegionPlaceQueryService {
     }
     List<Region> regions = regionRepository.findAllById(regionIds);
     long distinctSidos = regions.stream().map(r -> r.getSnapshot().sidoCode()).distinct().count();
-    return distinctSidos > 1;
+    boolean multipleSidos = distinctSidos > 1;
+    LOG.info(
+        "복수 시·도 포함 여부 확인: regionCount={}, distinctSidoCount={}, multipleSidos={}",
+        regionIds.size(),
+        distinctSidos,
+        multipleSidos);
+    return multipleSidos;
   }
 
   @Transactional(readOnly = true)
@@ -137,12 +158,17 @@ public class RegionQueryService implements RegionPlaceQueryService {
   public List<Integer> findRegionIds(String sidoCode, String sigunguCode) {
     if ((sidoCode != null && !sidoCode.matches("[0-9]{2}"))
         || (sigunguCode != null && !sigunguCode.matches("[0-9]{3}"))) {
-      throw new InvalidRegionPathException();
+      throw new RegionException(RegionErrorCode.INVALID_PATH);
     }
     List<Integer> regionIds = regionRepository.findIdsByCodes(sidoCode, sigunguCode);
     if (regionIds.isEmpty()) {
-      throw new InvalidRegionPathException();
+      throw new RegionException(RegionErrorCode.INVALID_PATH);
     }
+    LOG.info(
+        "단일 조건 지역 식별자 조회: sidoCode={}, sigunguCode={}, matchedCount={}",
+        sidoCode,
+        sigunguCode,
+        regionIds.size());
     return List.copyOf(regionIds);
   }
 
@@ -151,7 +177,7 @@ public class RegionQueryService implements RegionPlaceQueryService {
    *
    * @param filters 지역 필터 목록
    * @return 조건에 해당하는 지역 식별자 목록
-   * @throws InvalidRegionPathException 코드 형식이 잘못되었거나 해당 지역이 없을 때
+   * @throws RegionException 코드 형식이 잘못되었거나 해당 지역이 없을 때
    */
   @Transactional(readOnly = true)
   @Override
@@ -164,20 +190,20 @@ public class RegionQueryService implements RegionPlaceQueryService {
     for (RegionFilter filter : filters) {
       String sidoCode = filter.sidoCode();
       if (sidoCode == null || !sidoCode.matches("[0-9]{2}")) {
-        throw new InvalidRegionPathException();
+        throw new RegionException(RegionErrorCode.INVALID_PATH);
       }
 
       List<String> sigunguCodes = filter.sigunguCodes();
       if (sigunguCodes == null || sigunguCodes.isEmpty()) {
         List<Integer> ids = regionRepository.findIdsBySidoCode(sidoCode);
         if (ids.isEmpty()) {
-          throw new InvalidRegionPathException();
+          throw new RegionException(RegionErrorCode.INVALID_PATH);
         }
         allRegionIds.addAll(ids);
       } else {
         for (String sigunguCode : sigunguCodes) {
           if (sigunguCode == null || !sigunguCode.matches("[0-9]{3}")) {
-            throw new InvalidRegionPathException();
+            throw new RegionException(RegionErrorCode.INVALID_PATH);
           }
         }
         List<String> distinctSigunguCodes = sigunguCodes.stream().distinct().toList();
@@ -190,13 +216,15 @@ public class RegionQueryService implements RegionPlaceQueryService {
                 .collect(Collectors.toSet());
 
         if (matchedSigunguCodes.size() != distinctSigunguCodes.size()) {
-          throw new InvalidRegionPathException();
+          throw new RegionException(RegionErrorCode.INVALID_PATH);
         }
 
         matchedRegions.forEach(r -> allRegionIds.add(r.getSnapshot().regionId()));
       }
     }
 
+    LOG.info(
+        "지역 필터 기반 식별자 조회: filterCount={}, matchedCount={}", filters.size(), allRegionIds.size());
     return List.copyOf(allRegionIds);
   }
 }

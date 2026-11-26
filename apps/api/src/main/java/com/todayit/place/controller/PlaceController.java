@@ -1,18 +1,12 @@
 package com.todayit.place.controller;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.todayit.common.pagination.PageResponse;
 import com.todayit.common.pagination.PaginationValidator;
 import com.todayit.common.response.CommonResponse;
 import com.todayit.course.dto.response.CourseResponse;
-import com.todayit.course.exception.InvalidRegionPathException;
 import com.todayit.course.service.CoursePlaceQueryService;
 import com.todayit.course.service.model.CourseSort;
-import com.todayit.course.service.model.RegionFilter;
 import com.todayit.place.controller.docs.PlaceApiDocs;
-import com.todayit.place.dto.request.RegionFilterRequest;
 import com.todayit.place.dto.response.PlaceDetailResponse;
 import com.todayit.place.dto.response.PlaceFilterResponse;
 import com.todayit.place.dto.response.PlaceImageResponse;
@@ -20,17 +14,16 @@ import com.todayit.place.dto.response.PlaceLikeResponse;
 import com.todayit.place.dto.response.PlaceLocationResponse;
 import com.todayit.place.dto.response.PlaceScrapResponse;
 import com.todayit.place.entity.Category;
-import com.todayit.place.exception.ExceededSigunguLimitException;
 import com.todayit.place.exception.InvalidPlaceCategoryFilterException;
 import com.todayit.place.service.PlaceCommandService;
 import com.todayit.place.service.PlaceDetailFacade;
 import com.todayit.place.service.PlaceQueryService;
 import com.todayit.place.service.model.PlaceSort;
+import com.todayit.region.RegionFilterParser;
+import com.todayit.region.exception.RegionException;
+import com.todayit.region.service.model.RegionFilter;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
@@ -51,7 +44,6 @@ public class PlaceController implements PlaceApiDocs {
 
   private static final int DEFAULT_PAGE = 0;
   private static final int DEFAULT_SIZE = 20;
-  private static final int MAX_SIGUNGU_COUNT_PER_SIDO = 3;
   private static final Set<String> CATEGORY_FILTER_VALUES =
       Arrays.stream(Category.values()).map(Enum::name).collect(Collectors.toUnmodifiableSet());
 
@@ -59,7 +51,6 @@ public class PlaceController implements PlaceApiDocs {
   private final PlaceQueryService placeQueryService;
   private final PlaceCommandService placeCommandService;
   private final CoursePlaceQueryService coursePlaceQueryService;
-  private final ObjectMapper objectMapper;
 
   /**
    * 장소 기능을 처리할 서비스를 받습니다.
@@ -78,7 +69,6 @@ public class PlaceController implements PlaceApiDocs {
     this.placeQueryService = placeQueryService;
     this.placeCommandService = placeCommandService;
     this.coursePlaceQueryService = coursePlaceQueryService;
-    this.objectMapper = new ObjectMapper().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
   }
 
   /**
@@ -161,61 +151,14 @@ public class PlaceController implements PlaceApiDocs {
    *
    * @param regionsJson 지역 필터 JSON 문자열
    * @return 변환한 지역 필터 목록, 생략 시 {@code null}
-   * @throws InvalidRegionPathException 형식이 잘못되었거나 코드가 올바르지 않을 때
-   * @throws ExceededSigunguLimitException 시도당 끝자리가 0인 서로 다른 시군구 코드가 3개를 초과할 때
+   * @throws RegionException 형식이 잘못되었거나 시군구 개수 제한을 초과할 때
    */
   private List<RegionFilter> parseRegions(String regionsJson) {
     if (regionsJson == null) {
       return null;
     }
-    if (regionsJson.isBlank()) {
-      throw new InvalidRegionPathException();
-    }
-
-    List<RegionFilterRequest> requests;
-    try {
-      requests =
-          objectMapper.readValue(regionsJson, new TypeReference<List<RegionFilterRequest>>() {});
-    } catch (Exception e) {
-      throw new InvalidRegionPathException();
-    }
-
-    if (requests == null || requests.isEmpty()) {
-      throw new InvalidRegionPathException();
-    }
-
-    Map<String, Set<String>> sigunguBySido = new LinkedHashMap<>();
-    for (RegionFilterRequest request : requests) {
-      if (request == null
-          || request.sidoCode() == null
-          || !request.sidoCode().matches("^[0-9]{2}$")) {
-        throw new InvalidRegionPathException();
-      }
-
-      if (sigunguBySido.containsKey(request.sidoCode())) {
-        throw new InvalidRegionPathException();
-      }
-
-      List<String> sigunguCodes = request.sigunguCodes();
-      Set<String> set = new LinkedHashSet<>();
-      if (sigunguCodes != null) {
-        for (String sigunguCode : sigunguCodes) {
-          if (sigunguCode == null || !sigunguCode.matches("^[0-9]{3}$")) {
-            throw new InvalidRegionPathException();
-          }
-          set.add(sigunguCode);
-        }
-        long limitedCodeCount = set.stream().filter(code -> code.endsWith("0")).count();
-        if (limitedCodeCount > MAX_SIGUNGU_COUNT_PER_SIDO) {
-          throw new ExceededSigunguLimitException();
-        }
-      }
-
-      sigunguBySido.put(request.sidoCode(), set);
-    }
-
-    return sigunguBySido.entrySet().stream()
-        .map(entry -> new RegionFilter(entry.getKey(), List.copyOf(entry.getValue())))
+    return RegionFilterParser.parse(regionsJson).stream()
+        .map(value -> new RegionFilter(value.sidoCode(), value.sigunguCodes()))
         .toList();
   }
 

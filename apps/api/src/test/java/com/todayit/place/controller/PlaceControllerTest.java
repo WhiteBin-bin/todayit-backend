@@ -13,7 +13,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.todayit.common.exception.GlobalExceptionHandler;
 import com.todayit.common.pagination.PageResult;
 import com.todayit.course.service.CoursePlaceQueryService;
-import com.todayit.course.service.model.RegionFilter;
 import com.todayit.place.entity.Category;
 import com.todayit.place.entity.VisitorInfoType;
 import com.todayit.place.exception.PlaceNotFoundException;
@@ -29,6 +28,7 @@ import com.todayit.place.service.model.PlaceOpeningHoursResult;
 import com.todayit.place.service.model.PlaceResult;
 import com.todayit.place.service.model.PlaceScrapResult;
 import com.todayit.place.service.model.PlaceSort;
+import com.todayit.region.service.model.RegionFilter;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
