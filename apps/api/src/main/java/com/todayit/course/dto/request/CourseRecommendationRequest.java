@@ -16,7 +16,7 @@ import java.util.List;
  * @param region 시·도 2자리 또는 시·도와 시·군·구 5자리 코드
  * @param themes 콘셉트 이름, 최대 2개
  * @param durationMinutes 총 예상시간 상한(분), 양수
- * @param transport CAR, WALK, PUBLIC_TRANSIT 또는 기존 이동수단 코드
+ * @param transport CAR, WALKING, PUBLIC_TRANSPORT
  */
 public record CourseRecommendationRequest(
     @Parameter(
@@ -82,11 +82,11 @@ public record CourseRecommendationRequest(
 
                 - 생략하면 전체 이동수단을 대상으로 추천합니다.
                 - `CAR`: 자동차
-                - `WALK`: 도보
-                - `PUBLIC_TRANSIT`: 대중교통
+                - `WALKING`: 도보
+                - `PUBLIC_TRANSPORT`: 대중교통
                 """,
-            example = "WALK",
-            schema = @Schema(allowableValues = {"CAR", "WALK", "PUBLIC_TRANSIT"}))
+            example = "WALKING",
+            schema = @Schema(allowableValues = {"CAR", "WALKING", "PUBLIC_TRANSPORT"}))
         String transport) {
   /**
    * 조회 조건을 검증하고 업무 명령으로 변환합니다.
@@ -112,8 +112,8 @@ public record CourseRecommendationRequest(
       selectedTransport =
           switch (transport) {
             case "CAR" -> CourseTransport.CAR;
-            case "WALK", "WALKING" -> CourseTransport.WALKING;
-            case "PUBLIC_TRANSIT", "PUBLIC_TRANSPORT" -> CourseTransport.PUBLIC_TRANSPORT;
+            case "WALKING" -> CourseTransport.WALKING;
+            case "PUBLIC_TRANSPORT" -> CourseTransport.PUBLIC_TRANSPORT;
             default -> throw new InvalidRequestException("지원하지 않는 이동수단입니다.");
           };
     }

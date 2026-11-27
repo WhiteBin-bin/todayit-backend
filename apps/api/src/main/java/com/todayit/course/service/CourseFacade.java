@@ -395,10 +395,6 @@ public class CourseFacade implements MemberCourseQueryService {
 
     List<Integer> regionIds = course.getRegions().stream().map(RegionCourse::getRegionId).toList();
     RegionSummaryResult regionSummary = regionQueryService.getRegionSummary(regionIds);
-    String sidoCode = regionSummary != null ? regionSummary.sidoCode() : null;
-    String sidoName = regionSummary != null ? regionSummary.sidoName() : null;
-    String sigunguCode = regionSummary != null ? regionSummary.sigunguCode() : null;
-    String sigunguName = regionSummary != null ? regionSummary.sigunguName() : null;
 
     List<String> themes = course.getThemes().stream().map(ct -> ct.getTheme().getName()).toList();
     List<CoursePlaceDetailResult> places = toCoursePlaceDetailResults(course.getCoursePlaces());
@@ -424,10 +420,7 @@ public class CourseFacade implements MemberCourseQueryService {
         course.getStatus(),
         course.getVisibility(),
         course.getViewCount(),
-        sidoCode,
-        sidoName,
-        sigunguCode,
-        sigunguName,
+        regionSummary,
         themes,
         isWriter,
         places,
@@ -699,10 +692,15 @@ public class CourseFacade implements MemberCourseQueryService {
 
     List<CoursePlaceDetailResult> places =
         toCoursePlaceDetailResults(updatedCourse.getCoursePlaces());
+    long scrapCount = courseReactionQueryService.countScraps(updatedCourse.getCourseId());
 
     LOG.info("코스 조건 변경 조정 완료: courseId={}", updatedCourse.getCourseId());
     return new UpdateCourseConditionsResult(
-        updatedCourse.getCourseId(), conditionsResult, places, updatedCourse.getUpdatedAt());
+        updatedCourse.getCourseId(),
+        conditionsResult,
+        places,
+        updatedCourse.getUpdatedAt(),
+        scrapCount);
   }
 
   /**

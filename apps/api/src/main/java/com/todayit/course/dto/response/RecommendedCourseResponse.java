@@ -1,5 +1,7 @@
 package com.todayit.course.dto.response;
 
+import com.todayit.course.entity.CourseStatus;
+import com.todayit.course.entity.CourseTransport;
 import com.todayit.course.entity.CourseVisibility;
 import com.todayit.course.service.model.RecommendedCourseResult;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -15,8 +17,8 @@ import java.util.List;
  * @param thumbnailUrl 대표 이미지, 없으면 null
  * @param region 코스 지역 요약, 없으면 null
  * @param themes 콘셉트 이름 목록
- * @param transport CAR, WALK 또는 PUBLIC_TRANSIT, 미확인 시 null
- * @param status 코스 상태
+ * @param transport 이동수단 (CAR, WALKING, PUBLIC_TRANSPORT), 미확인 시 null
+ * @param status 코스 상태 (ACTIVE)
  * @param visibility 공개 범위
  * @param placeCount 방문 수
  * @param likeCount 좋아요 수
@@ -55,16 +57,16 @@ public record RecommendedCourseResponse(
             requiredMode = Schema.RequiredMode.REQUIRED)
         List<String> themes,
     @Schema(
-            description = "이동수단입니다. (CAR, WALK, PUBLIC_TRANSIT)",
-            example = "WALK",
+            description = "이동수단입니다. (CAR, WALKING, PUBLIC_TRANSPORT)",
+            example = "WALKING",
             nullable = true,
             requiredMode = Schema.RequiredMode.REQUIRED)
-        String transport,
+        CourseTransport transport,
     @Schema(
             description = "코스 상태입니다.",
-            example = "CONFIRMED",
+            example = "ACTIVE",
             requiredMode = Schema.RequiredMode.REQUIRED)
-        String status,
+        CourseStatus status,
     @Schema(
             description = "코스 공개 범위입니다.",
             example = "PUBLIC",
@@ -95,14 +97,6 @@ public record RecommendedCourseResponse(
    * @return 추천 카드 응답
    */
   public static RecommendedCourseResponse from(RecommendedCourseResult result) {
-    String transport =
-        result.transport() == null
-            ? null
-            : switch (result.transport()) {
-              case CAR -> "CAR";
-              case WALKING -> "WALK";
-              case PUBLIC_TRANSPORT -> "PUBLIC_TRANSIT";
-            };
     return new RecommendedCourseResponse(
         result.courseId(),
         result.title(),
@@ -110,8 +104,8 @@ public record RecommendedCourseResponse(
         result.thumbnailUrl(),
         CourseConditionRegionResponse.from(result.region()),
         result.themes(),
-        transport,
-        "CONFIRMED",
+        result.transport(),
+        CourseStatus.ACTIVE,
         CourseVisibility.PUBLIC,
         result.placeCount(),
         result.likeCount(),

@@ -22,10 +22,7 @@ import java.util.List;
  * @param status 코스 상태
  * @param visibility 코스 공개 여부
  * @param viewCount 조회수
- * @param sidoCode 시·도 코드, 없으면 null
- * @param sidoName 시·도 명칭, 없으면 null
- * @param sigunguCode 시·군·구 코드, 없으면 null
- * @param sigunguName 시·군·구 명칭, 없으면 null
+ * @param region 코스 지역 요약 정보, 없으면 null
  * @param themes 코스 콘셉트 목록
  * @param isWriter 현재 요청 회원이 코스 작성자인지 여부
  * @param liked 현재 요청 회원의 코스 좋아요 여부
@@ -86,18 +83,8 @@ public record CourseDetailResponse(
         CourseVisibility visibility,
     @Schema(description = "코스 조회수입니다.", example = "10", requiredMode = Schema.RequiredMode.REQUIRED)
         int viewCount,
-    @Schema(description = "시·도 코드입니다.", example = "11", nullable = true) String sidoCode,
-    @Schema(description = "시·도 명칭입니다.", example = "서울특별시", nullable = true) String sidoName,
-    @Schema(
-            description = "시·군·구 코드입니다. 시·도 전체 대상인 경우 null을 반환합니다.",
-            example = "110",
-            nullable = true)
-        String sigunguCode,
-    @Schema(
-            description = "시·군·구 명칭입니다. 시·도 전체 대상인 경우 null을 반환합니다.",
-            example = "종로구",
-            nullable = true)
-        String sigunguName,
+    @Schema(description = "코스 지역 요약 정보입니다. 설정된 지역이 없으면 null입니다.", nullable = true)
+        CourseConditionRegionResponse region,
     @Schema(
             description = "코스 콘셉트 목록입니다.",
             example = "[\"감성적\", \"여유로움\"]",
@@ -152,10 +139,7 @@ public record CourseDetailResponse(
    * @param status 코스 상태
    * @param visibility 코스 공개 여부
    * @param viewCount 조회수
-   * @param sidoCode 시·도 코드
-   * @param sidoName 시·도 명칭
-   * @param sigunguCode 시·군·구 코드
-   * @param sigunguName 시·군·구 명칭
+   * @param region 코스 지역 요약 정보
    * @param themes 코스 콘셉트 목록
    * @param isWriter 작성자 여부
    * @param liked 좋아요 여부
@@ -190,10 +174,7 @@ public record CourseDetailResponse(
         result.status(),
         result.visibility(),
         result.viewCount(),
-        result.sidoCode(),
-        result.sidoName(),
-        result.sigunguCode(),
-        result.sigunguName(),
+        CourseConditionRegionResponse.from(result.region()),
         result.themes(),
         result.isWriter(),
         result.liked(),

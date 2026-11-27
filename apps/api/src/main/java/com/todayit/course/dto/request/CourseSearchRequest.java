@@ -22,7 +22,7 @@ import java.util.List;
  * @param regions 지역 필터 JSON 배열 문자열, 생략 가능
  * @param themes 콘셉트 이름 목록, 최대 2개
  * @param duration 소요 시간 구간 필터 (ALL, UNDER_2_HOURS, TWO_TO_FOUR_HOURS, OVER_4_HOURS), 기본값 ALL
- * @param transport CAR, WALK, PUBLIC_TRANSIT 또는 기존 이동수단 코드
+ * @param transport CAR, WALKING, PUBLIC_TRANSPORT
  * @param sort 정렬 기준 (LATEST 또는 POPULAR), 기본값 LATEST
  * @param page 페이지 번호, 기본값 0
  * @param size 페이지 크기, 기본값 20
@@ -98,11 +98,11 @@ public record CourseSearchRequest(
 
                 - 생략하면 전체 이동수단을 조회합니다.
                 - `CAR`: 자동차
-                - `WALK`: 도보
-                - `PUBLIC_TRANSIT`: 대중교통
+                - `WALKING`: 도보
+                - `PUBLIC_TRANSPORT`: 대중교통
                 """,
-            example = "WALK",
-            schema = @Schema(allowableValues = {"CAR", "WALK", "PUBLIC_TRANSIT"}))
+            example = "WALKING",
+            schema = @Schema(allowableValues = {"CAR", "WALKING", "PUBLIC_TRANSPORT"}))
         String transport,
     @Parameter(
             description =
@@ -173,8 +173,8 @@ public record CourseSearchRequest(
       selectedTransport =
           switch (transport) {
             case "CAR" -> CourseTransport.CAR;
-            case "WALK", "WALKING" -> CourseTransport.WALKING;
-            case "PUBLIC_TRANSIT", "PUBLIC_TRANSPORT" -> CourseTransport.PUBLIC_TRANSPORT;
+            case "WALKING" -> CourseTransport.WALKING;
+            case "PUBLIC_TRANSPORT" -> CourseTransport.PUBLIC_TRANSPORT;
             default -> throw new InvalidRequestException("지원하지 않는 이동수단입니다.");
           };
     }

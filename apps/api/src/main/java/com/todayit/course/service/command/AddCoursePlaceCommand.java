@@ -6,6 +6,6 @@ package com.todayit.course.service.command;
  * @param courseId 코스 식별자
  * @param placeId 장소 식별자
  * @param order 지정 순서, null 가능
- * @param stayMinute 체류 시간(분)
+ * @param stayMinutes 체류 시간(분)
  */
-public record AddCoursePlaceCommand(int courseId, int placeId, Integer order, int stayMinute) {}
+public record AddCoursePlaceCommand(int courseId, int placeId, Integer order, int stayMinutes) {}

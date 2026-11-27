@@ -59,13 +59,7 @@ class CourseSearchRequestTest {
   }
 
   @ParameterizedTest
-  @CsvSource({
-    "CAR, CAR",
-    "WALK, WALKING",
-    "WALKING, WALKING",
-    "PUBLIC_TRANSIT, PUBLIC_TRANSPORT",
-    "PUBLIC_TRANSPORT, PUBLIC_TRANSPORT"
-  })
+  @CsvSource({"CAR, CAR", "WALKING, WALKING", "PUBLIC_TRANSPORT, PUBLIC_TRANSPORT"})
   @DisplayName("regions JSON 문자열과 이동수단 및 정렬을 정상적으로 매핑한다")
   void mapsRegionsJsonTransportAndSortSuccessfully(
       String rawTransport, CourseTransport expectedTransport) {

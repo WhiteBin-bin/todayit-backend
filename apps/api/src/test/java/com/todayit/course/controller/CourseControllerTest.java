@@ -451,10 +451,7 @@ class CourseControllerTest {
             CourseStatus.DRAFT,
             CourseVisibility.PRIVATE,
             0,
-            "11",
-            "서울특별시",
-            "110",
-            "종로구",
+            new RegionSummaryResult("11", "서울특별시", "110", "종로구"),
             List.of("감성적", "여유로움"),
             true,
             List.of(place),
@@ -488,10 +485,10 @@ class CourseControllerTest {
         .andExpect(jsonPath("$.data.liked").value(false))
         .andExpect(jsonPath("$.data.scrapped").value(false))
         .andExpect(jsonPath("$.data.beforeVisit[0]").value("웨이팅이 있을 수 있습니다."))
-        .andExpect(jsonPath("$.data.sidoCode").value("11"))
-        .andExpect(jsonPath("$.data.sidoName").value("서울특별시"))
-        .andExpect(jsonPath("$.data.sigunguCode").value("110"))
-        .andExpect(jsonPath("$.data.sigunguName").value("종로구"))
+        .andExpect(jsonPath("$.data.region.sidoCode").value("11"))
+        .andExpect(jsonPath("$.data.region.sidoName").value("서울특별시"))
+        .andExpect(jsonPath("$.data.region.sigunguCode").value("110"))
+        .andExpect(jsonPath("$.data.region.sigunguName").value("종로구"))
         .andExpect(jsonPath("$.data.themes[0]").value("감성적"))
         .andExpect(jsonPath("$.data.themes[1]").value("여유로움"))
         .andExpect(jsonPath("$.data.places[0].coursePlaceId").value(1))
@@ -499,7 +496,7 @@ class CourseControllerTest {
         .andExpect(jsonPath("$.data.places[0].name").value("블루보틀 삼청"))
         .andExpect(jsonPath("$.data.places[0].category").value("CAFE_DESSERT"))
         .andExpect(jsonPath("$.data.places[0].order").value(1))
-        .andExpect(jsonPath("$.data.places[0].stayMinute").value(60));
+        .andExpect(jsonPath("$.data.places[0].stayMinutes").value(60));
   }
 
   @Test
@@ -521,9 +518,6 @@ class CourseControllerTest {
             CourseVisibility.PUBLIC,
             5,
             null,
-            null,
-            null,
-            null,
             List.of(),
             false,
             List.of(),
@@ -544,6 +538,7 @@ class CourseControllerTest {
         .andExpect(jsonPath("$.data.courseId").value(1))
         .andExpect(jsonPath("$.data.authorDisplayName").value("ToDayIt"))
         .andExpect(jsonPath("$.data.authorProfileImageUrl").doesNotExist())
+        .andExpect(jsonPath("$.data.region").doesNotExist())
         .andExpect(jsonPath("$.data.isWriter").value(false))
         .andExpect(jsonPath("$.data.liked").value(false))
         .andExpect(jsonPath("$.data.scrapped").value(false))
@@ -595,7 +590,7 @@ class CourseControllerTest {
         {
           "placeId": 10,
           "order": 1,
-          "stayMinute": 60
+          "stayMinutes": 60
         }
         """;
 
@@ -614,7 +609,7 @@ class CourseControllerTest {
         .andExpect(jsonPath("$.data.addedPlace.coursePlaceId").value(1))
         .andExpect(jsonPath("$.data.addedPlace.placeId").value(10))
         .andExpect(jsonPath("$.data.addedPlace.order").value(1))
-        .andExpect(jsonPath("$.data.addedPlace.stayMinute").value(60))
+        .andExpect(jsonPath("$.data.addedPlace.stayMinutes").value(60))
         .andExpect(jsonPath("$.data.places").isArray());
     verify(courseFacade).addPlaceToCourse("member-1", new AddCoursePlaceCommand(1, 10, 1, 60));
   }
@@ -628,7 +623,7 @@ class CourseControllerTest {
         {
           "placeId": null,
           "order": 1,
-          "stayMinute": 60
+          "stayMinutes": 60
         }
         """;
 
@@ -657,7 +652,7 @@ class CourseControllerTest {
         {
           "placeId": 10,
           "order": 0,
-          "stayMinute": 60
+          "stayMinutes": 60
         }
         """;
 
@@ -686,7 +681,7 @@ class CourseControllerTest {
         {
           "placeId": 10,
           "order": 1,
-          "stayMinute": -10
+          "stayMinutes": -10
         }
         """;
 
@@ -715,7 +710,7 @@ class CourseControllerTest {
         {
           "placeId": 10,
           "order": 1,
-          "stayMinute": 1441
+          "stayMinutes": 1441
         }
         """;
 
@@ -773,7 +768,7 @@ class CourseControllerTest {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.addedPlace.order").value(1))
-        .andExpect(jsonPath("$.data.addedPlace.stayMinute").value(0))
+        .andExpect(jsonPath("$.data.addedPlace.stayMinutes").value(0))
         .andExpect(jsonPath("$.data.places").isArray());
     verify(courseFacade).addPlaceToCourse("member-1", new AddCoursePlaceCommand(1, 10, null, 0));
   }
@@ -1332,7 +1327,7 @@ class CourseControllerTest {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.courseId").value(1))
         .andExpect(jsonPath("$.data.scrapped").value(false))
-        .andExpect(jsonPath("$.data.scrapCount").value(17));
+        .andExpect(jsonPath("$.data.scrapCount").doesNotExist());
     verify(courseFacade).cancelCourseScrap(1, "member-1");
   }
 
@@ -1497,7 +1492,7 @@ class CourseControllerTest {
             CourseTransport.CAR);
 
     UpdateCourseConditionsResult expectedResult =
-        new UpdateCourseConditionsResult(1, conditionsResult, List.of(), updatedAt);
+        new UpdateCourseConditionsResult(1, conditionsResult, List.of(), updatedAt, 3L);
 
     when(courseFacade.updateCourseConditions(
             eq("member-1"), any(UpdateCourseConditionsCommand.class)))
@@ -1536,6 +1531,7 @@ class CourseControllerTest {
         .andExpect(jsonPath("$.data.conditions.durationMinutes").value(240))
         .andExpect(jsonPath("$.data.conditions.transport").value("CAR"))
         .andExpect(jsonPath("$.data.places").isArray())
+        .andExpect(jsonPath("$.data.scrapCount").value(3))
         .andExpect(jsonPath("$.data.updatedAt").value("2026-11-24T18:00:00"));
   }
 
@@ -1811,7 +1807,7 @@ class CourseControllerTest {
                 .param("regions", "[{\"sidoCode\":\"41\",\"sigunguCodes\":[\"111\"]}]")
                 .param("themes", "로맨틱", "아늑함")
                 .param("duration", "ALL")
-                .param("transport", "WALK")
+                .param("transport", "WALKING")
                 .param("sort", "POPULAR")
                 .param("page", "0")
                 .param("size", "20"));
@@ -1833,8 +1829,8 @@ class CourseControllerTest {
         .andExpect(jsonPath("$.data.content[0].themes[0]").value("로맨틱"))
         .andExpect(jsonPath("$.data.content[0].themes[1]").value("아늑함"))
         .andExpect(jsonPath("$.data.content[0].durationMinutes").value(180))
-        .andExpect(jsonPath("$.data.content[0].transport").value("WALK"))
-        .andExpect(jsonPath("$.data.content[0].status").value("CONFIRMED"))
+        .andExpect(jsonPath("$.data.content[0].transport").value("WALKING"))
+        .andExpect(jsonPath("$.data.content[0].status").value("ACTIVE"))
         .andExpect(jsonPath("$.data.content[0].visibility").value("PUBLIC"))
         .andExpect(jsonPath("$.data.content[0].placeCount").value(3))
         .andExpect(jsonPath("$.data.content[0].likeCount").value(128))

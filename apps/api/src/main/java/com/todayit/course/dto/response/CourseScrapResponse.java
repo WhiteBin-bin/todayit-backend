@@ -4,7 +4,7 @@ import com.todayit.course.service.model.CourseScrapResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
- * 코스 스크랩 및 스크랩 취소 API 응답입니다.
+ * 코스 스크랩 API 응답입니다.
  *
  * @param courseId 코스 식별자
  * @param scrapped 현재 회원의 스크랩 여부

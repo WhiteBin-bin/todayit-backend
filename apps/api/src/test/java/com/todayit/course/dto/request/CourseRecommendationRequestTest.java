@@ -13,13 +13,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class CourseRecommendationRequestTest {
-  @ParameterizedTest
-  @ValueSource(strings = {"WALK", "WALKING"})
-  @DisplayName("도보 이동수단 값(WALK, WALKING)을 WALKING으로 변환한다")
-  void acceptsWalkingAliases(String transport) {
+  @Test
+  @DisplayName("도보 이동수단 값(WALKING)을 WALKING으로 변환한다")
+  void acceptsWalkingTransport() {
     // given
     CourseRecommendationRequest request =
-        new CourseRecommendationRequest("11110", List.of("감성적"), 120, transport);
+        new CourseRecommendationRequest("11110", List.of("감성적"), 120, "WALKING");
 
     // when
     CourseRecommendationCommand command = request.toCommand();

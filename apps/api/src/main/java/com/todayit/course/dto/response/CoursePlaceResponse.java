@@ -16,7 +16,7 @@ import java.math.BigDecimal;
  * @param longitude 장소 경도
  * @param imageUrl 장소 대표 이미지 URL, 없으면 null
  * @param order 방문 순서 (1부터 시작)
- * @param stayMinute 예상 체류 시간(분), 미입력 시 null
+ * @param stayMinutes 예상 체류 시간(분), 미입력 시 null
  */
 @Schema(description = "코스에 포함된 장소 정보")
 public record CoursePlaceResponse(
@@ -63,7 +63,7 @@ public record CoursePlaceResponse(
             requiredMode = Schema.RequiredMode.REQUIRED)
         int order,
     @Schema(description = "예상 체류 시간(분)입니다. 미입력 시 null을 반환합니다.", example = "60", nullable = true)
-        Integer stayMinute) {
+        Integer stayMinutes) {
 
   /**
    * 서비스 장소 상세 결과를 API 응답 모델로 변환합니다.
@@ -82,6 +82,6 @@ public record CoursePlaceResponse(
         result.longitude(),
         result.imageUrl(),
         result.order(),
-        result.stayMinute());
+        result.stayMinutes());
   }
 }

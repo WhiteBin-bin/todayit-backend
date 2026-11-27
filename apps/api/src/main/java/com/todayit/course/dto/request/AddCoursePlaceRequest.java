@@ -9,7 +9,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
  *
  * @param placeId 장소 식별자
  * @param order 방문 순서, 미입력 시 맨 뒤로 자동 배치
- * @param stayMinute 머무는 시간(분), 미입력 시 0
+ * @param stayMinutes 머무는 시간(분), 미입력 시 0
  */
 @Schema(description = "코스에 추가할 장소 정보입니다.")
 public record AddCoursePlaceRequest(
@@ -46,9 +46,9 @@ public record AddCoursePlaceRequest(
             example = "60",
             requiredMode = Schema.RequiredMode.NOT_REQUIRED,
             nullable = true)
-        Integer stayMinute) {
+        Integer stayMinutes) {
 
-  private static final int MAX_STAY_MINUTE = 1440;
+  private static final int MAX_STAY_MINUTES = 1440;
 
   /**
    * 입력값을 검증합니다.
@@ -62,7 +62,7 @@ public record AddCoursePlaceRequest(
     if (order != null && order < 1) {
       throw new CourseException(CourseErrorCode.INVALID_ORDER);
     }
-    if (stayMinute != null && (stayMinute < 0 || stayMinute > MAX_STAY_MINUTE)) {
+    if (stayMinutes != null && (stayMinutes < 0 || stayMinutes > MAX_STAY_MINUTES)) {
       throw new CourseException(CourseErrorCode.INVALID_STAY_MINUTE);
     }
   }
@@ -72,7 +72,7 @@ public record AddCoursePlaceRequest(
    *
    * @return 0 이상의 체류 시간
    */
-  public int resolveStayMinute() {
-    return stayMinute != null ? stayMinute : 0;
+  public int resolveStayMinutes() {
+    return stayMinutes != null ? stayMinutes : 0;
   }
 }

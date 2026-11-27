@@ -3,6 +3,7 @@ package com.todayit.course.service.model;
 import com.todayit.course.entity.CourseStatus;
 import com.todayit.course.entity.CourseTransport;
 import com.todayit.course.entity.CourseVisibility;
+import com.todayit.region.service.model.RegionSummaryResult;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -20,10 +21,7 @@ import java.util.List;
  * @param status 코스 상태
  * @param visibility 코스 공개 여부
  * @param viewCount 조회수
- * @param sidoCode 시·도 코드, 없으면 null
- * @param sidoName 시·도 이름, 없으면 null
- * @param sigunguCode 시·군·구 코드, 없으면 null
- * @param sigunguName 시·군·구 이름, 없으면 null
+ * @param region 코스 지역 요약 정보, 설정되지 않았으면 null
  * @param themes 콘셉트 목록
  * @param isWriter 요청 회원이 작성자인지 여부
  * @param places 포함된 장소 목록
@@ -45,10 +43,7 @@ public record CourseDetailResult(
     CourseStatus status,
     CourseVisibility visibility,
     int viewCount,
-    String sidoCode,
-    String sidoName,
-    String sigunguCode,
-    String sigunguName,
+    RegionSummaryResult region,
     List<String> themes,
     boolean isWriter,
     List<CoursePlaceDetailResult> places,
@@ -72,10 +67,7 @@ public record CourseDetailResult(
    * @param status 코스 상태
    * @param visibility 코스 공개 여부
    * @param viewCount 조회수
-   * @param sidoCode 시·도 코드
-   * @param sidoName 시·도 이름
-   * @param sigunguCode 시·군·구 코드
-   * @param sigunguName 시·군·구 이름
+   * @param region 코스 지역 요약 정보
    * @param themes 콘셉트 목록
    * @param isWriter 작성자 여부
    * @param places 장소 목록

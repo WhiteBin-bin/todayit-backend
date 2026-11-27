@@ -13,6 +13,7 @@ import com.todayit.course.dto.request.UpdateCoursePlaceOrdersRequest;
 import com.todayit.course.dto.request.UpdateCourseTransportRequest;
 import com.todayit.course.dto.request.UpdateCourseVisibilityRequest;
 import com.todayit.course.dto.response.AddCoursePlaceResponse;
+import com.todayit.course.dto.response.CancelCourseScrapResponse;
 import com.todayit.course.dto.response.CopyCourseResponse;
 import com.todayit.course.dto.response.CourseCardResponse;
 import com.todayit.course.dto.response.CourseDetailResponse;
@@ -166,7 +167,7 @@ public class CourseController implements CourseApiDocs {
             courseFacade.addPlaceToCourse(
                 authentication.getName(),
                 new AddCoursePlaceCommand(
-                    courseId, request.placeId(), request.order(), request.resolveStayMinute())));
+                    courseId, request.placeId(), request.order(), request.resolveStayMinutes())));
     LOG.info("코스 장소 추가 완료: courseId={}, placeId={}", courseId, request.placeId());
     return ResponseEntity.status(HttpStatus.CREATED).body(CommonResponse.success(response));
   }
@@ -288,10 +289,10 @@ public class CourseController implements CourseApiDocs {
    */
   @Override
   @DeleteMapping("/{courseId}/scrap")
-  public ResponseEntity<CommonResponse<CourseScrapResponse>> cancelCourseScrap(
+  public ResponseEntity<CommonResponse<CancelCourseScrapResponse>> cancelCourseScrap(
       @PathVariable int courseId, Authentication authentication) {
-    CourseScrapResponse response =
-        CourseScrapResponse.from(
+    CancelCourseScrapResponse response =
+        CancelCourseScrapResponse.from(
             courseFacade.cancelCourseScrap(courseId, authentication.getName()));
     LOG.info("코스 스크랩 취소 완료: courseId={}", courseId);
     return ResponseEntity.ok(CommonResponse.success(response));

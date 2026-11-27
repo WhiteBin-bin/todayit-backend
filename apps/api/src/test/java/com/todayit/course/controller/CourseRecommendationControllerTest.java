@@ -55,7 +55,7 @@ class CourseRecommendationControllerTest {
                 .principal(new UsernamePasswordAuthenticationToken("member", null))
                 .param("region", "11110")
                 .param("themes", "감성적", "조용함")
-                .param("transport", "WALK")
+                .param("transport", "WALKING")
                 .param("durationMinutes", "120"));
 
     // then

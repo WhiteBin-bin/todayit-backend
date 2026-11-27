@@ -12,6 +12,7 @@ import java.util.List;
  * @param conditions 수정된 생성 조건 정보
  * @param places 코스에 포함된 장소 목록
  * @param updatedAt 수정 일시
+ * @param scrapCount 코스의 활성 스크랩 수
  */
 @Schema(description = "코스 생성 조건 수정 응답")
 public record UpdateCourseConditionsResponse(
@@ -27,7 +28,12 @@ public record UpdateCourseConditionsResponse(
             description = "코스 수정 일시입니다.",
             example = "2026-11-24T18:30:00",
             requiredMode = Schema.RequiredMode.REQUIRED)
-        LocalDateTime updatedAt) {
+        LocalDateTime updatedAt,
+    @Schema(
+            description = "코스의 전체 활성 스크랩 수입니다.",
+            example = "0",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        long scrapCount) {
 
   /**
    * 장소 목록을 방어적으로 복사하여 초기화합니다.
@@ -36,6 +42,7 @@ public record UpdateCourseConditionsResponse(
    * @param conditions 수정된 생성 조건 정보
    * @param places 코스에 포함된 장소 목록
    * @param updatedAt 수정 일시
+   * @param scrapCount 코스의 활성 스크랩 수
    */
   public UpdateCourseConditionsResponse {
     places = places != null ? List.copyOf(places) : List.of();
@@ -54,6 +61,7 @@ public record UpdateCourseConditionsResponse(
         result.courseId(),
         CourseConditionsResponse.from(result.conditions()),
         placeResponses,
-        result.updatedAt());
+        result.updatedAt(),
+        result.scrapCount());
   }
 }

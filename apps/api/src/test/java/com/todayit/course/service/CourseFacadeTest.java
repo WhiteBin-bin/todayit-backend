@@ -296,15 +296,16 @@ class CourseFacadeTest {
     assertThat(result.title()).isEqualTo("코스");
     assertThat(result.authorDisplayName()).isEqualTo("오잇러버");
     assertThat(result.authorProfileImageUrl()).isEqualTo("https://example.com/profile.jpg");
-    assertThat(result.sidoName()).isEqualTo("서울특별시");
-    assertThat(result.sigunguName()).isEqualTo("종로구");
+    assertThat(result.region()).isNotNull();
+    assertThat(result.region().sidoName()).isEqualTo("서울특별시");
+    assertThat(result.region().sigunguName()).isEqualTo("종로구");
     assertThat(result.isWriter()).isTrue();
     assertThat(result.liked()).isTrue();
     assertThat(result.scrapped()).isFalse();
     assertThat(result.beforeVisit()).isEmpty();
     assertThat(result.places()).hasSize(1);
     assertThat(result.places().get(0).name()).isEqualTo("블루보틀 삼청");
-    assertThat(result.places().get(0).stayMinute()).isEqualTo(60);
+    assertThat(result.places().get(0).stayMinutes()).isEqualTo(60);
   }
 
   @Test
@@ -333,10 +334,7 @@ class CourseFacadeTest {
     assertThat(result.title()).isEqualTo("지역 없는 코스");
     assertThat(result.authorDisplayName()).isEqualTo("ToDayIt");
     assertThat(result.authorProfileImageUrl()).isNull();
-    assertThat(result.sidoCode()).isNull();
-    assertThat(result.sidoName()).isNull();
-    assertThat(result.sigunguCode()).isNull();
-    assertThat(result.sigunguName()).isNull();
+    assertThat(result.region()).isNull();
     assertThat(result.places()).isEmpty();
     assertThat(result.liked()).isFalse();
     assertThat(result.scrapped()).isFalse();
@@ -686,6 +684,7 @@ class CourseFacadeTest {
     when(courses.updateCourseConditions("member-1", command)).thenReturn(course);
     when(regions.getRegionSummary(any()))
         .thenReturn(new RegionSummaryResult("11", "서울특별시", "110", "종로구"));
+    when(courseReactionQueryService.countScraps(1)).thenReturn(2L);
 
     // when
     UpdateCourseConditionsResult result = facade.updateCourseConditions("member-1", command);
@@ -700,6 +699,7 @@ class CourseFacadeTest {
     assertThat(result.conditions().endAt()).isEqualTo(endAt);
     assertThat(result.conditions().durationMinutes()).isEqualTo(240);
     assertThat(result.conditions().transport()).isEqualTo(CourseTransport.CAR);
+    assertThat(result.scrapCount()).isEqualTo(2L);
     assertThat(result.updatedAt()).isEqualTo(updatedAt);
   }
 

@@ -14,7 +14,7 @@ import java.math.BigDecimal;
  * @param longitude 경도
  * @param imageUrl 대표 이미지 URL, 없으면 null
  * @param order 방문 순서
- * @param stayMinute 머무는 시간(분), 미입력 시 null
+ * @param stayMinutes 체류 시간(분), 미입력 시 null
  */
 public record CoursePlaceDetailResult(
     int coursePlaceId,
@@ -26,4 +26,4 @@ public record CoursePlaceDetailResult(
     BigDecimal longitude,
     String imageUrl,
     int order,
-    Integer stayMinute) {}
+    Integer stayMinutes) {}

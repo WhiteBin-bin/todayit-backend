@@ -13,6 +13,7 @@ import com.todayit.course.dto.request.UpdateCoursePlaceOrdersRequest;
 import com.todayit.course.dto.request.UpdateCourseTransportRequest;
 import com.todayit.course.dto.request.UpdateCourseVisibilityRequest;
 import com.todayit.course.dto.response.AddCoursePlaceResponse;
+import com.todayit.course.dto.response.CancelCourseScrapResponse;
 import com.todayit.course.dto.response.CopyCourseResponse;
 import com.todayit.course.dto.response.CourseCardResponse;
 import com.todayit.course.dto.response.CourseDetailResponse;
@@ -62,7 +63,7 @@ public interface CourseApiDocs {
           - `themes`: 등록된 콘셉트 이름을 중복 없이 최대 2개까지 선택할 수 있습니다. 생략하면 전체 콘셉트를 조회합니다.
           - `duration`: 단일 선택 구간(`ALL`: 전체, `UNDER_2_HOURS`: 2시간 이하, `TWO_TO_FOUR_HOURS`: 2~4시간, `OVER_4_HOURS`: 4시간 초과)이며 생략 시 `ALL`을 조회합니다.
           - 시간 구간은 `endAt - startAt` 기준이며, 시각이 없거나 종료 시각이 시작 시각 이후가 아니면 시간 필터에서 제외합니다.
-          - `transport`: `CAR`(자동차), `WALK`(도보), `PUBLIC_TRANSIT`(대중교통) 중 선택하며 생략 시 전체 이동수단을 조회합니다.
+          - `transport`: `CAR`(자동차), `WALKING`(도보), `PUBLIC_TRANSPORT`(대중교통) 중 선택하며 생략 시 전체 이동수단을 조회합니다.
           - `sort`: `LATEST`(최신순, 기본값) 또는 `POPULAR`(인기순) 중 선택합니다.
           - `page`: 페이지 번호 (0부터 시작, 기본값 0)
           - `size`: 페이지당 결과 개수 (1~100, 기본값 20)
@@ -96,8 +97,8 @@ public interface CourseApiDocs {
                             },
                             "themes": ["로맨틱", "아늑함"],
                             "durationMinutes": 180,
-                            "transport": "WALK",
-                            "status": "CONFIRMED",
+                            "transport": "WALKING",
+                            "status": "ACTIVE",
                             "visibility": "PUBLIC",
                             "placeCount": 3,
                             "likeCount": 128,
@@ -317,10 +318,12 @@ public interface CourseApiDocs {
                         "status": "ACTIVE",
                         "visibility": "PUBLIC",
                         "viewCount": 10,
-                        "sidoCode": "11",
-                        "sidoName": "서울특별시",
-                        "sigunguCode": "110",
-                        "sigunguName": "종로구",
+                        "region": {
+                          "sidoCode": "11",
+                          "sidoName": "서울특별시",
+                          "sigunguCode": "110",
+                          "sigunguName": "종로구"
+                        },
                         "themes": ["카페·디저트"],
                         "isWriter": true,
                         "places": [
@@ -334,7 +337,7 @@ public interface CourseApiDocs {
                             "longitude": 126.98123400,
                             "imageUrl": "https://example.com/place.jpg",
                             "order": 1,
-                            "stayMinute": 60
+                            "stayMinutes": 60
                           }
                         ],
                         "createdAt": "2026-11-19T09:00:00",
@@ -393,7 +396,7 @@ public interface CourseApiDocs {
           - 작성자 본인만 코스에 장소를 추가할 수 있습니다.
           - 동일한 장소는 한 코스에 최대 2회까지만 추가할 수 있습니다.
           - `order`를 생략하면 코스의 마지막 순서 다음으로 자동 배치됩니다.
-          - `stayMinute`는 0~1440분 범위로 입력하며 생략하면 `0`으로 저장됩니다.
+          - `stayMinutes`는 0~1440분 범위로 입력하며 생략하면 `0`으로 저장됩니다.
           """,
       deprecated = true,
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
@@ -422,7 +425,7 @@ public interface CourseApiDocs {
                           "longitude": 126.98123400,
                           "imageUrl": "https://example.com/place.jpg",
                           "order": 3,
-                          "stayMinute": 60
+                          "stayMinutes": 60
                         },
                         "places": [
                           {
@@ -435,7 +438,7 @@ public interface CourseApiDocs {
                             "longitude": 126.97704100,
                             "imageUrl": "https://example.com/place1.jpg",
                             "order": 1,
-                            "stayMinute": 120
+                            "stayMinutes": 120
                           },
                           {
                             "coursePlaceId": 2,
@@ -447,7 +450,7 @@ public interface CourseApiDocs {
                             "longitude": 126.98220000,
                             "imageUrl": "https://example.com/place2.jpg",
                             "order": 2,
-                            "stayMinute": 60
+                            "stayMinutes": 60
                           },
                           {
                             "coursePlaceId": 3,
@@ -459,7 +462,7 @@ public interface CourseApiDocs {
                             "longitude": 126.98123400,
                             "imageUrl": "https://example.com/place.jpg",
                             "order": 3,
-                            "stayMinute": 60
+                            "stayMinutes": 60
                           }
                         ]
                       }
@@ -596,7 +599,7 @@ public interface CourseApiDocs {
                             "longitude": 126.98220000,
                             "imageUrl": "https://example.com/place2.jpg",
                             "order": 1,
-                            "stayMinute": 60
+                            "stayMinutes": 60
                           },
                           {
                             "coursePlaceId": 1,
@@ -608,7 +611,7 @@ public interface CourseApiDocs {
                             "longitude": 126.97704100,
                             "imageUrl": "https://example.com/place1.jpg",
                             "order": 2,
-                            "stayMinute": 120
+                            "stayMinutes": 120
                           }
                         ]
                       }
@@ -718,7 +721,7 @@ public interface CourseApiDocs {
                             "longitude": 126.97704100,
                             "imageUrl": "https://example.com/place1.jpg",
                             "order": 1,
-                            "stayMinute": 120
+                            "stayMinutes": 120
                           }
                         ]
                       }
@@ -856,7 +859,7 @@ public interface CourseApiDocs {
 
           - 다른 회원의 공개(`PUBLIC`) 확정 코스이거나 본인이 작성한 확정 코스만 복사할 수 있습니다.
           - 임시저장(`DRAFT`) 상태의 코스는 복사할 수 없습니다 (`400 CANNOT_COPY_DRAFT`).
-          - 복사 직후 새 코스의 제목(`title`)과 각 장소의 체류시간(`stayMinute`)은 `null`로 초기화됩니다.
+          - 복사 직후 새 코스의 제목(`title`)과 각 장소의 체류시간(`stayMinutes`)은 `null`로 초기화됩니다.
           """,
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
   @ApiResponses({
@@ -889,7 +892,7 @@ public interface CourseApiDocs {
                             "longitude": 126.98123400,
                             "imageUrl": "https://example.com/place.jpg",
                             "order": 1,
-                            "stayMinute": null
+                            "stayMinutes": null
                           }
                         ],
                         "createdAt": "2026-11-24T12:00:00"
@@ -1151,7 +1154,7 @@ public interface CourseApiDocs {
       summary = "코스 스크랩 취소",
       description =
           """
-          인증된 회원이 스크랩한 코스를 취소하고 최신 활성 스크랩 수를 반환합니다.
+          인증된 회원이 스크랩한 코스를 취소합니다.
 
           - 스크랩하지 않은 상태이거나 이미 취소한 상태여도 멱등하게 `200 OK`(`scrapped: false`)를 반환합니다.
           - 대상 코스가 존재하지 않거나 접근 권한이 없으면 `404 COURSE_NOT_FOUND`를 반환합니다.
@@ -1173,8 +1176,7 @@ public interface CourseApiDocs {
                       "success": true,
                       "data": {
                         "courseId": 1,
-                        "scrapped": false,
-                        "scrapCount": 4
+                        "scrapped": false
                       }
                     }
                     """))),
@@ -1216,7 +1218,7 @@ public interface CourseApiDocs {
                         value =
                             "{\"success\":false,\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"서버 내부 오류가 발생했습니다.\"}")))
   })
-  ResponseEntity<CommonResponse<CourseScrapResponse>> cancelCourseScrap(
+  ResponseEntity<CommonResponse<CancelCourseScrapResponse>> cancelCourseScrap(
       @Parameter(description = "코스 식별자입니다.", example = "1", required = true) int courseId,
       @Parameter(hidden = true) Authentication authentication);
 
@@ -1374,7 +1376,8 @@ public interface CourseApiDocs {
                           "transport": "CAR"
                         },
                         "places": [],
-                        "updatedAt": "2026-11-24T18:30:00"
+                        "updatedAt": "2026-11-24T18:30:00",
+                        "scrapCount": 0
                       }
                     }
                     """))),
@@ -1568,7 +1571,7 @@ public interface CourseApiDocs {
           - `region`: 시·도 2자리(예: `11`) 또는 시·도+시·군·구 5자리(예: `11110`) 코드로 입력하며 생략 시 전체 지역을 대상으로 합니다.
           - `themes`: 등록된 콘셉트 이름을 같은 키로 반복하여 중복 없이 최대 2개까지 전달합니다.
           - `durationMinutes`: 검증된 총 예상 소요 시간(분)의 상한이며, 입력 시 시간 미확인 코스는 제외됩니다.
-          - `transport`: `CAR`(자동차), `WALK`(도보), `PUBLIC_TRANSIT`(대중교통) 중 선택합니다.
+          - `transport`: `CAR`(자동차), `WALKING`(도보), `PUBLIC_TRANSPORT`(대중교통) 중 선택합니다.
           - 선호정보 이용 미동의 또는 개인화 신호가 없으면 최근 인기순으로 대체합니다.
           - 조회 중 외부 AI를 호출하거나 추천 이유를 생성하지 않습니다.
           """,

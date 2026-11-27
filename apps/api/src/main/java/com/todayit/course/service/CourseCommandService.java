@@ -130,7 +130,7 @@ public class CourseCommandService {
     }
 
     CoursePlace coursePlace =
-        addPlace(course, command.placeId(), command.order(), command.stayMinute());
+        addPlace(course, command.placeId(), command.order(), command.stayMinutes());
     Course savedCourse = courseRepository.saveAndFlush(course);
     CoursePlace persistedPlace =
         savedCourse.getCoursePlaces().stream()
@@ -142,7 +142,7 @@ public class CourseCommandService {
             .orElse(coursePlace);
 
     LOG.info(
-        "코스 장소 추가 저장: courseId={}, coursePlaceId={}, placeId={}, order={}, stayMinute={}",
+        "코스 장소 추가 저장: courseId={}, coursePlaceId={}, placeId={}, order={}, stayMinutes={}",
         command.courseId(),
         persistedPlace.getCoursePlaceId(),
         persistedPlace.getPlaceId(),

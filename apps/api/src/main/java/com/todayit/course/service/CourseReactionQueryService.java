@@ -72,4 +72,16 @@ public class CourseReactionQueryService {
     LOG.info("코스 스크랩 여부 조회: courseId={}, scrapped={}", courseId, scrapped);
     return scrapped;
   }
+
+  /**
+   * 코스의 활성 스크랩 수를 조회합니다.
+   *
+   * @param courseId 코스 식별자
+   * @return 활성 상태이며 삭제되지 않은 스크랩 수
+   */
+  public long countScraps(int courseId) {
+    long scrapCount = scraps.countActiveByCourseId(courseId);
+    LOG.info("코스 스크랩 수 조회: courseId={}, scrapCount={}", courseId, scrapCount);
+    return scrapCount;
+  }
 }
