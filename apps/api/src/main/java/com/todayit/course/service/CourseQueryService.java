@@ -8,8 +8,10 @@ import com.todayit.course.entity.CourseTransport;
 import com.todayit.course.exception.CourseErrorCode;
 import com.todayit.course.exception.CourseException;
 import com.todayit.course.repository.CourseRepository;
+import com.todayit.course.repository.CourseScrapRepository;
 import com.todayit.course.service.model.CourseDurationFilter;
 import com.todayit.course.service.model.CourseResult;
+import com.todayit.course.service.model.CourseScrapSort;
 import com.todayit.course.service.model.CourseSort;
 import java.util.List;
 import org.slf4j.Logger;
@@ -28,14 +30,18 @@ public class CourseQueryService implements CoursePlaceQueryService {
   private static final Logger LOG = LoggerFactory.getLogger(CourseQueryService.class);
 
   private final CourseRepository courseRepository;
+  private final CourseScrapRepository courseScrapRepository;
 
   /**
    * 코스 조회에 필요한 Repository를 받습니다.
    *
    * @param courseRepository 코스 Repository
+   * @param courseScrapRepository 코스 스크랩 Repository
    */
-  public CourseQueryService(CourseRepository courseRepository) {
+  public CourseQueryService(
+      CourseRepository courseRepository, CourseScrapRepository courseScrapRepository) {
     this.courseRepository = courseRepository;
+    this.courseScrapRepository = courseScrapRepository;
   }
 
   /**
@@ -208,5 +214,31 @@ public class CourseQueryService implements CoursePlaceQueryService {
   public Page<Course> findMyCourses(String memberId, CourseStatus status, Pageable pageable) {
     LOG.info("내 코스 엔티티 목록 조회: status={}, pageable={}", status, pageable);
     return courseRepository.findByMemberIdAndStatus(memberId, status, pageable);
+  }
+
+  /**
+   * 회원이 활성 상태로 스크랩한 코스를 정렬 기준 및 페이징에 맞게 조회합니다.
+   *
+   * @param memberId 회원 식별자
+   * @param page 페이지 번호
+   * @param size 페이지 크기
+   * @param sort 스크랩 코스 정렬 기준
+   * @return 스크랩 코스 엔티티 페이지
+   */
+  @Transactional(readOnly = true)
+  public Page<Course> findScrappedCourses(
+      String memberId, int page, int size, CourseScrapSort sort) {
+    Pageable pageable = PageRequest.of(page, size);
+    Page<Course> coursePage =
+        sort == CourseScrapSort.OLDEST
+            ? courseScrapRepository.findScrappedCoursesOldest(memberId, pageable)
+            : courseScrapRepository.findScrappedCoursesLatest(memberId, pageable);
+    LOG.info(
+        "스크랩 코스 엔티티 목록 조회: page={}, size={}, sort={}, resultCount={}",
+        page,
+        size,
+        sort,
+        coursePage.getNumberOfElements());
+    return coursePage;
   }
 }

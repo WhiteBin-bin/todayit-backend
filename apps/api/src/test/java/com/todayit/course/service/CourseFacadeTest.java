@@ -33,6 +33,8 @@ import com.todayit.course.service.model.CourseDetailResult;
 import com.todayit.course.service.model.CourseDurationFilter;
 import com.todayit.course.service.model.CourseLikeResult;
 import com.todayit.course.service.model.CoursePlaceItem;
+import com.todayit.course.service.model.CourseScrapResult;
+import com.todayit.course.service.model.CourseScrapSort;
 import com.todayit.course.service.model.CourseSort;
 import com.todayit.course.service.model.CreateCourseResult;
 import com.todayit.course.service.model.MyCourseCardResult;
@@ -496,6 +498,91 @@ class CourseFacadeTest {
     // then
     assertThat(result).isEqualTo(expected);
     verify(courses).likeCourse(1, "member-1");
+  }
+
+  @Test
+  @DisplayName("코스 스크랩 등록을 CourseCommandService에 정상적으로 위임한다")
+  void scrapsCourseSuccessfully() {
+    // given
+    CourseScrapResult expected = new CourseScrapResult(1, true, 5L);
+    when(courses.scrapCourse(1, "member-1")).thenReturn(expected);
+
+    // when
+    CourseScrapResult result = facade.scrapCourse(1, "member-1");
+
+    // then
+    assertThat(result).isEqualTo(expected);
+    verify(courses).scrapCourse(1, "member-1");
+  }
+
+  @Test
+  @DisplayName("코스 스크랩 취소를 CourseCommandService에 정상적으로 위임한다")
+  void cancelsCourseScrapSuccessfully() {
+    // given
+    CourseScrapResult expected = new CourseScrapResult(1, false, 4L);
+    when(courses.cancelCourseScrap(1, "member-1")).thenReturn(expected);
+
+    // when
+    CourseScrapResult result = facade.cancelCourseScrap(1, "member-1");
+
+    // then
+    assertThat(result).isEqualTo(expected);
+    verify(courses).cancelCourseScrap(1, "member-1");
+  }
+
+  @Test
+  @DisplayName("회원의 스크랩 코스 목록을 정상적으로 조회하고 카드 모델 페이지로 조합한다")
+  void findsScrappedCoursesSuccessfully() {
+    // given
+    Course course =
+        Course.createDraft(
+            "member-2",
+            "스크랩한 코스",
+            CourseTransport.CAR,
+            LocalDateTime.of(2026, 11, 24, 10, 0),
+            LocalDateTime.of(2026, 11, 24, 18, 0),
+            List.of(),
+            LocalDateTime.of(2026, 11, 24, 9, 0));
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PUBLIC);
+    addPlace(course, 10, 1, 30);
+
+    when(courseQueryService.findScrappedCourses("member-1", 0, 20, CourseScrapSort.LATEST))
+        .thenReturn(new PageImpl<>(List.of(course), PageRequest.of(0, 20), 1));
+    when(placeCourseQueryService.findPlacesByIds(List.of(10)))
+        .thenReturn(
+            Map.of(
+                10,
+                new CoursePlaceItem(
+                    10,
+                    "장소 1",
+                    "CAFE",
+                    "주소 1",
+                    BigDecimal.valueOf(37.1),
+                    BigDecimal.valueOf(127.1),
+                    "http://image.jpg")));
+    when(courseReactionQueryService.countLikes(List.of(1)))
+        .thenReturn(List.<Object[]>of(new Object[] {1, 7L}));
+    when(regions.getRegionSummary(List.of()))
+        .thenReturn(new RegionSummaryResult("11", "서울특별시", "110", "종로구"));
+
+    // when
+    PageResult<MyCourseCardResult> result =
+        facade.findScrappedCourses("member-1", 0, 20, CourseScrapSort.LATEST);
+
+    // then
+    assertThat(result.totalElements()).isEqualTo(1L);
+    assertThat(result.content()).hasSize(1);
+    MyCourseCardResult card = result.content().getFirst();
+    assertThat(card.courseId()).isEqualTo(1);
+    assertThat(card.title()).isEqualTo("스크랩한 코스");
+    assertThat(card.status()).isEqualTo(CourseStatus.ACTIVE);
+    assertThat(card.thumbnailUrl()).isEqualTo("http://image.jpg");
+    assertThat(card.placeCount()).isEqualTo(1);
+    assertThat(card.likeCount()).isEqualTo(7L);
+    assertThat(card.sidoName()).isEqualTo("서울특별시");
+    assertThat(card.sigunguName()).isEqualTo("종로구");
   }
 
   @Test

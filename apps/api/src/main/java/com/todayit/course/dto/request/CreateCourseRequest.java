@@ -20,11 +20,20 @@ import java.util.List;
  */
 @Schema(
     description =
-        "새 코스를 만들 때 입력하는 정보입니다. 코스명, 콘셉트, 시작 시각, 이동수단은 필수입니다. "
-            + "종료 시각은 선택이며 입력하지 않으면 null로 저장됩니다.")
+        """
+        새 코스를 생성할 때 입력하는 정보입니다.
+
+        - `title`, `themes`, `startAt`, `transport`는 필수입니다.
+        - `endAt`은 선택이며 입력하지 않으면 `null`로 저장됩니다.
+        """)
 public record CreateCourseRequest(
     @Schema(
-            description = "사용자가 정한 코스 이름입니다. 앞뒤 공백을 제거한 뒤 1~100자로 입력합니다.",
+            description =
+                """
+                사용자가 정한 코스 이름입니다.
+
+                - 앞뒤 공백을 제거한 뒤 1~100자로 입력합니다.
+                """,
             example = "종로 데이트",
             minLength = 1,
             maxLength = 100,
@@ -32,27 +41,46 @@ public record CreateCourseRequest(
         String title,
     @Schema(
             description =
-                "코스에서 느끼고 싶은 분위기의 이름을 중복 없이 1~2개 입력합니다. "
-                    + "theme 테이블에 등록된 이름을 사용합니다. 초기 등록값은 조용함, 로맨틱, 아늑함, 감성적, 활기참, "
-                    + "이색적, 여유로움, 고급스러움, 레트로, 자연친화적입니다.",
+                """
+                코스에서 느끼고 싶은 콘셉트 이름 목록입니다.
+
+                - 중복 없이 1~2개 입력합니다.
+                - 허용 콘셉트: `조용함`, `로맨틱`, `아늑함`, `감성적`, `활기참`, `이색적`, `여유로움`, `고급스러움`, `레트로`, `자연친화적`
+                """,
             example = "[\"감성적\", \"여유로움\"]",
             requiredMode = Schema.RequiredMode.REQUIRED)
         List<String> themes,
     @Schema(
-            description = "코스 방문을 시작할 날짜와 시각입니다. 2026-12-01T10:00:00처럼 날짜와 시각 사이에 T를 넣어 입력합니다.",
+            description =
+                """
+                코스 방문 시작 일시입니다.
+
+                - `2026-12-01T10:00:00` 형식(ISO 8601)으로 입력합니다.
+                """,
             example = "2026-12-01T10:00:00",
             requiredMode = Schema.RequiredMode.REQUIRED)
         LocalDateTime startAt,
     @Schema(
             description =
-                "코스 방문을 마칠 날짜와 시각입니다. 입력하는 경우 시작 시각보다 이후여야 하며, "
-                    + "2026-12-01T14:00:00 형식으로 입력합니다.",
+                """
+                코스 방문 종료 일시입니다.
+
+                - 선택 항목이며 입력하는 경우 시작 일시(`startAt`)보다 이후여야 합니다.
+                - `2026-12-01T14:00:00` 형식(ISO 8601)으로 입력합니다.
+                """,
             example = "2026-12-01T14:00:00",
             requiredMode = Schema.RequiredMode.NOT_REQUIRED,
             nullable = true)
         LocalDateTime endAt,
     @Schema(
-            description = "코스에서 사용할 이동수단입니다. 자동차는 CAR, 도보는 WALKING, 대중교통은 PUBLIC_TRANSPORT로 입력합니다.",
+            description =
+                """
+                코스에서 사용할 이동수단입니다.
+
+                - `CAR`: 자동차
+                - `WALKING`: 도보
+                - `PUBLIC_TRANSPORT`: 대중교통
+                """,
             example = "WALKING",
             requiredMode = Schema.RequiredMode.REQUIRED)
         CourseTransport transport) {

@@ -9,8 +9,10 @@ import java.util.List;
  *
  * @param courses 추천 순서의 코스 카드 목록
  */
-@Schema(description = "회원별 추천 코스 목록")
-public record RecommendedCoursesResponse(List<RecommendedCourseResponse> courses) {
+@Schema(description = "회원별 추천 코스 목록 응답")
+public record RecommendedCoursesResponse(
+    @Schema(description = "추천 순서의 코스 카드 목록입니다.", requiredMode = Schema.RequiredMode.REQUIRED)
+        List<RecommendedCourseResponse> courses) {
   /** 추천 코스 목록을 방어적으로 복사합니다. */
   public RecommendedCoursesResponse {
     courses = List.copyOf(courses);

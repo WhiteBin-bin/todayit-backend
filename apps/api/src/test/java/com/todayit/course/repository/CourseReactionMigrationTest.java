@@ -118,6 +118,25 @@ class CourseReactionMigrationTest {
   }
 
   @Test
+  @DisplayName("동일한 회원의 동일 코스 중복 스크랩은 UNIQUE 제약으로 거부한다")
+  void rejectsDuplicateScrap() {
+    // given
+    String sql =
+        "insert into course_scrap (member_id, course_id, is_active, is_delete) values (?, ?, true, false)";
+    jdbc.update(sql, MEMBER_ID, courseId);
+
+    // when
+    DataIntegrityViolationException exception =
+        assertThrows(
+            DataIntegrityViolationException.class, () -> jdbc.update(sql, MEMBER_ID, courseId));
+
+    // then
+    assertThat(exception.getMostSpecificCause()).isInstanceOf(SQLException.class);
+    SQLException cause = (SQLException) exception.getMostSpecificCause();
+    assertThat(cause.getSQLState()).isEqualTo("23505");
+  }
+
+  @Test
   @DisplayName("없는 회원의 코스 좋아요는 FK 제약으로 거부한다")
   void rejectsLikeWithMissingMember() {
     // given

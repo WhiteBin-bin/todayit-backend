@@ -17,6 +17,7 @@ import com.todayit.course.dto.response.CopyCourseResponse;
 import com.todayit.course.dto.response.CourseCardResponse;
 import com.todayit.course.dto.response.CourseDetailResponse;
 import com.todayit.course.dto.response.CourseLikeResponse;
+import com.todayit.course.dto.response.CourseScrapResponse;
 import com.todayit.course.dto.response.CreateCourseResponse;
 import com.todayit.course.dto.response.RecommendedCoursesResponse;
 import com.todayit.course.dto.response.RemoveCoursePlaceResponse;
@@ -51,14 +52,21 @@ public interface CourseApiDocs {
   @Operation(
       summary = "코스 목록 및 필터 조회",
       description =
-          "공개·확정·미삭제 코스를 지역, 콘셉트(최대 2개), 소요 시간(ALL/UNDER_2_HOURS/TWO_TO_FOUR_HOURS/OVER_4_HOURS), "
-              + "이동수단, 정렬(LATEST/POPULAR) 및 페이징 조건에 맞게 조회합니다. "
-              + "regions는 시도 및 시군구 목록을 담은 JSON 배열 문자열입니다. regions를 생략하면 지역 필터를 적용하지 않으며, "
-              + "빈 배열([])이나 빈 문자열 또는 공백 문자열은 400 INVALID_REGION_PATH를 반환합니다. "
-              + "각 시도 항목의 sigunguCodes를 생략하거나 빈 배열로 전달하면 해당 시도 전체를 조회합니다. "
-              + "끝자리가 0인 시군구 코드만 시도당 최대 3개로 제한하며, 나머지 코드는 개수 제한에서 제외합니다. "
-              + "duration은 단일 선택 구간(ALL: 전체, UNDER_2_HOURS: 2시간 이하, TWO_TO_FOUR_HOURS: 2~4시간, OVER_4_HOURS: 4시간 초과)이며 생략 시 전체를 조회합니다. "
-              + "시간 구간은 endAt - startAt 기준이며, 시각이 없거나 종료 시각이 시작 시각 이후가 아니면 시간 필터에서 제외합니다.")
+          """
+          공개·확정·미삭제 코스를 지역, 콘셉트, 소요 시간, 이동수단, 정렬 및 페이징 조건에 맞게 조회합니다.
+
+          - `regions`: 시도 및 시군구 목록을 담은 JSON 배열 문자열입니다. 생략하면 지역 필터를 적용하지 않습니다.
+          - `regions`에 빈 배열(`[]`), 빈 문자열 또는 공백 문자열을 전달하면 `400 INVALID_REGION_PATH`를 반환합니다.
+          - 각 시도 항목의 `sigunguCodes`를 생략하거나 빈 배열로 전달하면 해당 시도 전체를 조회합니다.
+          - 끝자리가 `0`인 시군구 코드만 시도당 최대 3개로 제한하며, 나머지 코드는 개수 제한에서 제외합니다.
+          - `themes`: 등록된 콘셉트 이름을 중복 없이 최대 2개까지 선택할 수 있습니다. 생략하면 전체 콘셉트를 조회합니다.
+          - `duration`: 단일 선택 구간(`ALL`: 전체, `UNDER_2_HOURS`: 2시간 이하, `TWO_TO_FOUR_HOURS`: 2~4시간, `OVER_4_HOURS`: 4시간 초과)이며 생략 시 `ALL`을 조회합니다.
+          - 시간 구간은 `endAt - startAt` 기준이며, 시각이 없거나 종료 시각이 시작 시각 이후가 아니면 시간 필터에서 제외합니다.
+          - `transport`: `CAR`(자동차), `WALK`(도보), `PUBLIC_TRANSIT`(대중교통) 중 선택하며 생략 시 전체 이동수단을 조회합니다.
+          - `sort`: `LATEST`(최신순, 기본값) 또는 `POPULAR`(인기순) 중 선택합니다.
+          - `page`: 페이지 번호 (0부터 시작, 기본값 0)
+          - `size`: 페이지당 결과 개수 (1~100, 기본값 20)
+          """)
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -161,7 +169,16 @@ public interface CourseApiDocs {
    */
   @Operation(
       summary = "코스 생성",
-      description = "코스명, 콘셉트, 방문 시간, 이동수단을 입력받아 새로운 코스를 DRAFT 상태로 생성합니다.",
+      description =
+          """
+          코스명, 콘셉트, 방문 시간, 이동수단을 입력받아 새로운 코스를 임시저장(`DRAFT`) 상태로 생성합니다.
+
+          - `title`: 앞뒤 공백 제거 후 1~100자로 입력합니다.
+          - `themes`: 등록된 콘셉트 이름을 중복 없이 1~2개 입력합니다.
+          - `startAt`: 방문 시작 일시 (필수, ISO 8601 형식)
+          - `endAt`: 방문 종료 일시 (선택, 입력 시 `startAt` 이후여야 합니다.)
+          - `transport`: `CAR`(자동차), `WALKING`(도보), `PUBLIC_TRANSPORT`(대중교통) 중 하나를 입력합니다.
+          """,
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
   @ApiResponses({
     @ApiResponse(
@@ -261,7 +278,15 @@ public interface CourseApiDocs {
    */
   @Operation(
       summary = "코스 상세 조회",
-      description = "코스 식별자로 코스의 상세 정보, 연관된 장소 목록 및 방문 순서를 조회합니다.",
+      description =
+          """
+          코스 식별자로 코스의 상세 정보, 연관된 장소 목록 및 방문 순서를 조회합니다.
+
+          - 공개(`PUBLIC`) 확정 코스는 비회원과 모든 회원이 조회할 수 있습니다.
+          - 비공개(`PRIVATE`) 또는 임시저장(`DRAFT`) 코스는 작성자 본인만 조회할 수 있습니다.
+          - 로그인한 회원이 조회하면 본인의 작성자 여부(`isWriter`), 좋아요 여부(`liked`), 스크랩 여부(`scrapped`)를 함께 반환합니다.
+          - 비회원이 조회하면 `isWriter`, `liked`, `scrapped`는 모두 `false`로 반환합니다.
+          """,
       security = {
         @SecurityRequirement(name = ""),
         @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
@@ -361,7 +386,15 @@ public interface CourseApiDocs {
    */
   @Operation(
       summary = "코스 장소 추가",
-      description = "코스에 새로운 장소를 추가합니다. 동일한 장소는 코스에 최대 2회까지만 추가할 수 있습니다.",
+      description =
+          """
+          코스에 새로운 장소를 추가합니다.
+
+          - 작성자 본인만 코스에 장소를 추가할 수 있습니다.
+          - 동일한 장소는 한 코스에 최대 2회까지만 추가할 수 있습니다.
+          - `order`를 생략하면 코스의 마지막 순서 다음으로 자동 배치됩니다.
+          - `stayMinute`는 0~1440분 범위로 입력하며 생략하면 `0`으로 저장됩니다.
+          """,
       deprecated = true,
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
   @ApiResponses({
@@ -528,7 +561,13 @@ public interface CourseApiDocs {
    */
   @Operation(
       summary = "코스 장소 순서 일괄 변경",
-      description = "코스 내 장소들의 방문 순서를 전달받은 식별자 순서대로 일괄 변경합니다.",
+      description =
+          """
+          코스 내 장소들의 방문 순서를 전달받은 식별자 순서대로 일괄 변경합니다.
+
+          - 작성자 본인만 변경할 수 있습니다.
+          - `coursePlaceIds`에는 현재 코스에 포함된 모든 코스 장소 식별자를 빠짐없이 중복 없이 전달해야 합니다.
+          """,
       deprecated = true,
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
   @ApiResponses({
@@ -643,7 +682,13 @@ public interface CourseApiDocs {
    */
   @Operation(
       summary = "코스 장소 삭제",
-      description = "코스 내 특정 장소를 삭제하고 남은 장소들의 순서를 재조정합니다.",
+      description =
+          """
+          코스 내 특정 장소를 삭제하고 남은 장소들의 방문 순서를 1부터 연속되도록 재조정합니다.
+
+          - 작성자 본인만 삭제할 수 있습니다.
+          - 삭제 후 재정렬된 남은 장소 목록을 반환합니다.
+          """,
       deprecated = true,
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
   @ApiResponses({
@@ -742,7 +787,13 @@ public interface CourseApiDocs {
    */
   @Operation(
       summary = "코스 삭제",
-      description = "코스를 영구 삭제합니다. 연관된 코스 장소, 지역 매핑, 테마 매핑 등의 데이터도 함께 삭제됩니다.",
+      description =
+          """
+          코스를 영구 삭제합니다.
+
+          - 작성자 본인만 삭제할 수 있습니다.
+          - 연관된 코스 장소, 지역 매핑, 콘셉트 매핑 등의 데이터도 함께 삭제됩니다.
+          """,
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "코스 영구 삭제 성공"),
@@ -800,7 +851,13 @@ public interface CourseApiDocs {
   @Operation(
       summary = "코스 복사",
       description =
-          "확정된 코스의 장소 목록과 순서만을 복제하여 새로운 DRAFT 코스를 생성합니다. 다른 회원의 공개 코스이거나 본인이 작성한 코스만 복사할 수 있습니다.",
+          """
+          확정된 코스의 장소 목록과 방문 순서만을 복제하여 새로운 임시저장(`DRAFT`) 코스를 생성합니다.
+
+          - 다른 회원의 공개(`PUBLIC`) 확정 코스이거나 본인이 작성한 확정 코스만 복사할 수 있습니다.
+          - 임시저장(`DRAFT`) 상태의 코스는 복사할 수 없습니다 (`400 CANNOT_COPY_DRAFT`).
+          - 복사 직후 새 코스의 제목(`title`)과 각 장소의 체류시간(`stayMinute`)은 `null`로 초기화됩니다.
+          """,
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
   @ApiResponses({
     @ApiResponse(
@@ -905,7 +962,13 @@ public interface CourseApiDocs {
    */
   @Operation(
       summary = "코스 좋아요 등록",
-      description = "코스에 좋아요를 1회 등록합니다. 이미 좋아요를 누른 경우 409 Conflict를 반환합니다.",
+      description =
+          """
+          인증된 회원이 코스에 좋아요를 등록합니다.
+
+          - 공개(`PUBLIC`) 확정 코스이거나 본인이 작성한 확정 코스에 좋아요를 누를 수 있습니다.
+          - 이미 좋아요를 누른 코스인 경우 `409 COURSE_ALREADY_LIKED`를 반환합니다.
+          """,
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
   @ApiResponses({
     @ApiResponse(
@@ -984,6 +1047,180 @@ public interface CourseApiDocs {
       @Parameter(hidden = true) Authentication authentication);
 
   /**
+   * 인증된 회원이 코스를 스크랩합니다.
+   *
+   * @param courseId 코스 식별자
+   * @param authentication 인증된 회원 정보
+   * @return 코스 스크랩 결과
+   */
+  @Operation(
+      summary = "코스 스크랩",
+      description =
+          """
+          인증된 회원이 코스를 스크랩합니다.
+
+          - 공개(`PUBLIC`) 확정 코스이거나 본인이 작성한 확정 코스를 스크랩할 수 있습니다.
+          - 이미 활성 상태로 스크랩한 코스인 경우 `409 COURSE_ALREADY_SCRAPPED`를 반환합니다.
+          - 이전에 스크랩을 취소했던 코스를 다시 스크랩하면 재활성화됩니다.
+          """,
+      security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "201",
+        description = "코스 스크랩 성공",
+        useReturnTypeSchema = true,
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                    {
+                      "success": true,
+                      "data": {
+                        "courseId": 1,
+                        "scrapped": true,
+                        "scrapCount": 5
+                      }
+                    }
+                    """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                    {"success":false,"code":"UNAUTHORIZED","message":"인증이 필요합니다."}
+                    """))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "코스가 없거나 비활성·삭제 상태이거나 접근 권한이 없음",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                    {"success":false,"code":"COURSE_NOT_FOUND","message":"코스를 찾을 수 없습니다."}
+                    """))),
+    @ApiResponse(
+        responseCode = "409",
+        description = "이미 스크랩한 코스",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                    {"success":false,"code":"COURSE_ALREADY_SCRAPPED","message":"이미 스크랩한 코스입니다."}
+                    """))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 내부 오류",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"서버 내부 오류가 발생했습니다.\"}")))
+  })
+  ResponseEntity<CommonResponse<CourseScrapResponse>> scrapCourse(
+      @Parameter(description = "코스 식별자입니다.", example = "1", required = true) int courseId,
+      @Parameter(hidden = true) Authentication authentication);
+
+  /**
+   * 인증된 회원이 코스 스크랩을 취소합니다.
+   *
+   * @param courseId 코스 식별자
+   * @param authentication 인증된 회원 정보
+   * @return 코스 스크랩 취소 결과
+   */
+  @Operation(
+      summary = "코스 스크랩 취소",
+      description =
+          """
+          인증된 회원이 스크랩한 코스를 취소하고 최신 활성 스크랩 수를 반환합니다.
+
+          - 스크랩하지 않은 상태이거나 이미 취소한 상태여도 멱등하게 `200 OK`(`scrapped: false`)를 반환합니다.
+          - 대상 코스가 존재하지 않거나 접근 권한이 없으면 `404 COURSE_NOT_FOUND`를 반환합니다.
+          """,
+      security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
+  @ApiResponses({
+    @ApiResponse(
+        responseCode = "200",
+        description = "코스 스크랩 취소 성공",
+        useReturnTypeSchema = true,
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                    {
+                      "success": true,
+                      "data": {
+                        "courseId": 1,
+                        "scrapped": false,
+                        "scrapCount": 4
+                      }
+                    }
+                    """))),
+    @ApiResponse(
+        responseCode = "401",
+        description = "인증 실패",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                    {"success":false,"code":"UNAUTHORIZED","message":"인증이 필요합니다."}
+                    """))),
+    @ApiResponse(
+        responseCode = "404",
+        description = "코스가 없거나 비활성·삭제 상태이거나 접근 권한이 없음",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            """
+                    {"success":false,"code":"COURSE_NOT_FOUND","message":"코스를 찾을 수 없습니다."}
+                    """))),
+    @ApiResponse(
+        responseCode = "500",
+        description = "서버 내부 오류",
+        content =
+            @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = ErrorResponse.class),
+                examples =
+                    @ExampleObject(
+                        value =
+                            "{\"success\":false,\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"서버 내부 오류가 발생했습니다.\"}")))
+  })
+  ResponseEntity<CommonResponse<CourseScrapResponse>> cancelCourseScrap(
+      @Parameter(description = "코스 식별자입니다.", example = "1", required = true) int courseId,
+      @Parameter(hidden = true) Authentication authentication);
+
+  /**
    * 확정된 코스의 공개 범위를 변경합니다.
    *
    * @param courseId 코스 식별자
@@ -994,7 +1231,12 @@ public interface CourseApiDocs {
   @Operation(
       summary = "코스 공개 범위 설정",
       description =
-          "확정된 코스의 공개 범위(PUBLIC, PRIVATE)를 변경합니다. 작성자 본인만 변경할 수 있으며, 임시저장(DRAFT) 코스는 공개 범위를 변경할 수 없습니다.",
+          """
+          확정된 코스의 공개 범위(`PUBLIC`, `PRIVATE`)를 변경합니다.
+
+          - 작성자 본인만 변경할 수 있습니다.
+          - 임시저장(`DRAFT`) 코스는 공개 범위를 변경할 수 없습니다 (`400 CANNOT_CHANGE_DRAFT_VISIBILITY`).
+          """,
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
   @ApiResponses({
     @ApiResponse(
@@ -1091,7 +1333,17 @@ public interface CourseApiDocs {
    */
   @Operation(
       summary = "코스 생성 조건 수정",
-      description = "임시저장(DRAFT) 코스의 생성 조건(행정 지역, 방문 시간, 소요 시간, 이동수단)을 수정합니다.",
+      description =
+          """
+          임시저장(`DRAFT`) 코스의 생성 조건(행정 지역, 방문 시간, 소요 시간, 이동수단)을 수정합니다.
+
+          - 작성자 본인만 수정할 수 있으며, 확정(`ACTIVE`) 코스는 생성 조건을 수정할 수 없습니다 (`400 CANNOT_EDIT_ACTIVE_COURSE`).
+          - 요청에서 생략하거나 `null`로 전달한 항목은 기존 값을 유지합니다.
+          - `region`: 시·도 2자리, 시·도+시·군·구 5자리 또는 유일한 시·군·구 3자리 코드로 입력합니다.
+          - `startAt` / `endAt`: 방문 시작 및 종료 일시 (ISO 8601 형식, 종료 시각은 시작 시각 이후여야 합니다.)
+          - `durationMinutes`: 예상 소요 시간(분, 1 이상의 양수)
+          - `transport`: `CAR`, `WALKING`, `PUBLIC_TRANSPORT` 중 하나를 입력합니다.
+          """,
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
   @ApiResponses({
     @ApiResponse(
@@ -1206,7 +1458,14 @@ public interface CourseApiDocs {
    */
   @Operation(
       summary = "코스 이동수단 변경",
-      description = "임시저장(DRAFT) 코스의 이동수단을 변경합니다. 확정된 코스는 이동수단을 변경할 수 없습니다.",
+      description =
+          """
+          임시저장(`DRAFT`) 코스의 이동수단을 변경합니다.
+
+          - 작성자 본인만 변경할 수 있습니다.
+          - 확정(`ACTIVE`) 코스는 이동수단을 변경할 수 없습니다 (`400 CANNOT_EDIT_ACTIVE_COURSE`).
+          - `transport`: `CAR`, `WALKING`, `PUBLIC_TRANSPORT` 중 하나를 입력합니다.
+          """,
       deprecated = true,
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
   @ApiResponses({
@@ -1303,13 +1562,16 @@ public interface CourseApiDocs {
   @Operation(
       summary = "추천 코스 조회",
       description =
-          "공개·확정·미삭제 코스를 기존 추천 알고리즘으로 정렬합니다. "
-              + "지역은 시·도 2자리 또는 시·도와 시·군·구 5자리 코드입니다. "
-              + "themes는 등록된 콘셉트 이름을 같은 키로 반복하여 최대 2개 전달합니다. "
-              + "이동수단은 CAR/WALK/PUBLIC_TRANSIT입니다. "
-              + "durationMinutes는 검증된 총 예상시간의 상한이며 시간 미확인 코스는 제외됩니다. "
-              + "선호정보 이용 미동의 또는 개인화 신호가 없으면 최근 인기순으로 대체합니다. "
-              + "조회 중 AI를 호출하거나 추천 이유를 생성하지 않습니다.",
+          """
+          공개·확정·미삭제 코스를 추천 알고리즘으로 정렬하여 조회합니다.
+
+          - `region`: 시·도 2자리(예: `11`) 또는 시·도+시·군·구 5자리(예: `11110`) 코드로 입력하며 생략 시 전체 지역을 대상으로 합니다.
+          - `themes`: 등록된 콘셉트 이름을 같은 키로 반복하여 중복 없이 최대 2개까지 전달합니다.
+          - `durationMinutes`: 검증된 총 예상 소요 시간(분)의 상한이며, 입력 시 시간 미확인 코스는 제외됩니다.
+          - `transport`: `CAR`(자동차), `WALK`(도보), `PUBLIC_TRANSIT`(대중교통) 중 선택합니다.
+          - 선호정보 이용 미동의 또는 개인화 신호가 없으면 최근 인기순으로 대체합니다.
+          - 조회 중 외부 AI를 호출하거나 추천 이유를 생성하지 않습니다.
+          """,
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "추천 코스 조회 성공", useReturnTypeSchema = true),

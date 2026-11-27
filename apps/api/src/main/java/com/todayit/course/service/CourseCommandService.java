@@ -11,12 +11,14 @@ import com.todayit.course.exception.CourseErrorCode;
 import com.todayit.course.exception.CourseException;
 import com.todayit.course.repository.CourseMemberLikeRepository;
 import com.todayit.course.repository.CourseRepository;
+import com.todayit.course.repository.CourseScrapRepository;
 import com.todayit.course.service.command.AddCoursePlaceCommand;
 import com.todayit.course.service.command.CreateCourseCommand;
 import com.todayit.course.service.command.UpdateCourseConditionsCommand;
 import com.todayit.course.service.command.UpdateCoursePlaceOrdersCommand;
 import com.todayit.course.service.model.AddCoursePlaceEntities;
 import com.todayit.course.service.model.CourseLikeResult;
+import com.todayit.course.service.model.CourseScrapResult;
 import com.todayit.course.service.model.CreateCourseResult;
 import com.todayit.course.service.model.UpdateCourseTransportResult;
 import com.todayit.course.service.model.UpdateCourseVisibilityResult;
@@ -45,6 +47,7 @@ public class CourseCommandService {
 
   private final CourseRepository courseRepository;
   private final CourseMemberLikeRepository courseMemberLikeRepository;
+  private final CourseScrapRepository courseScrapRepository;
   private final RegionQueryService regionQueryService;
 
   /**
@@ -52,14 +55,17 @@ public class CourseCommandService {
    *
    * @param courseRepository 코스 저장소
    * @param courseMemberLikeRepository 코스 회원 좋아요 저장소
+   * @param courseScrapRepository 코스 스크랩 저장소
    * @param regionQueryService 행정 지역 조회 서비스
    */
   public CourseCommandService(
       CourseRepository courseRepository,
       CourseMemberLikeRepository courseMemberLikeRepository,
+      CourseScrapRepository courseScrapRepository,
       RegionQueryService regionQueryService) {
     this.courseRepository = courseRepository;
     this.courseMemberLikeRepository = courseMemberLikeRepository;
+    this.courseScrapRepository = courseScrapRepository;
     this.regionQueryService = regionQueryService;
   }
 
@@ -456,6 +462,71 @@ public class CourseCommandService {
   }
 
   /**
+   * 코스를 스크랩하고 최신 활성 스크랩 수를 반환합니다.
+   *
+   * @param courseId 코스 식별자
+   * @param memberId 회원 식별자
+   * @return 코스 스크랩 결과
+   * @throws CourseException 코스가 존재하지 않거나, 삭제되었거나, 임시저장이거나, 타인의 비공개 코스인 경우 / 이미 스크랩한 경우
+   */
+  @Transactional
+  public CourseScrapResult scrapCourse(int courseId, String memberId) {
+    Course course =
+        courseRepository
+            .findById(courseId)
+            .orElseThrow(() -> new CourseException(CourseErrorCode.NOT_FOUND));
+    validateCourseForLike(course, memberId);
+
+    if (courseScrapRepository.existsByMemberIdAndCourseCourseIdAndActiveTrueAndDeletedFalse(
+        memberId, courseId)) {
+      throw new CourseException(CourseErrorCode.ALREADY_SCRAPPED);
+    }
+
+    int upsertedCount;
+    try {
+      upsertedCount = courseScrapRepository.upsertByMemberIdAndCourseId(memberId, courseId);
+    } catch (DataIntegrityViolationException e) {
+      if (isCourseForeignKeyViolation(e)) {
+        throw new CourseException(CourseErrorCode.NOT_FOUND);
+      }
+      throw e;
+    }
+    if (upsertedCount == 0) {
+      throw new CourseException(CourseErrorCode.ALREADY_SCRAPPED);
+    }
+
+    long scrapCount = courseScrapRepository.countActiveByCourseId(courseId);
+    LOG.info("코스 스크랩 저장: courseId={}, scrapCount={}", courseId, scrapCount);
+    return new CourseScrapResult(courseId, true, scrapCount);
+  }
+
+  /**
+   * 코스의 스크랩을 취소하고 최신 활성 스크랩 수를 반환합니다.
+   *
+   * @param courseId 코스 식별자
+   * @param memberId 회원 식별자
+   * @return 코스 스크랩 취소 결과
+   * @throws CourseException 코스가 존재하지 않거나, 삭제되었거나, 임시저장이거나, 타인의 비공개 코스인 경우
+   */
+  @Transactional
+  public CourseScrapResult cancelCourseScrap(int courseId, String memberId) {
+    Course course =
+        courseRepository
+            .findById(courseId)
+            .orElseThrow(() -> new CourseException(CourseErrorCode.NOT_FOUND));
+    validateCourseForLike(course, memberId);
+
+    int cancelledCount = courseScrapRepository.cancelByMemberIdAndCourseId(memberId, courseId);
+    long scrapCount = courseScrapRepository.countActiveByCourseId(courseId);
+    LOG.info(
+        "코스 스크랩 취소 저장: courseId={}, cancelledCount={}, scrapCount={}",
+        courseId,
+        cancelledCount,
+        scrapCount);
+    return new CourseScrapResult(courseId, false, scrapCount);
+  }
+
+  /**
    * 확정된 코스의 공개 범위를 변경합니다.
    *
    * @param memberId 인증된 작성자 식별자
@@ -607,7 +678,8 @@ public class CourseCommandService {
       String message = current.getMessage();
       if (message != null) {
         String lower = message.toLowerCase();
-        if (lower.contains("fk_course_member_like_course")) {
+        if (lower.contains("fk_course_member_like_course")
+            || lower.contains("fk_course_scrap_course")) {
           return true;
         }
       }

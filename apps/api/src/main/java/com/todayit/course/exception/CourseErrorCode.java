@@ -58,7 +58,10 @@ public enum CourseErrorCode implements ErrorCode {
   CANNOT_EDIT_ACTIVE_COURSE("CANNOT_EDIT_ACTIVE_COURSE", "확정된 코스는 생성 조건을 수정할 수 없습니다."),
 
   /** 이미 좋아요를 누른 코스에 다시 좋아요를 요청한 경우입니다. */
-  ALREADY_LIKED("COURSE_ALREADY_LIKED", "이미 좋아요를 눌렀습니다.", ErrorStatus.CONFLICT);
+  ALREADY_LIKED("COURSE_ALREADY_LIKED", "이미 좋아요를 눌렀습니다.", ErrorStatus.CONFLICT),
+
+  /** 이미 스크랩한 코스에 다시 스크랩을 요청한 경우입니다. */
+  ALREADY_SCRAPPED("COURSE_ALREADY_SCRAPPED", "이미 스크랩한 코스입니다.", ErrorStatus.CONFLICT);
 
   private final String code;
   private final String message;

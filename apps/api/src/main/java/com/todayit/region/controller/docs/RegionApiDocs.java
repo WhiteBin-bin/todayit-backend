@@ -25,15 +25,24 @@ public interface RegionApiDocs {
    */
   @Operation(
       summary = "전체 지역 목록 조회",
-      description = "전국 시·도, 시·군·구 및 하위 세부 지역 목록을 3단계 계층(트리) 구조로 일괄 조회합니다. 필터 렌더링에 사용됩니다.")
+      description =
+          """
+          전국 시·도, 시·군·구 및 하위 세부 지역(일반구) 목록을 3단계 계층(트리) 구조로 일괄 조회합니다.
+
+          - 장소 및 코스 목록 필터의 지역 선택 UI 렌더링에 사용됩니다.
+          - 1단계(`sidoCode`, `sidoName`): 시·도 정보 (2자리 법정동 코드, 예: `11` 서울특별시, `41` 경기도)
+          - 2단계(`sigungus`): 시·도 하위 시·군·구 목록 (끝자리가 `0`인 3자리 법정동 코드, 예: `110` 종로구/수원시, `130` 성남시)
+          - 3단계(`subRegions`): 수원시, 성남시 등 일반구를 가진 시(市)의 하위 구 목록 (끝자리가 `0`이 아닌 3자리 법정동 코드, 예: `135` 분당구)
+          - 하위 일반구가 없는 시·군·구는 `subRegions`를 빈 배열(`[]`)로 반환합니다.
+          """)
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
         description = "전체 지역 목록 조회 성공",
+        useReturnTypeSchema = true,
         content =
             @Content(
                 mediaType = MediaType.APPLICATION_JSON_VALUE,
-                schema = @Schema(implementation = CommonResponse.class),
                 examples =
                     @ExampleObject(
                         name = "성공 예시",

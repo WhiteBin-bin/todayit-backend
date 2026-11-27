@@ -13,9 +13,31 @@ import java.util.List;
  */
 @Schema(description = "시·군·구 응답")
 public record SigunguResponse(
-    @Schema(description = "시·군·구 법정동 코드 (3자리)", example = "130") String sigunguCode,
-    @Schema(description = "시·군·구 명칭", example = "성남시") String sigunguName,
-    @Schema(description = "하위 세부 지역 목록") List<SubRegionResponse> subRegions) {
+    @Schema(
+            description =
+                """
+                시·군·구 법정동 코드입니다.
+
+                - 끝자리가 `0`인 3자리 숫자 문자열입니다. (예: `110` 종로구/수원시, `130` 성남시)
+                """,
+            example = "130",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        String sigunguCode,
+    @Schema(
+            description = "시·군·구 명칭입니다.",
+            example = "성남시",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        String sigunguName,
+    @Schema(
+            description =
+                """
+                하위 세부 지역(일반구) 목록입니다.
+
+                - 수원시, 성남시 등 일반구를 가진 시(市)인 경우 하위 구 목록을 포함합니다.
+                - 하위 일반구가 없는 시·군·구는 빈 배열(`[]`)을 반환합니다.
+                """,
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        List<SubRegionResponse> subRegions) {
 
   /**
    * 세부 지역 목록을 방어적으로 복사하여 초기화합니다.

@@ -10,6 +10,9 @@ import com.todayit.region.RegionFilterParser;
 import com.todayit.region.exception.RegionException;
 import com.todayit.region.service.model.RegionFilter;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.HashSet;
 import java.util.List;
 
@@ -27,25 +30,117 @@ import java.util.List;
 public record CourseSearchRequest(
     @Parameter(
             description =
-                "지역 필터 JSON 배열 문자열입니다. regions를 생략하면 지역 필터를 적용하지 않습니다. "
-                    + "각 시도 항목의 sigunguCodes를 생략하거나 빈 배열로 전달하면 해당 시도 전체를 조회합니다. "
-                    + "끝자리가 0인 시군구 코드만 시도당 최대 3개로 제한하며 나머지 코드는 개수 제한에서 제외합니다.",
+                """
+                지역 필터 JSON 배열 문자열입니다.
+
+                - 생략하면 지역 필터를 적용하지 않습니다.
+                - 빈 배열(`[]`), 빈 문자열 또는 공백 문자열을 전달하면 `400 INVALID_REGION_PATH`를 반환합니다.
+                - 각 시도 항목의 `sigunguCodes`를 생략하거나 빈 배열(`[]`)로 전달하면 해당 시도 전체를 조회합니다.
+                - 끝자리가 `0`인 시군구 코드만 시도당 최대 3개로 제한하며 나머지 코드는 개수 제한에서 제외합니다.
+                - 시군구 코드를 전달하면 해당 코드의 지역만 조회하며 하위 구 코드는 자동으로 추가하지 않습니다.
+                """,
             example =
                 "[{\"sidoCode\":\"11\",\"sigunguCodes\":[\"680\",\"650\"]},{\"sidoCode\":\"41\",\"sigunguCodes\":[]}]")
         String regions,
-    @Parameter(description = "콘셉트 이름 목록입니다. 중복 없이 최대 2개까지 선택할 수 있습니다.") List<String> themes,
     @Parameter(
             description =
-                "소요 시간 구간 필터입니다. 단일 선택이며 생략 시 전체(ALL)를 조회합니다. "
-                    + "(ALL: 전체, UNDER_2_HOURS: 2시간 이하, TWO_TO_FOUR_HOURS: 2~4시간, OVER_4_HOURS: 4시간 초과)",
-            example = "TWO_TO_FOUR_HOURS")
+                """
+                코스 콘셉트 필터 목록입니다.
+
+                - 중복 없이 최대 2개까지 복수 선택할 수 있습니다.
+                - 선택한 콘셉트 중 하나에 해당하는 코스를 조회합니다.
+                - 생략하면 전체 콘셉트를 조회합니다.
+                - 허용 콘셉트: `조용함`, `로맨틱`, `아늑함`, `감성적`, `활기참`, `이색적`, `여유로움`, `고급스러움`, `레트로`, `자연친화적`
+                """,
+            examples = {
+              @ExampleObject(name = "조용함", value = "[\"조용함\"]"),
+              @ExampleObject(name = "로맨틱", value = "[\"로맨틱\"]"),
+              @ExampleObject(name = "아늑함", value = "[\"아늑함\"]"),
+              @ExampleObject(name = "감성적", value = "[\"감성적\"]"),
+              @ExampleObject(name = "활기참", value = "[\"활기참\"]"),
+              @ExampleObject(name = "이색적", value = "[\"이색적\"]"),
+              @ExampleObject(name = "여유로움", value = "[\"여유로움\"]"),
+              @ExampleObject(name = "고급스러움", value = "[\"고급스러움\"]"),
+              @ExampleObject(name = "레트로", value = "[\"레트로\"]"),
+              @ExampleObject(name = "자연친화적", value = "[\"자연친화적\"]"),
+              @ExampleObject(name = "로맨틱 + 아늑함", value = "[\"로맨틱\",\"아늑함\"]"),
+              @ExampleObject(name = "감성적 + 여유로움", value = "[\"감성적\",\"여유로움\"]"),
+              @ExampleObject(name = "자연친화적 + 조용함", value = "[\"자연친화적\",\"조용함\"]")
+            },
+            array =
+                @ArraySchema(
+                    schema =
+                        @Schema(
+                            type = "string",
+                            allowableValues = {
+                              "조용함", "로맨틱", "아늑함", "감성적", "활기참", "이색적", "여유로움", "고급스러움", "레트로",
+                              "자연친화적"
+                            })))
+        List<String> themes,
+    @Parameter(
+            description =
+                """
+                소요 시간 구간 필터입니다.
+
+                - 단일 선택이며 생략하면 `ALL`(전체)을 조회합니다.
+                - `ALL`: 전체 (시간 필터 미적용)
+                - `UNDER_2_HOURS`: 2시간 이하 (120분 이하)
+                - `TWO_TO_FOUR_HOURS`: 2~4시간 (120분 초과 ~ 240분 이하)
+                - `OVER_4_HOURS`: 4시간 초과 (240분 초과)
+                """,
+            example = "TWO_TO_FOUR_HOURS",
+            schema = @Schema(defaultValue = "ALL"))
         CourseDurationFilter duration,
-    @Parameter(description = "이동수단 필터입니다. (CAR, WALK, PUBLIC_TRANSIT)", example = "WALK")
+    @Parameter(
+            description =
+                """
+                이동수단 필터입니다.
+
+                - 생략하면 전체 이동수단을 조회합니다.
+                - `CAR`: 자동차
+                - `WALK`: 도보
+                - `PUBLIC_TRANSIT`: 대중교통
+                """,
+            example = "WALK",
+            schema = @Schema(allowableValues = {"CAR", "WALK", "PUBLIC_TRANSIT"}))
         String transport,
-    @Parameter(description = "정렬 기준입니다. (LATEST: 최신순, POPULAR: 인기순)", example = "LATEST")
+    @Parameter(
+            description =
+                """
+                정렬 기준입니다.
+
+                - 생략하면 기본값은 `LATEST`입니다.
+                - `LATEST`: 최신순
+                - `POPULAR`: 인기순 (조회수순)
+                """,
+            example = "LATEST",
+            schema =
+                @Schema(
+                    allowableValues = {"LATEST", "POPULAR"},
+                    defaultValue = "LATEST"))
         String sort,
-    @Parameter(description = "페이지 번호입니다. 0부터 시작합니다.", example = "0") Integer page,
-    @Parameter(description = "페이지 크기입니다. 기본값은 20입니다.", example = "20") Integer size) {
+    @Parameter(
+            description =
+                """
+                페이지 번호입니다.
+
+                - 0부터 시작합니다.
+                - 생략하면 기본값은 `0`입니다.
+                """,
+            example = "0",
+            schema = @Schema(minimum = "0", defaultValue = "0"))
+        Integer page,
+    @Parameter(
+            description =
+                """
+                페이지당 결과 개수입니다.
+
+                - 1부터 100까지 입력할 수 있습니다.
+                - 생략하면 기본값은 `20`입니다.
+                """,
+            example = "20",
+            schema = @Schema(minimum = "1", maximum = "100", defaultValue = "20"))
+        Integer size) {
 
   private static final int DEFAULT_PAGE = 0;
   private static final int DEFAULT_SIZE = 20;

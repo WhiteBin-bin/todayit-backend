@@ -19,6 +19,7 @@ import com.todayit.common.pagination.PageResult;
 import com.todayit.course.entity.CourseStatus;
 import com.todayit.course.entity.CourseVisibility;
 import com.todayit.course.service.MemberCourseQueryService;
+import com.todayit.course.service.model.CourseScrapSort;
 import com.todayit.course.service.model.MyCourseCardResult;
 import com.todayit.course.service.model.MyCourseSort;
 import com.todayit.member.entity.PreferredRegionCode;
@@ -47,6 +48,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -78,7 +80,7 @@ class MemberControllerTest {
   @Test
   @DisplayName("회원이 스크랩한 장소를 조회한다")
   void returnsScrappedPlaces() throws Exception {
-    // Given
+    // given
     PlaceResult place =
         new PlaceResult(
             1,
@@ -93,13 +95,16 @@ class MemberControllerTest {
     when(placeScrapQueryService.findScrappedPlaces("member-1", 1, 20, PlaceScrapSort.OLDEST))
         .thenReturn(new PageResult<>(List.of(place), 1, 20, 21));
 
-    // When
-    mockMvc
-        .perform(
+    // when
+    ResultActions result =
+        mockMvc.perform(
             get("/api/v1/members/me/scrapped-places")
                 .param("page", "1")
                 .param("sort", "OLDEST")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null)))
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null)));
+
+    // then
+    result
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.content[0].placeId").value(1))
@@ -107,46 +112,50 @@ class MemberControllerTest {
         .andExpect(jsonPath("$.data.size").value(20))
         .andExpect(jsonPath("$.data.totalElements").value(21))
         .andExpect(jsonPath("$.data.totalPages").value(2));
-
-    // Then
     verify(placeScrapQueryService).findScrappedPlaces("member-1", 1, 20, PlaceScrapSort.OLDEST);
   }
 
   @Test
   @DisplayName("이미 사용 중인 닉네임이면 available false를 반환한다")
   void returnsAvailableFalse() throws Exception {
+    // given
     String nickname = "더미사용자";
-
     when(signupService.isNicknameAvailable(nickname)).thenReturn(false);
 
-    mockMvc
-        .perform(get("/api/v1/members/nickname/check").param("nickname", nickname))
+    // when
+    ResultActions result =
+        mockMvc.perform(get("/api/v1/members/nickname/check").param("nickname", nickname));
+
+    // then
+    result
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.available").value(false));
-
     verify(signupService).isNicknameAvailable(nickname);
   }
 
   @Test
   @DisplayName("닉네임 파라미터가 없으면 400을 반환한다")
   void rejectsMissingNickname() throws Exception {
+    // given
     when(signupService.isNicknameAvailable(null))
         .thenThrow(new InvalidRequestException("닉네임은 필수입니다."));
 
-    mockMvc
-        .perform(get("/api/v1/members/nickname/check"))
+    // when
+    ResultActions result = mockMvc.perform(get("/api/v1/members/nickname/check"));
+
+    // then
+    result
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
-
     verify(signupService).isNicknameAvailable(null);
   }
 
   @Test
   @DisplayName("프로필 이미지를 업로드하면 변경된 회원 정보를 반환한다")
   void uploadsProfileImage() throws Exception {
-    // Given
+    // given
     String memberId = "member-1";
     String profileImageUrl = "https://example.com/profile.png";
     LocalDateTime updatedAt = LocalDateTime.of(2026, 11, 4, 5, 0);
@@ -159,25 +168,27 @@ class MemberControllerTest {
     when(memberProfileFacade.uploadProfileImage(eq(memberId), any(MultipartFile.class)))
         .thenReturn(result);
 
-    // When & Then
-    mockMvc
-        .perform(
+    // when
+    ResultActions response =
+        mockMvc.perform(
             multipart("/api/v1/members/me/profile-image")
                 .file(file)
-                .principal(new UsernamePasswordAuthenticationToken(memberId, null)))
+                .principal(new UsernamePasswordAuthenticationToken(memberId, null)));
+
+    // then
+    response
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.memberId").value(memberId))
         .andExpect(jsonPath("$.data.profileImage").value(profileImageUrl))
         .andExpect(jsonPath("$.data.updatedAt").value("2026-11-04T05:00:00"));
-
     verify(memberProfileFacade).uploadProfileImage(eq(memberId), any(MultipartFile.class));
   }
 
   @Test
   @DisplayName("프로필 이미지 약관에 동의하지 않으면 400을 반환한다")
   void rejectsProfileImageWithoutConsent() throws Exception {
-    // Given
+    // given
     String memberId = "member-1";
 
     MockMultipartFile file =
@@ -186,12 +197,15 @@ class MemberControllerTest {
     when(memberProfileFacade.uploadProfileImage(eq(memberId), any(MultipartFile.class)))
         .thenThrow(new BusinessException(MemberErrorCode.PROFILE_IMAGE_CONSENT_REQUIRED));
 
-    // When & Then
-    mockMvc
-        .perform(
+    // when
+    ResultActions response =
+        mockMvc.perform(
             multipart("/api/v1/members/me/profile-image")
                 .file(file)
-                .principal(new UsernamePasswordAuthenticationToken(memberId, null)))
+                .principal(new UsernamePasswordAuthenticationToken(memberId, null)));
+
+    // then
+    response
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.code").value("PROFILE_IMAGE_CONSENT_REQUIRED"));
@@ -200,17 +214,22 @@ class MemberControllerTest {
   @Test
   @DisplayName("프로필 이미지 파일이 없으면 400을 반환한다")
   void rejectsMissingProfileImage() throws Exception {
-    mockMvc
-        .perform(
-            multipart("/api/v1/members/me/profile-image")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null)))
-        .andExpect(status().isBadRequest());
+    // given
+    UsernamePasswordAuthenticationToken principal =
+        new UsernamePasswordAuthenticationToken("member-1", null);
+
+    // when
+    ResultActions response =
+        mockMvc.perform(multipart("/api/v1/members/me/profile-image").principal(principal));
+
+    // then
+    response.andExpect(status().isBadRequest());
   }
 
   @Test
   @DisplayName("회원 프로필 수정 요청을 처리하고 변경 결과를 반환한다")
   void updatesMemberProfile() throws Exception {
-    // Given
+    // given
     String memberId = "member-1";
     LocalDateTime updatedAt = LocalDateTime.of(2026, 11, 9, 4, 0);
 
@@ -227,9 +246,9 @@ class MemberControllerTest {
     when(memberProfileService.updateProfile(eq(memberId), any(MemberProfileCommand.class)))
         .thenReturn(result);
 
-    // When & Then
-    mockMvc
-        .perform(
+    // when
+    ResultActions response =
+        mockMvc.perform(
             patch("/api/v1/members/me")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
@@ -245,7 +264,10 @@ class MemberControllerTest {
                               "preferredThemes": ["QUIET", "ROMANTIC"]
                             }
                             """)
-                .principal(new UsernamePasswordAuthenticationToken(memberId, null)))
+                .principal(new UsernamePasswordAuthenticationToken(memberId, null)));
+
+    // then
+    response
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.memberId").value(memberId))
@@ -269,15 +291,15 @@ class MemberControllerTest {
   @Test
   @DisplayName("선호정보 약관에 동의하지 않으면 400을 반환한다")
   void rejectsProfileUpdateWithoutPreferenceConsent() throws Exception {
-    // Given
+    // given
     String memberId = "member-1";
 
     when(memberProfileService.updateProfile(eq(memberId), any(MemberProfileCommand.class)))
         .thenThrow(new BusinessException(MemberErrorCode.PREFERENCE_CONSENT_REQUIRED));
 
-    // When & Then
-    mockMvc
-        .perform(
+    // when
+    ResultActions response =
+        mockMvc.perform(
             patch("/api/v1/members/me")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
@@ -286,7 +308,10 @@ class MemberControllerTest {
                                       "preferredThemes": ["QUIET"]
                                     }
                                     """)
-                .principal(new UsernamePasswordAuthenticationToken(memberId, null)))
+                .principal(new UsernamePasswordAuthenticationToken(memberId, null)));
+
+    // then
+    response
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.code").value("PREFERENCE_CONSENT_REQUIRED"))
@@ -296,12 +321,20 @@ class MemberControllerTest {
   @Test
   @DisplayName("수정 항목이 없으면 400을 반환한다")
   void rejectsEmptyMemberProfileRequest() throws Exception {
-    mockMvc
-        .perform(
+    // given
+    UsernamePasswordAuthenticationToken principal =
+        new UsernamePasswordAuthenticationToken("member-1", null);
+
+    // when
+    ResultActions response =
+        mockMvc.perform(
             patch("/api/v1/members/me")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null)))
+                .principal(principal));
+
+    // then
+    response
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
   }
@@ -309,12 +342,20 @@ class MemberControllerTest {
   @Test
   @DisplayName("잘못된 테마 코드를 전달하면 400을 반환한다")
   void rejectsUnknownTheme() throws Exception {
-    mockMvc
-        .perform(
+    // given
+    UsernamePasswordAuthenticationToken principal =
+        new UsernamePasswordAuthenticationToken("member-1", null);
+
+    // when
+    ResultActions response =
+        mockMvc.perform(
             patch("/api/v1/members/me")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"preferredThemes\":[\"UNKNOWN_THEME\"]}")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null)))
+                .principal(principal));
+
+    // then
+    response
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
   }
@@ -322,7 +363,7 @@ class MemberControllerTest {
   @Test
   @DisplayName("로그인한 회원 본인의 프로필 정보를 반환한다")
   void findsMemberProfile() throws Exception {
-    // Given
+    // given
     String memberId = "member-1";
     LocalDateTime updatedAt = LocalDateTime.of(2026, 11, 9, 4, 0);
 
@@ -338,11 +379,14 @@ class MemberControllerTest {
 
     when(memberProfileService.findProfile(memberId)).thenReturn(result);
 
-    // When & Then
-    mockMvc
-        .perform(
+    // when
+    ResultActions response =
+        mockMvc.perform(
             get("/api/v1/members/me")
-                .principal(new UsernamePasswordAuthenticationToken(memberId, null)))
+                .principal(new UsernamePasswordAuthenticationToken(memberId, null)));
+
+    // then
+    response
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.memberId").value(memberId))
@@ -351,14 +395,13 @@ class MemberControllerTest {
         .andExpect(jsonPath("$.data.preferredRegions[0].sidoCode").value("11"))
         .andExpect(jsonPath("$.data.preferredRegions[0].sigunguCode").value("110"))
         .andExpect(jsonPath("$.data.preferredThemes[0]").value("QUIET"));
-
     verify(memberProfileService).findProfile(memberId);
   }
 
   @Test
   @DisplayName("프로필 이미지를 삭제하면 기본 이미지 상태를 반환한다")
   void deletesProfileImage() throws Exception {
-    // Given
+    // given
     String memberId = "member-1";
     LocalDateTime updatedAt = LocalDateTime.of(2026, 11, 10, 10, 0);
 
@@ -366,25 +409,32 @@ class MemberControllerTest {
 
     when(memberProfileFacade.deleteProfileImage(memberId)).thenReturn(result);
 
-    // When & Then
-    mockMvc
-        .perform(
+    // when
+    ResultActions response =
+        mockMvc.perform(
             delete("/api/v1/members/me/profile-image")
-                .principal(new UsernamePasswordAuthenticationToken(memberId, null)))
+                .principal(new UsernamePasswordAuthenticationToken(memberId, null)));
+
+    // then
+    response
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.memberId").value(memberId))
         .andExpect(jsonPath("$.data.profileImage").value(nullValue()))
         .andExpect(jsonPath("$.data.updatedAt").value("2026-11-10T10:00:00"));
-
     verify(memberProfileFacade).deleteProfileImage(memberId);
   }
 
   @Test
   @DisplayName("선호 지역을 2개 선택하면 400을 반환한다")
   void rejectsMultiplePreferredRegions() throws Exception {
-    mockMvc
-        .perform(
+    // given
+    UsernamePasswordAuthenticationToken principal =
+        new UsernamePasswordAuthenticationToken("member-1", null);
+
+    // when
+    ResultActions response =
+        mockMvc.perform(
             patch("/api/v1/members/me")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
@@ -402,7 +452,10 @@ class MemberControllerTest {
                                       ]
                                     }
                                     """)
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null)))
+                .principal(principal));
+
+    // then
+    response
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
   }
@@ -410,7 +463,7 @@ class MemberControllerTest {
   @Test
   @DisplayName("회원이 작성한 코스 목록을 조회한다")
   void returnsMyCoursesSuccessfully() throws Exception {
-    // Given
+    // given
     MyCourseCardResult card =
         new MyCourseCardResult(
             1,
@@ -433,14 +486,17 @@ class MemberControllerTest {
             "member-1", CourseStatus.ACTIVE, 0, 20, MyCourseSort.LATEST))
         .thenReturn(pageResult);
 
-    // When & Then
-    mockMvc
-        .perform(
+    // when
+    ResultActions response =
+        mockMvc.perform(
             get("/api/v1/members/me/courses")
                 .param("status", "ACTIVE")
                 .param("page", "0")
                 .param("sort", "LATEST")
-                .principal(new UsernamePasswordAuthenticationToken("member-1", null)))
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null)));
+
+    // then
+    response
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.content").isArray())
@@ -461,5 +517,61 @@ class MemberControllerTest {
 
     verify(memberCourseQueryService)
         .findMyCourses("member-1", CourseStatus.ACTIVE, 0, 20, MyCourseSort.LATEST);
+  }
+
+  @Test
+  @DisplayName("회원이 스크랩한 코스 목록을 조회한다")
+  void returnsScrappedCoursesSuccessfully() throws Exception {
+    // given
+    MyCourseCardResult card =
+        new MyCourseCardResult(
+            1,
+            "스크랩 데이트 코스",
+            CourseStatus.ACTIVE,
+            CourseVisibility.PUBLIC,
+            "https://example.com/place.jpg",
+            2,
+            "서울특별시",
+            "종로구",
+            List.of("카페·디저트"),
+            5L,
+            LocalDateTime.of(2026, 11, 24, 10, 0),
+            LocalDateTime.of(2026, 11, 24, 18, 0),
+            LocalDateTime.of(2026, 11, 24, 9, 0),
+            LocalDateTime.of(2026, 11, 24, 12, 0));
+    PageResult<MyCourseCardResult> pageResult = new PageResult<>(List.of(card), 0, 20, 1L);
+
+    when(memberCourseQueryService.findScrappedCourses("member-1", 0, 20, CourseScrapSort.LATEST))
+        .thenReturn(pageResult);
+
+    // when
+    ResultActions response =
+        mockMvc.perform(
+            get("/api/v1/members/me/scrapped-courses")
+                .param("page", "0")
+                .param("sort", "LATEST")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null)));
+
+    // then
+    response
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.content").isArray())
+        .andExpect(jsonPath("$.data.content[0].courseId").value(1))
+        .andExpect(jsonPath("$.data.content[0].title").value("스크랩 데이트 코스"))
+        .andExpect(jsonPath("$.data.content[0].status").value("ACTIVE"))
+        .andExpect(jsonPath("$.data.content[0].visibility").value("PUBLIC"))
+        .andExpect(
+            jsonPath("$.data.content[0].thumbnailUrl").value("https://example.com/place.jpg"))
+        .andExpect(jsonPath("$.data.content[0].placeCount").value(2))
+        .andExpect(jsonPath("$.data.content[0].sidoName").value("서울특별시"))
+        .andExpect(jsonPath("$.data.content[0].sigunguName").value("종로구"))
+        .andExpect(jsonPath("$.data.content[0].likeCount").value(5))
+        .andExpect(jsonPath("$.data.page").value(0))
+        .andExpect(jsonPath("$.data.size").value(20))
+        .andExpect(jsonPath("$.data.totalElements").value(1))
+        .andExpect(jsonPath("$.data.totalPages").value(1));
+
+    verify(memberCourseQueryService).findScrappedCourses("member-1", 0, 20, CourseScrapSort.LATEST);
   }
 }

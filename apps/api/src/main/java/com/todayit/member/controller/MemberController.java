@@ -6,6 +6,7 @@ import com.todayit.common.response.CommonResponse;
 import com.todayit.course.dto.response.MyCourseCardResponse;
 import com.todayit.course.entity.CourseStatus;
 import com.todayit.course.service.MemberCourseQueryService;
+import com.todayit.course.service.model.CourseScrapSort;
 import com.todayit.course.service.model.MyCourseSort;
 import com.todayit.member.controller.docs.MemberApiDocs;
 import com.todayit.member.dto.request.MemberProfileRequest;
@@ -77,6 +78,7 @@ public class MemberController implements MemberApiDocs {
    * @param nickname 확인할 닉네임
    * @return 닉네임 사용 가능 여부
    */
+  @Override
   @GetMapping("/nickname/check")
   public ResponseEntity<CommonResponse<NicknameAvailabilityResponse>> checkNickname(
       @RequestParam(required = false) String nickname) {
@@ -94,6 +96,7 @@ public class MemberController implements MemberApiDocs {
    * @param authentication 인증된 회원 정보
    * @return 스크랩 장소 페이지
    */
+  @Override
   @GetMapping("/me/scrapped-places")
   public ResponseEntity<CommonResponse<PageResponse<PlaceResponse>>> findScrappedPlaces(
       @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
@@ -115,6 +118,7 @@ public class MemberController implements MemberApiDocs {
    * @param authentication 인증된 회원 정보
    * @return 변경된 회원 프로필 이미지 정보
    */
+  @Override
   @PostMapping(value = "/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<CommonResponse<MemberProfileImageResponse>> uploadProfileImage(
       @RequestPart("file") MultipartFile file, Authentication authentication) {
@@ -132,6 +136,7 @@ public class MemberController implements MemberApiDocs {
    * @param authentication 인증된 회원 정보
    * @return 변경된 회원 프로필 정보
    */
+  @Override
   @PatchMapping("/me")
   public ResponseEntity<CommonResponse<MemberProfileResponse>> updateProfile(
       @RequestBody MemberProfileRequest request, Authentication authentication) {
@@ -147,6 +152,7 @@ public class MemberController implements MemberApiDocs {
    * @param authentication 인증된 회원 정보
    * @return 회원 프로필 조회 응답
    */
+  @Override
   @GetMapping("/me")
   public ResponseEntity<CommonResponse<MemberProfileDetailResponse>> findProfile(
       Authentication authentication) {
@@ -162,6 +168,7 @@ public class MemberController implements MemberApiDocs {
    * @param authentication 인증된 회원 정보
    * @return 초기화된 프로필 이미지 정보
    */
+  @Override
   @DeleteMapping("/me/profile-image")
   public ResponseEntity<CommonResponse<MemberProfileImageResponse>> deleteProfileImage(
       Authentication authentication) {
@@ -193,6 +200,29 @@ public class MemberController implements MemberApiDocs {
             PageResponse.from(
                 memberCourseQueryService.findMyCourses(
                     authentication.getName(), status, page, DEFAULT_SIZE, sort),
+                MyCourseCardResponse::from)));
+  }
+
+  /**
+   * 인증된 회원이 스크랩한 코스를 조회합니다.
+   *
+   * @param page 페이지 번호
+   * @param sort 스크랩 코스 정렬 기준
+   * @param authentication 인증된 회원 정보
+   * @return 스크랩 코스 카드 페이지
+   */
+  @Override
+  @GetMapping("/me/scrapped-courses")
+  public ResponseEntity<CommonResponse<PageResponse<MyCourseCardResponse>>> findScrappedCourses(
+      @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
+      @RequestParam(defaultValue = "LATEST") CourseScrapSort sort,
+      Authentication authentication) {
+    PaginationValidator.validate(page, DEFAULT_SIZE);
+    return ResponseEntity.ok(
+        CommonResponse.success(
+            PageResponse.from(
+                memberCourseQueryService.findScrappedCourses(
+                    authentication.getName(), page, DEFAULT_SIZE, sort),
                 MyCourseCardResponse::from)));
   }
 }

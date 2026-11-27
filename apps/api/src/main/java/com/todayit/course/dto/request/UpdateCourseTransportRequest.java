@@ -13,7 +13,14 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Schema(description = "임시저장 코스의 이동수단 변경 요청 정보입니다.")
 public record UpdateCourseTransportRequest(
     @Schema(
-            description = "코스 이동수단입니다. CAR, WALKING, PUBLIC_TRANSPORT 중 하나를 입력합니다.",
+            description =
+                """
+                변경할 코스 이동수단입니다.
+
+                - `CAR`: 자동차
+                - `WALKING`: 도보
+                - `PUBLIC_TRANSPORT`: 대중교통
+                """,
             example = "CAR",
             requiredMode = Schema.RequiredMode.REQUIRED)
         CourseTransport transport) {

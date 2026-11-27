@@ -2,10 +2,11 @@ package com.todayit.course.service;
 
 import com.todayit.common.pagination.PageResult;
 import com.todayit.course.entity.CourseStatus;
+import com.todayit.course.service.model.CourseScrapSort;
 import com.todayit.course.service.model.MyCourseCardResult;
 import com.todayit.course.service.model.MyCourseSort;
 
-/** 회원의 본인 작성 코스 조회에 필요한 코스 서비스 계약입니다. */
+/** 회원의 본인 작성 코스 및 스크랩 코스 조회에 필요한 코스 서비스 계약입니다. */
 public interface MemberCourseQueryService {
 
   /**
@@ -20,4 +21,16 @@ public interface MemberCourseQueryService {
    */
   PageResult<MyCourseCardResult> findMyCourses(
       String memberId, CourseStatus status, int page, int size, MyCourseSort sort);
+
+  /**
+   * 회원이 스크랩한 코스 목록을 정렬 기준 및 페이징에 맞게 조회합니다.
+   *
+   * @param memberId 회원 식별자
+   * @param page 페이지 번호
+   * @param size 페이지 크기
+   * @param sort 스크랩 정렬 기준
+   * @return 스크랩 코스 카드 페이지
+   */
+  PageResult<MyCourseCardResult> findScrappedCourses(
+      String memberId, int page, int size, CourseScrapSort sort);
 }

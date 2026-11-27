@@ -25,6 +25,8 @@ import com.todayit.course.service.model.CourseDurationFilter;
 import com.todayit.course.service.model.CourseLikeResult;
 import com.todayit.course.service.model.CoursePlaceDetailResult;
 import com.todayit.course.service.model.CoursePlaceItem;
+import com.todayit.course.service.model.CourseScrapResult;
+import com.todayit.course.service.model.CourseScrapSort;
 import com.todayit.course.service.model.CourseSort;
 import com.todayit.course.service.model.CreateCourseResult;
 import com.todayit.course.service.model.MyCourseCardResult;
@@ -463,6 +465,42 @@ public class CourseFacade implements MemberCourseQueryService {
   }
 
   /**
+   * 인증된 회원의 코스 스크랩 등록을 조정합니다.
+   *
+   * @param courseId 코스 식별자
+   * @param memberId 인증된 회원 식별자
+   * @return 코스 스크랩 등록 결과
+   */
+  @Transactional
+  public CourseScrapResult scrapCourse(int courseId, String memberId) {
+    CourseScrapResult result = courseCommandService.scrapCourse(courseId, memberId);
+    LOG.info(
+        "코스 스크랩 등록 조정 완료: courseId={}, scrapped={}, scrapCount={}",
+        result.courseId(),
+        result.scrapped(),
+        result.scrapCount());
+    return result;
+  }
+
+  /**
+   * 인증된 회원의 코스 스크랩 취소를 조정합니다.
+   *
+   * @param courseId 코스 식별자
+   * @param memberId 인증된 회원 식별자
+   * @return 코스 스크랩 취소 결과
+   */
+  @Transactional
+  public CourseScrapResult cancelCourseScrap(int courseId, String memberId) {
+    CourseScrapResult result = courseCommandService.cancelCourseScrap(courseId, memberId);
+    LOG.info(
+        "코스 스크랩 취소 조정 완료: courseId={}, scrapped={}, scrapCount={}",
+        result.courseId(),
+        result.scrapped(),
+        result.scrapCount());
+    return result;
+  }
+
+  /**
    * 회원이 작성한 코스 목록을 조건에 맞게 페이지 단위로 조회하고 카드 모델로 조립합니다.
    *
    * @param memberId 인증된 회원 식별자
@@ -496,6 +534,54 @@ public class CourseFacade implements MemberCourseQueryService {
           List.of(), coursePage.getNumber(), coursePage.getSize(), coursePage.getTotalElements());
     }
 
+    List<MyCourseCardResult> cardList = toMyCourseCardResults(courses);
+
+    LOG.info(
+        "내 코스 목록 조회 완료: status={}, page={}, size={}, sort={}, resultCount={}",
+        status,
+        page,
+        size,
+        sort,
+        cardList.size());
+    return new PageResult<>(
+        cardList, coursePage.getNumber(), coursePage.getSize(), coursePage.getTotalElements());
+  }
+
+  /**
+   * 회원이 스크랩한 코스 목록을 조건에 맞게 페이지 단위로 조회하고 카드 모델로 조립합니다.
+   *
+   * @param memberId 인증된 회원 식별자
+   * @param page 페이지 번호 (0부터 시작)
+   * @param size 페이지 크기 (1 이상)
+   * @param sort 스크랩 정렬 기준 (LATEST 또는 OLDEST)
+   * @return 스크랩 코스 목록 페이지 결과
+   */
+  @Override
+  @Transactional(readOnly = true)
+  public PageResult<MyCourseCardResult> findScrappedCourses(
+      String memberId, int page, int size, CourseScrapSort sort) {
+    Page<Course> coursePage = courseQueryService.findScrappedCourses(memberId, page, size, sort);
+    List<Course> courses = coursePage.getContent();
+
+    if (courses.isEmpty()) {
+      LOG.info("스크랩 코스 목록 조회 완료: page={}, size={}, sort={}, resultCount=0", page, size, sort);
+      return new PageResult<>(
+          List.of(), coursePage.getNumber(), coursePage.getSize(), coursePage.getTotalElements());
+    }
+
+    List<MyCourseCardResult> cardList = toMyCourseCardResults(courses);
+
+    LOG.info(
+        "스크랩 코스 목록 조회 완료: page={}, size={}, sort={}, resultCount={}",
+        page,
+        size,
+        sort,
+        cardList.size());
+    return new PageResult<>(
+        cardList, coursePage.getNumber(), coursePage.getSize(), coursePage.getTotalElements());
+  }
+
+  private List<MyCourseCardResult> toMyCourseCardResults(List<Course> courses) {
     List<Integer> firstPlaceIds =
         courses.stream()
             .map(
@@ -518,61 +604,49 @@ public class CourseFacade implements MemberCourseQueryService {
       likeCountMap.put(((Number) row[0]).intValue(), ((Number) row[1]).longValue());
     }
 
-    List<MyCourseCardResult> cardList =
-        courses.stream()
-            .map(
-                course -> {
-                  List<String> themes =
-                      course.getThemes().stream().map(ct -> ct.getTheme().getName()).toList();
+    return courses.stream()
+        .map(
+            course -> {
+              List<String> themes =
+                  course.getThemes().stream().map(ct -> ct.getTheme().getName()).toList();
 
-                  List<Integer> regionIds =
-                      course.getRegions().stream().map(RegionCourse::getRegionId).toList();
-                  RegionSummaryResult regionSummary =
-                      regionQueryService.getRegionSummary(regionIds);
-                  String sidoName = regionSummary != null ? regionSummary.sidoName() : null;
-                  String sigunguName = regionSummary != null ? regionSummary.sigunguName() : null;
+              List<Integer> regionIds =
+                  course.getRegions().stream().map(RegionCourse::getRegionId).toList();
+              RegionSummaryResult regionSummary = regionQueryService.getRegionSummary(regionIds);
+              String sidoName = regionSummary != null ? regionSummary.sidoName() : null;
+              String sigunguName = regionSummary != null ? regionSummary.sigunguName() : null;
 
-                  Integer firstPlaceId =
-                      course.getCoursePlaces().stream()
-                          .min(Comparator.comparingInt(CoursePlace::getOrder))
-                          .map(CoursePlace::getPlaceId)
-                          .orElse(null);
+              Integer firstPlaceId =
+                  course.getCoursePlaces().stream()
+                      .min(Comparator.comparingInt(CoursePlace::getOrder))
+                      .map(CoursePlace::getPlaceId)
+                      .orElse(null);
 
-                  String thumbnailUrl = null;
-                  if (firstPlaceId != null && placeMap.containsKey(firstPlaceId)) {
-                    thumbnailUrl = placeMap.get(firstPlaceId).imageUrl();
-                  }
+              String thumbnailUrl = null;
+              if (firstPlaceId != null && placeMap.containsKey(firstPlaceId)) {
+                thumbnailUrl = placeMap.get(firstPlaceId).imageUrl();
+              }
 
-                  int placeCount = course.getCoursePlaces().size();
-                  long likeCount = likeCountMap.getOrDefault(course.getCourseId(), 0L);
+              int placeCount = course.getCoursePlaces().size();
+              long likeCount = likeCountMap.getOrDefault(course.getCourseId(), 0L);
 
-                  return new MyCourseCardResult(
-                      course.getCourseId(),
-                      course.getTitle(),
-                      course.getStatus(),
-                      course.getVisibility(),
-                      thumbnailUrl,
-                      placeCount,
-                      sidoName,
-                      sigunguName,
-                      themes,
-                      likeCount,
-                      course.getStartAt(),
-                      course.getEndAt(),
-                      course.getCreatedAt(),
-                      course.getUpdatedAt());
-                })
-            .toList();
-
-    LOG.info(
-        "내 코스 목록 조회 완료: status={}, page={}, size={}, sort={}, resultCount={}",
-        status,
-        page,
-        size,
-        sort,
-        cardList.size());
-    return new PageResult<>(
-        cardList, coursePage.getNumber(), coursePage.getSize(), coursePage.getTotalElements());
+              return new MyCourseCardResult(
+                  course.getCourseId(),
+                  course.getTitle(),
+                  course.getStatus(),
+                  course.getVisibility(),
+                  thumbnailUrl,
+                  placeCount,
+                  sidoName,
+                  sigunguName,
+                  themes,
+                  likeCount,
+                  course.getStartAt(),
+                  course.getEndAt(),
+                  course.getCreatedAt(),
+                  course.getUpdatedAt());
+            })
+        .toList();
   }
 
   /**

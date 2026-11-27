@@ -9,10 +9,23 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * @param sigunguCode 시·군·구 법정동 코드
  * @param sigunguName 세부 지역 명칭
  */
-@Schema(description = "세부 지역 응답")
+@Schema(description = "세부 지역(일반구) 응답")
 public record SubRegionResponse(
-    @Schema(description = "시·군·구 법정동 코드 (3자리)", example = "135") String sigunguCode,
-    @Schema(description = "세부 지역 명칭", example = "분당구") String sigunguName) {
+    @Schema(
+            description =
+                """
+                세부 지역(일반구)의 시·군·구 법정동 코드입니다.
+
+                - 끝자리가 `0`이 아닌 3자리 숫자 문자열입니다. (예: `135` 분당구, `115` 팔달구)
+                """,
+            example = "135",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        String sigunguCode,
+    @Schema(
+            description = "세부 지역(일반구) 명칭입니다.",
+            example = "분당구",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        String sigunguName) {
 
   /**
    * 서비스 계층의 세부 지역 모델로부터 응답 DTO를 생성합니다.

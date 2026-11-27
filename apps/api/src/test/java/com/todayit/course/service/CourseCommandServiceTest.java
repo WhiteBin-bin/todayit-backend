@@ -3,6 +3,7 @@ package com.todayit.course.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -20,12 +21,14 @@ import com.todayit.course.exception.CourseErrorCode;
 import com.todayit.course.exception.CourseException;
 import com.todayit.course.repository.CourseMemberLikeRepository;
 import com.todayit.course.repository.CourseRepository;
+import com.todayit.course.repository.CourseScrapRepository;
 import com.todayit.course.service.command.AddCoursePlaceCommand;
 import com.todayit.course.service.command.CreateCourseCommand;
 import com.todayit.course.service.command.UpdateCourseConditionsCommand;
 import com.todayit.course.service.command.UpdateCoursePlaceOrdersCommand;
 import com.todayit.course.service.model.AddCoursePlaceEntities;
 import com.todayit.course.service.model.CourseLikeResult;
+import com.todayit.course.service.model.CourseScrapResult;
 import com.todayit.course.service.model.CreateCourseResult;
 import com.todayit.course.service.model.UpdateCourseTransportResult;
 import com.todayit.course.service.model.UpdateCourseVisibilityResult;
@@ -51,6 +54,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class CourseCommandServiceTest {
   @Mock private CourseRepository courses;
   @Mock private CourseMemberLikeRepository courseMemberLikeRepository;
+  @Mock private CourseScrapRepository courseScrapRepository;
   @Mock private RegionQueryService regionQueryService;
   @InjectMocks private CourseCommandService service;
 
@@ -950,6 +954,209 @@ class CourseCommandServiceTest {
 
     // then
     assertThat(exception).isSameAs(failure);
+  }
+
+  @Test
+  @DisplayName("공개 확정 코스를 정상적으로 스크랩하고 최신 활성 스크랩 수를 반환한다")
+  void scrapsCourseSuccessfully() {
+    // given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "공개 코스",
+            CourseTransport.CAR,
+            LocalDateTime.now(),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PUBLIC);
+
+    when(courses.findById(1)).thenReturn(Optional.of(course));
+    when(courseScrapRepository.existsByMemberIdAndCourseCourseIdAndActiveTrueAndDeletedFalse(
+            "scrapper-member", 1))
+        .thenReturn(false);
+    when(courseScrapRepository.upsertByMemberIdAndCourseId("scrapper-member", 1)).thenReturn(1);
+    when(courseScrapRepository.countActiveByCourseId(1)).thenReturn(18L);
+
+    // when
+    CourseScrapResult result = service.scrapCourse(1, "scrapper-member");
+
+    // then
+    assertThat(result.courseId()).isEqualTo(1);
+    assertThat(result.scrapped()).isTrue();
+    assertThat(result.scrapCount()).isEqualTo(18L);
+    verify(courseScrapRepository).upsertByMemberIdAndCourseId("scrapper-member", 1);
+  }
+
+  @Test
+  @DisplayName("이미 스크랩한 코스에 다시 스크랩을 요청하면 409 예외를 던진다")
+  void rejectsDuplicateScrapWhenAlreadyActive() {
+    // given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "공개 코스",
+            CourseTransport.CAR,
+            LocalDateTime.now(),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PUBLIC);
+
+    when(courses.findById(1)).thenReturn(Optional.of(course));
+    when(courseScrapRepository.existsByMemberIdAndCourseCourseIdAndActiveTrueAndDeletedFalse(
+            "scrapper-member", 1))
+        .thenReturn(true);
+
+    // when
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.scrapCourse(1, "scrapper-member"));
+
+    // then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.ALREADY_SCRAPPED);
+    verify(courseScrapRepository, never()).upsertByMemberIdAndCourseId(any(), anyInt());
+  }
+
+  @Test
+  @DisplayName("스크랩 등록 시 동시 요청으로 upsert 결과가 0이면 409 예외를 던진다")
+  void rejectsDuplicateScrapWhenUpsertReturnsZero() {
+    // given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "공개 코스",
+            CourseTransport.CAR,
+            LocalDateTime.now(),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PUBLIC);
+
+    when(courses.findById(1)).thenReturn(Optional.of(course));
+    when(courseScrapRepository.existsByMemberIdAndCourseCourseIdAndActiveTrueAndDeletedFalse(
+            "scrapper-member", 1))
+        .thenReturn(false);
+    when(courseScrapRepository.upsertByMemberIdAndCourseId("scrapper-member", 1)).thenReturn(0);
+
+    // when
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.scrapCourse(1, "scrapper-member"));
+
+    // then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.ALREADY_SCRAPPED);
+  }
+
+  @Test
+  @DisplayName("존재하지 않거나 비활성 코스 스크랩 요청 시 404 예외를 던진다")
+  void rejectsScrappingNonExistentCourse() {
+    // given
+    when(courses.findById(999)).thenReturn(Optional.empty());
+
+    // when
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.scrapCourse(999, "scrapper-member"));
+
+    // then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("스크랩 등록 시 코스가 동시 삭제되어 외래키 위반이 발생하면 404 예외를 던진다")
+  void throwsCourseNotFoundWhenCourseDeletedConcurrentlyDuringScrap() {
+    // given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "내 코스",
+            CourseTransport.CAR,
+            LocalDateTime.of(2026, 12, 1, 10, 0),
+            LocalDateTime.of(2026, 12, 1, 14, 0),
+            List.of(),
+            LocalDateTime.of(2026, 11, 24, 9, 0));
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PUBLIC);
+
+    when(courses.findById(1)).thenReturn(Optional.of(course));
+    when(courseScrapRepository.existsByMemberIdAndCourseCourseIdAndActiveTrueAndDeletedFalse(
+            "scrapper-member", 1))
+        .thenReturn(false);
+    when(courseScrapRepository.upsertByMemberIdAndCourseId("scrapper-member", 1))
+        .thenThrow(
+            new DataIntegrityViolationException(
+                "violates foreign key constraint fk_course_scrap_course"));
+
+    // when
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.scrapCourse(1, "scrapper-member"));
+
+    // then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("공개 확정 코스의 스크랩을 취소하고 최신 활성 스크랩 수를 반환한다")
+  void cancelsCourseScrapSuccessfully() {
+    // given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "공개 코스",
+            CourseTransport.CAR,
+            LocalDateTime.now(),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PUBLIC);
+
+    when(courses.findById(1)).thenReturn(Optional.of(course));
+    when(courseScrapRepository.cancelByMemberIdAndCourseId("scrapper-member", 1)).thenReturn(1);
+    when(courseScrapRepository.countActiveByCourseId(1)).thenReturn(17L);
+
+    // when
+    CourseScrapResult result = service.cancelCourseScrap(1, "scrapper-member");
+
+    // then
+    assertThat(result.courseId()).isEqualTo(1);
+    assertThat(result.scrapped()).isFalse();
+    assertThat(result.scrapCount()).isEqualTo(17L);
+    verify(courseScrapRepository).cancelByMemberIdAndCourseId("scrapper-member", 1);
+  }
+
+  @Test
+  @DisplayName("존재하지 않거나 타인의 비공개 코스에 스크랩 취소를 요청하면 404 예외를 던진다")
+  void rejectsCancellingScrapOnOthersPrivateCourse() {
+    // given
+    Course course =
+        Course.createDraft(
+            "owner-member",
+            "비공개 코스",
+            CourseTransport.CAR,
+            LocalDateTime.now(),
+            null,
+            List.of(),
+            LocalDateTime.now());
+    ReflectionTestUtils.setField(course, "courseId", 1);
+    ReflectionTestUtils.setField(course, "status", CourseStatus.ACTIVE);
+    ReflectionTestUtils.setField(course, "visibility", CourseVisibility.PRIVATE);
+
+    when(courses.findById(1)).thenReturn(Optional.of(course));
+
+    // when
+    CourseException exception =
+        assertThrows(CourseException.class, () -> service.cancelCourseScrap(1, "other-member"));
+
+    // then
+    assertThat(exception.getErrorCode()).isEqualTo(CourseErrorCode.NOT_FOUND);
+    verify(courseScrapRepository, never()).cancelByMemberIdAndCourseId(any(), anyInt());
   }
 
   @Test

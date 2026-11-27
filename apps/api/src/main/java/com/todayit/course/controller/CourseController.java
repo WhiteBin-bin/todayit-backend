@@ -17,6 +17,7 @@ import com.todayit.course.dto.response.CopyCourseResponse;
 import com.todayit.course.dto.response.CourseCardResponse;
 import com.todayit.course.dto.response.CourseDetailResponse;
 import com.todayit.course.dto.response.CourseLikeResponse;
+import com.todayit.course.dto.response.CourseScrapResponse;
 import com.todayit.course.dto.response.CreateCourseResponse;
 import com.todayit.course.dto.response.RecommendedCoursesResponse;
 import com.todayit.course.dto.response.RemoveCoursePlaceResponse;
@@ -259,6 +260,41 @@ public class CourseController implements CourseApiDocs {
         CourseLikeResponse.from(courseFacade.likeCourse(courseId, authentication.getName()));
     LOG.info("코스 좋아요 등록 완료: courseId={}", courseId);
     return ResponseEntity.status(HttpStatus.CREATED).body(CommonResponse.success(response));
+  }
+
+  /**
+   * 인증된 회원의 코스 스크랩을 등록합니다.
+   *
+   * @param courseId 코스 식별자
+   * @param authentication 인증된 회원 정보
+   * @return 코스 스크랩 결과
+   */
+  @Override
+  @PostMapping("/{courseId}/scrap")
+  public ResponseEntity<CommonResponse<CourseScrapResponse>> scrapCourse(
+      @PathVariable int courseId, Authentication authentication) {
+    CourseScrapResponse response =
+        CourseScrapResponse.from(courseFacade.scrapCourse(courseId, authentication.getName()));
+    LOG.info("코스 스크랩 등록 완료: courseId={}", courseId);
+    return ResponseEntity.status(HttpStatus.CREATED).body(CommonResponse.success(response));
+  }
+
+  /**
+   * 인증된 회원의 코스 스크랩을 취소합니다.
+   *
+   * @param courseId 코스 식별자
+   * @param authentication 인증된 회원 정보
+   * @return 코스 스크랩 취소 결과
+   */
+  @Override
+  @DeleteMapping("/{courseId}/scrap")
+  public ResponseEntity<CommonResponse<CourseScrapResponse>> cancelCourseScrap(
+      @PathVariable int courseId, Authentication authentication) {
+    CourseScrapResponse response =
+        CourseScrapResponse.from(
+            courseFacade.cancelCourseScrap(courseId, authentication.getName()));
+    LOG.info("코스 스크랩 취소 완료: courseId={}", courseId);
+    return ResponseEntity.ok(CommonResponse.success(response));
   }
 
   /**

@@ -16,27 +16,64 @@ import java.time.LocalDateTime;
  * @param durationMinutes 소요 시간(분)
  * @param transport 이동수단
  */
-@Schema(description = "임시저장 코스의 생성 조건을 수정하기 위한 요청 정보입니다. 모든 필드는 선택 사항이며, 입력된 값만 수정됩니다.")
+@Schema(
+    description =
+        """
+        임시저장(`DRAFT`) 코스의 생성 조건을 수정하기 위한 요청 정보입니다.
+
+        - 모든 필드는 선택 사항이며, 입력된 값만 수정되고 생략하거나 `null`인 항목은 기존 값을 유지합니다.
+        """)
 public record UpdateCourseConditionsRequest(
     @Schema(
-            description = "변경할 행정 지역 코드입니다. 시·도 2자리, 시·도+시·군·구 5자리, 또는 유일한 시·군·구 3자리로 입력합니다.",
+            description =
+                """
+                변경할 행정 지역 코드입니다.
+
+                - 시·도 2자리(예: `11`), 시·도+시·군·구 5자리(예: `11110`), 또는 유일한 시·군·구 3자리(예: `110`)로 입력합니다.
+                """,
             example = "11",
             nullable = true)
         String region,
     @Schema(
-            description = "코스 방문 시작 일시입니다. 2026-12-01T10:00:00 형식으로 입력합니다.",
+            description =
+                """
+                코스 방문 시작 일시입니다.
+
+                - `2026-12-01T10:00:00` 형식(ISO 8601)으로 입력합니다.
+                """,
             example = "2026-12-01T10:00:00",
             nullable = true)
         LocalDateTime startAt,
     @Schema(
-            description = "코스 방문 종료 일시입니다. 시작 시각 이후이어야 하며, 2026-12-01T14:00:00 형식으로 입력합니다.",
+            description =
+                """
+                코스 방문 종료 일시입니다.
+
+                - 시작 일시(`startAt`) 이후이어야 합니다.
+                - `2026-12-01T14:00:00` 형식(ISO 8601)으로 입력합니다.
+                """,
             example = "2026-12-01T14:00:00",
             nullable = true)
         LocalDateTime endAt,
-    @Schema(description = "예상 소요 시간(분)입니다. 1 이상의 양수이어야 합니다.", example = "240", nullable = true)
+    @Schema(
+            description =
+                """
+                예상 소요 시간(분)입니다.
+
+                - 1 이상의 양수로 입력합니다.
+                """,
+            example = "240",
+            nullable = true)
         Integer durationMinutes,
     @Schema(
-            description = "코스 이동수단입니다. CAR, WALKING, PUBLIC_TRANSPORT 중 하나를 입력합니다.",
+            description =
+                """
+                코스 이동수단입니다.
+
+                - `CAR`: 자동차
+                - `WALKING`: 도보
+                - `PUBLIC_TRANSPORT`: 대중교통
+                """,
             example = "CAR",
             nullable = true)
         CourseTransport transport) {

@@ -12,7 +12,13 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Schema(description = "코스 공개 범위 설정 요청")
 public record UpdateCourseVisibilityRequest(
     @Schema(
-            description = "코스 공개 범위 (PUBLIC: 공개, PRIVATE: 비공개)",
+            description =
+                """
+                변경할 코스 공개 범위입니다.
+
+                - `PUBLIC`: 공개
+                - `PRIVATE`: 비공개
+                """,
             example = "PUBLIC",
             requiredMode = Schema.RequiredMode.REQUIRED)
         CourseVisibility visibility) {

@@ -34,6 +34,7 @@ import com.todayit.course.service.model.CourseDetailResult;
 import com.todayit.course.service.model.CourseDurationFilter;
 import com.todayit.course.service.model.CourseLikeResult;
 import com.todayit.course.service.model.CoursePlaceDetailResult;
+import com.todayit.course.service.model.CourseScrapResult;
 import com.todayit.course.service.model.CourseSort;
 import com.todayit.course.service.model.CreateCourseResult;
 import com.todayit.course.service.model.RemoveCoursePlaceResult;
@@ -1242,6 +1243,119 @@ class CourseControllerTest {
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.code").value("COURSE_NOT_FOUND"));
     verify(courseFacade).likeCourse(999, "member-1");
+  }
+
+  @Test
+  @DisplayName("코스 스크랩 등록 요청이 유효하면 201과 스크랩 결과를 반환한다")
+  void scrapsCourseSuccessfully() throws Exception {
+    // given
+    CourseScrapResult scrapResult = new CourseScrapResult(1, true, 18L);
+    when(courseFacade.scrapCourse(1, "member-1")).thenReturn(scrapResult);
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses/1/scrap")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
+
+    // then
+    result
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.courseId").value(1))
+        .andExpect(jsonPath("$.data.scrapped").value(true))
+        .andExpect(jsonPath("$.data.scrapCount").value(18));
+    verify(courseFacade).scrapCourse(1, "member-1");
+  }
+
+  @Test
+  @DisplayName("이미 스크랩한 코스에 스크랩 요청 시 409 Conflict를 반환한다")
+  void returnsConflictWhenCourseAlreadyScrapped() throws Exception {
+    // given
+    doThrow(new CourseException(CourseErrorCode.ALREADY_SCRAPPED))
+        .when(courseFacade)
+        .scrapCourse(1, "member-1");
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses/1/scrap")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
+
+    // then
+    result
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("COURSE_ALREADY_SCRAPPED"))
+        .andExpect(jsonPath("$.message").value("이미 스크랩한 코스입니다."));
+    verify(courseFacade).scrapCourse(1, "member-1");
+  }
+
+  @Test
+  @DisplayName("존재하지 않거나 비활성·삭제된 코스에 스크랩 요청 시 404를 반환한다")
+  void returnsNotFoundWhenCourseNotFoundOnScrapCourse() throws Exception {
+    // given
+    doThrow(new CourseException(CourseErrorCode.NOT_FOUND))
+        .when(courseFacade)
+        .scrapCourse(999, "member-1");
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            post("/api/v1/courses/999/scrap")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
+
+    // then
+    result
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("COURSE_NOT_FOUND"));
+    verify(courseFacade).scrapCourse(999, "member-1");
+  }
+
+  @Test
+  @DisplayName("코스 스크랩 취소 요청이 유효하면 200과 스크랩 취소 결과를 반환한다")
+  void cancelsCourseScrapSuccessfully() throws Exception {
+    // given
+    CourseScrapResult scrapResult = new CourseScrapResult(1, false, 17L);
+    when(courseFacade.cancelCourseScrap(1, "member-1")).thenReturn(scrapResult);
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            delete("/api/v1/courses/1/scrap")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
+
+    // then
+    result
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.courseId").value(1))
+        .andExpect(jsonPath("$.data.scrapped").value(false))
+        .andExpect(jsonPath("$.data.scrapCount").value(17));
+    verify(courseFacade).cancelCourseScrap(1, "member-1");
+  }
+
+  @Test
+  @DisplayName("존재하지 않거나 비활성·삭제된 코스에 스크랩 취소 요청 시 404를 반환한다")
+  void returnsNotFoundWhenCourseNotFoundOnCancelCourseScrap() throws Exception {
+    // given
+    doThrow(new CourseException(CourseErrorCode.NOT_FOUND))
+        .when(courseFacade)
+        .cancelCourseScrap(999, "member-1");
+
+    // when
+    ResultActions result =
+        mvc.perform(
+            delete("/api/v1/courses/999/scrap")
+                .principal(new UsernamePasswordAuthenticationToken("member-1", null, List.of())));
+
+    // then
+    result
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("COURSE_NOT_FOUND"));
+    verify(courseFacade).cancelCourseScrap(999, "member-1");
   }
 
   @Test

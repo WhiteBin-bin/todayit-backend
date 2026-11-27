@@ -15,7 +15,12 @@ import java.util.List;
 @Schema(description = "코스 장소 순서 변경 요청")
 public record UpdateCoursePlaceOrdersRequest(
     @Schema(
-            description = "새로운 방문 순서대로 나열된 코스 장소 식별자 목록입니다. 코스의 모든 장소 식별자를 중복 없이 포함해야 합니다.",
+            description =
+                """
+                새로운 방문 순서대로 나열된 코스 장소 식별자 목록입니다.
+
+                - 현재 코스에 포함된 모든 코스 장소 식별자(`coursePlaceId`)를 중복 없이 포함해야 합니다.
+                """,
             example = "[3, 1, 2]",
             requiredMode = Schema.RequiredMode.REQUIRED)
         @NotNull(message = "코스 장소 식별자 목록은 필수입니다.")

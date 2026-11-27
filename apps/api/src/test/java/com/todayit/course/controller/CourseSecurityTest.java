@@ -161,6 +161,34 @@ class CourseSecurityTest {
   }
 
   @Test
+  @DisplayName("코스 스크랩은 비회원 요청을 거부한다")
+  void rejectsAnonymousCourseScrap() throws Exception {
+    // given
+    String path = "/api/v1/courses/1/scrap";
+
+    // when
+    ResultActions result = mvc.perform(post(path));
+
+    // then
+    result.andExpect(status().isUnauthorized());
+    verifyNoInteractions(facade);
+  }
+
+  @Test
+  @DisplayName("코스 스크랩 취소는 비회원 요청을 거부한다")
+  void rejectsAnonymousCourseScrapCancel() throws Exception {
+    // given
+    String path = "/api/v1/courses/1/scrap";
+
+    // when
+    ResultActions result = mvc.perform(delete(path));
+
+    // then
+    result.andExpect(status().isUnauthorized());
+    verifyNoInteractions(facade);
+  }
+
+  @Test
   @DisplayName("코스 생성 조건 수정은 비회원 요청을 거부한다")
   void rejectsAnonymousCourseConditionsUpdate() throws Exception {
     // given

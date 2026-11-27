@@ -13,9 +13,30 @@ import java.util.List;
  */
 @Schema(description = "시·도 및 시·군·구 계층 지역 응답")
 public record RegionResponse(
-    @Schema(description = "시·도 법정동 코드 (2자리)", example = "11") String sidoCode,
-    @Schema(description = "시·도 명칭", example = "서울특별시") String sidoName,
-    @Schema(description = "하위 시·군·구 목록") List<SigunguResponse> sigungus) {
+    @Schema(
+            description =
+                """
+                시·도 법정동 코드입니다.
+
+                - 2자리 숫자 문자열입니다. (예: `11` 서울특별시, `41` 경기도)
+                """,
+            example = "11",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        String sidoCode,
+    @Schema(
+            description = "시·도 명칭입니다.",
+            example = "서울특별시",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        String sidoName,
+    @Schema(
+            description =
+                """
+                해당 시·도에 속한 시·군·구 목록입니다.
+
+                - 끝자리가 `0`인 3자리 시·군·구 코드 기준 오름차순으로 정렬됩니다.
+                """,
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        List<SigunguResponse> sigungus) {
 
   /**
    * 시·군·구 목록을 방어적으로 복사하여 초기화합니다.
