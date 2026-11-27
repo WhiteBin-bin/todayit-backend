@@ -284,6 +284,8 @@ public interface CourseApiDocs {
                         "courseId": 1,
                         "title": "데이트 코스",
                         "courseSummary": "종로구 일대를 둘러보는 여유로운 코스입니다.",
+                        "authorDisplayName": "오잇러버",
+                        "authorProfileImageUrl": "https://example.com/profile.jpg",
                         "transport": "CAR",
                         "startAt": "2026-11-20T10:00:00",
                         "endAt": "2026-11-20T18:00:00",
@@ -360,6 +362,7 @@ public interface CourseApiDocs {
   @Operation(
       summary = "코스 장소 추가",
       description = "코스에 새로운 장소를 추가합니다. 동일한 장소는 코스에 최대 2회까지만 추가할 수 있습니다.",
+      deprecated = true,
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
   @ApiResponses({
     @ApiResponse(
@@ -526,6 +529,7 @@ public interface CourseApiDocs {
   @Operation(
       summary = "코스 장소 순서 일괄 변경",
       description = "코스 내 장소들의 방문 순서를 전달받은 식별자 순서대로 일괄 변경합니다.",
+      deprecated = true,
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
   @ApiResponses({
     @ApiResponse(
@@ -640,6 +644,7 @@ public interface CourseApiDocs {
   @Operation(
       summary = "코스 장소 삭제",
       description = "코스 내 특정 장소를 삭제하고 남은 장소들의 순서를 재조정합니다.",
+      deprecated = true,
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
   @ApiResponses({
     @ApiResponse(
@@ -1202,6 +1207,7 @@ public interface CourseApiDocs {
   @Operation(
       summary = "코스 이동수단 변경",
       description = "임시저장(DRAFT) 코스의 이동수단을 변경합니다. 확정된 코스는 이동수단을 변경할 수 없습니다.",
+      deprecated = true,
       security = @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH))
   @ApiResponses({
     @ApiResponse(

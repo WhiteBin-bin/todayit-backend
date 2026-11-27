@@ -12,6 +12,8 @@ import java.util.List;
  * @param courseId 코스 식별자
  * @param title 코스명
  * @param courseSummary 코스 요약
+ * @param authorDisplayName 작성자 공개 표시명
+ * @param authorProfileImageUrl 공개 표시 가능한 작성자 프로필 이미지 URL, 없으면 null
  * @param transport 이동수단
  * @param startAt 코스 시작 일시
  * @param endAt 코스 종료 일시, 없으면 null
@@ -35,6 +37,8 @@ public record CourseDetailResult(
     int courseId,
     String title,
     String courseSummary,
+    String authorDisplayName,
+    String authorProfileImageUrl,
     CourseTransport transport,
     LocalDateTime startAt,
     LocalDateTime endAt,
@@ -60,6 +64,8 @@ public record CourseDetailResult(
    * @param courseId 코스 식별자
    * @param title 코스명
    * @param courseSummary 코스 요약
+   * @param authorDisplayName 작성자 공개 표시명
+   * @param authorProfileImageUrl 작성자 프로필 이미지 URL
    * @param transport 이동수단
    * @param startAt 코스 시작 일시
    * @param endAt 코스 종료 일시

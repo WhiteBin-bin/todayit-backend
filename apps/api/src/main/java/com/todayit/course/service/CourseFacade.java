@@ -17,6 +17,7 @@ import com.todayit.course.service.command.UpdateCoursePlaceOrdersCommand;
 import com.todayit.course.service.model.AddCoursePlaceEntities;
 import com.todayit.course.service.model.AddCoursePlaceResult;
 import com.todayit.course.service.model.CopyCourseResult;
+import com.todayit.course.service.model.CourseAuthorProfile;
 import com.todayit.course.service.model.CourseCardResult;
 import com.todayit.course.service.model.CourseConditionsResult;
 import com.todayit.course.service.model.CourseDetailResult;
@@ -61,27 +62,31 @@ public class CourseFacade implements MemberCourseQueryService {
   private final CourseQueryService courseQueryService;
   private final PlaceCourseQueryService placeCourseQueryService;
   private final CourseReactionQueryService courseReactionQueryService;
+  private final MemberCourseAuthorQueryService memberCourseAuthorQueryService;
 
   /**
-   * 지역 조회, 코스 저장·조회, 장소 조회 및 반응 조회 서비스를 받습니다.
+   * 지역 조회, 코스 저장·조회, 장소 조회, 반응 조회 및 작성자 조회 서비스를 받습니다.
    *
    * @param regionQueryService 지역 검증 서비스
    * @param courseCommandService 코스 저장 서비스
    * @param courseQueryService 코스 조회 서비스
-   * @param courseReactionQueryService 코스 반응 조회 서비스
    * @param placeCourseQueryService 장소 조회 서비스
+   * @param courseReactionQueryService 코스 반응 조회 서비스
+   * @param memberCourseAuthorQueryService 코스 작성자 프로필 조회 서비스
    */
   public CourseFacade(
       RegionQueryService regionQueryService,
       CourseCommandService courseCommandService,
       CourseQueryService courseQueryService,
       PlaceCourseQueryService placeCourseQueryService,
-      CourseReactionQueryService courseReactionQueryService) {
+      CourseReactionQueryService courseReactionQueryService,
+      MemberCourseAuthorQueryService memberCourseAuthorQueryService) {
     this.regionQueryService = regionQueryService;
     this.courseCommandService = courseCommandService;
     this.courseQueryService = courseQueryService;
     this.placeCourseQueryService = placeCourseQueryService;
     this.courseReactionQueryService = courseReactionQueryService;
+    this.memberCourseAuthorQueryService = memberCourseAuthorQueryService;
   }
 
   /**
@@ -383,6 +388,9 @@ public class CourseFacade implements MemberCourseQueryService {
       throw new CourseException(CourseErrorCode.NOT_FOUND);
     }
 
+    CourseAuthorProfile authorProfile =
+        memberCourseAuthorQueryService.getAuthorProfile(course.getMemberId());
+
     List<Integer> regionIds = course.getRegions().stream().map(RegionCourse::getRegionId).toList();
     RegionSummaryResult regionSummary = regionQueryService.getRegionSummary(regionIds);
     String sidoCode = regionSummary != null ? regionSummary.sidoCode() : null;
@@ -406,6 +414,8 @@ public class CourseFacade implements MemberCourseQueryService {
         course.getCourseId(),
         course.getTitle(),
         course.getCourseSummary(),
+        authorProfile.displayName(),
+        authorProfile.profileImageUrl(),
         course.getTransport(),
         course.getStartAt(),
         course.getEndAt(),
@@ -519,9 +529,7 @@ public class CourseFacade implements MemberCourseQueryService {
                       course.getRegions().stream().map(RegionCourse::getRegionId).toList();
                   RegionSummaryResult regionSummary =
                       regionQueryService.getRegionSummary(regionIds);
-                  String sidoCode = regionSummary != null ? regionSummary.sidoCode() : null;
                   String sidoName = regionSummary != null ? regionSummary.sidoName() : null;
-                  String sigunguCode = regionSummary != null ? regionSummary.sigunguCode() : null;
                   String sigunguName = regionSummary != null ? regionSummary.sigunguName() : null;
 
                   Integer firstPlaceId =

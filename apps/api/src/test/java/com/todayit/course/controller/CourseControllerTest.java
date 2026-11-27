@@ -442,6 +442,8 @@ class CourseControllerTest {
             1,
             "종로 데이트 코스",
             "종로 감성 카페 투어",
+            "오잇러버",
+            "https://example.com/profile.jpg",
             CourseTransport.WALKING,
             LocalDateTime.of(2026, 12, 1, 10, 0),
             LocalDateTime.of(2026, 12, 1, 18, 0),
@@ -475,6 +477,9 @@ class CourseControllerTest {
         .andExpect(jsonPath("$.data.courseId").value(1))
         .andExpect(jsonPath("$.data.title").value("종로 데이트 코스"))
         .andExpect(jsonPath("$.data.courseSummary").value("종로 감성 카페 투어"))
+        .andExpect(jsonPath("$.data.authorDisplayName").value("오잇러버"))
+        .andExpect(
+            jsonPath("$.data.authorProfileImageUrl").value("https://example.com/profile.jpg"))
         .andExpect(jsonPath("$.data.transport").value("WALKING"))
         .andExpect(jsonPath("$.data.status").value("DRAFT"))
         .andExpect(jsonPath("$.data.visibility").value("PRIVATE"))
@@ -506,6 +511,8 @@ class CourseControllerTest {
             1,
             "종로 공개 코스",
             null,
+            "ToDayIt",
+            null,
             CourseTransport.WALKING,
             LocalDateTime.of(2026, 12, 1, 10, 0),
             null,
@@ -534,6 +541,8 @@ class CourseControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.courseId").value(1))
+        .andExpect(jsonPath("$.data.authorDisplayName").value("ToDayIt"))
+        .andExpect(jsonPath("$.data.authorProfileImageUrl").doesNotExist())
         .andExpect(jsonPath("$.data.isWriter").value(false))
         .andExpect(jsonPath("$.data.liked").value(false))
         .andExpect(jsonPath("$.data.scrapped").value(false))

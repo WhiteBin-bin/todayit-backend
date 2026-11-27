@@ -27,6 +27,7 @@ import com.todayit.course.service.command.UpdateCoursePlaceOrdersCommand;
 import com.todayit.course.service.model.AddCoursePlaceEntities;
 import com.todayit.course.service.model.AddCoursePlaceResult;
 import com.todayit.course.service.model.CopyCourseResult;
+import com.todayit.course.service.model.CourseAuthorProfile;
 import com.todayit.course.service.model.CourseCardResult;
 import com.todayit.course.service.model.CourseDetailResult;
 import com.todayit.course.service.model.CourseDurationFilter;
@@ -66,6 +67,7 @@ class CourseFacadeTest {
   @Mock private CourseQueryService courseQueryService;
   @Mock private PlaceCourseQueryService placeCourseQueryService;
   @Mock private CourseReactionQueryService courseReactionQueryService;
+  @Mock private MemberCourseAuthorQueryService memberCourseAuthorQueryService;
 
   @InjectMocks private CourseFacade facade;
 
@@ -282,12 +284,16 @@ class CourseFacadeTest {
     when(placeCourseQueryService.findPlacesByIds(List.of(10))).thenReturn(Map.of(10, placeItem));
     when(courseReactionQueryService.isLiked("member-1", 1)).thenReturn(true);
     when(courseReactionQueryService.isScrapped("member-1", 1)).thenReturn(false);
+    when(memberCourseAuthorQueryService.getAuthorProfile("member-1"))
+        .thenReturn(new CourseAuthorProfile("오잇러버", "https://example.com/profile.jpg"));
 
     // when
     CourseDetailResult result = facade.getCourseDetail(1, "member-1");
 
     // then
     assertThat(result.title()).isEqualTo("코스");
+    assertThat(result.authorDisplayName()).isEqualTo("오잇러버");
+    assertThat(result.authorProfileImageUrl()).isEqualTo("https://example.com/profile.jpg");
     assertThat(result.sidoName()).isEqualTo("서울특별시");
     assertThat(result.sigunguName()).isEqualTo("종로구");
     assertThat(result.isWriter()).isTrue();
@@ -315,12 +321,16 @@ class CourseFacadeTest {
 
     when(courseQueryService.getCourse(1)).thenReturn(course);
     when(regions.getRegionSummary(List.of())).thenReturn(null);
+    when(memberCourseAuthorQueryService.getAuthorProfile("member-1"))
+        .thenReturn(CourseAuthorProfile.inactive());
 
     // when
     CourseDetailResult result = facade.getCourseDetail(1, "member-1");
 
     // then
     assertThat(result.title()).isEqualTo("지역 없는 코스");
+    assertThat(result.authorDisplayName()).isEqualTo("ToDayIt");
+    assertThat(result.authorProfileImageUrl()).isNull();
     assertThat(result.sidoCode()).isNull();
     assertThat(result.sidoName()).isNull();
     assertThat(result.sigunguCode()).isNull();

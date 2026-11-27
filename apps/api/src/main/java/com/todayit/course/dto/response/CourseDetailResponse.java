@@ -14,6 +14,8 @@ import java.util.List;
  * @param courseId 코스 식별자
  * @param title 코스 이름, 없으면 null
  * @param courseSummary 코스 요약 설명, 없으면 null
+ * @param authorDisplayName 작성자 공개 표시명
+ * @param authorProfileImageUrl 공개 표시 가능한 작성자 프로필 이미지 URL, 없으면 null
  * @param transport 이동 수단, 없으면 null
  * @param startAt 코스 시작 일시, 없으면 null
  * @param endAt 코스 종료 일시, 없으면 null
@@ -47,6 +49,16 @@ public record CourseDetailResponse(
             example = "카페와 산책을 즐기는 코스",
             nullable = true)
         String courseSummary,
+    @Schema(
+            description = "작성자 공개 표시명입니다. 활성 작성자는 현재 닉네임, 탈퇴·제재된 작성자의 유지 코스는 ToDayIt을 반환합니다.",
+            example = "오잇러버",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+        String authorDisplayName,
+    @Schema(
+            description = "공개 표시 가능한 작성자 프로필 이미지 URL입니다. 이미지가 미등록·삭제됐거나 공개 대상이 아니면 null을 반환합니다.",
+            example = "https://example.com/profile.jpg",
+            nullable = true)
+        String authorProfileImageUrl,
     @Schema(
             description = "코스의 이동 수단입니다. 임시저장 코스는 미설정 시 null입니다.",
             example = "WALKING",
@@ -132,6 +144,8 @@ public record CourseDetailResponse(
    * @param courseId 코스 식별자
    * @param title 코스 이름
    * @param courseSummary 코스 요약 설명
+   * @param authorDisplayName 작성자 공개 표시명
+   * @param authorProfileImageUrl 작성자 프로필 이미지 URL
    * @param transport 이동 수단
    * @param startAt 코스 시작 일시
    * @param endAt 코스 종료 일시
@@ -168,6 +182,8 @@ public record CourseDetailResponse(
         result.courseId(),
         result.title(),
         result.courseSummary(),
+        result.authorDisplayName(),
+        result.authorProfileImageUrl(),
         result.transport(),
         result.startAt(),
         result.endAt(),
